@@ -50,22 +50,17 @@ async def initialize_providers() -> List[LLMProvider]:
         if api_keys:
             # Provider 1: Cerebras Primary
             providers.append(CerebrasProvider(
-                api_key=api_keys[0], 
+                api_keys=api_keys, 
                 model="gpt-oss-120b"
             ))
             
             # Provider 2: Secondary Cerebras model if available
-            if len(api_keys) > 1:
-                 providers.append(CerebrasProvider(
-                    api_key=api_keys[1], 
-                    model="zai-glm-4.6" 
-                ))
-            else:
-                 # Reuse key if only one
-                 providers.append(CerebrasProvider(
-                    api_key=api_keys[0], 
-                    model="llama3.1-70b" 
-                ))
+            # We pass the same list of keys; they will be rotated independently (or we could share the iterator if we wanted strict global rotation)
+            # Since we want to maximize throughput, passing the full list is good.
+            providers.append(CerebrasProvider(
+                api_keys=api_keys, 
+                model="zai-glm-4.6" 
+            ))
     except Exception as e:
         print(f"Warning: Could not load Cerebras API keys: {e}")
 
