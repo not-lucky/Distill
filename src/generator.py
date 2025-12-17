@@ -1,0 +1,50 @@
+import asyncio
+import json
+from typing import List, Dict, Optional
+from src.models import LeetCodeProblem
+from src.providers.base import LLMProvider
+from src.utils import save_archival
+
+class CardGenerator:
+    def __init__(self, providers: List[LLMProvider], combiner: LLMProvider):
+        self.providers = providers
+        self.combiner = combiner
+
+    async def process_question(self, question: str) -> Optional[Dict]:
+        print(f"Processing '{question}'...")
+        
+        # 1. Generate Initial Cards (Parallel)
+        tasks = []
+        schema = LeetCodeProblem.model_json_schema()
+        
+        for provider in self.providers:
+            tasks.append(provider.generate_initial_cards(question, schema))
+        
+        results = await asyncio.gather(*tasks)
+        
+        valid_results = [r for r in results if r]
+        
+        if not valid_results:
+            print(f"  [Error] All providers failed for '{question}'. Skipping.")
+            return None
+
+        # 2. Combine Cards
+        inputs = ""
+        for i, res in enumerate(valid_results):
+            inputs += f"Set {i+1}:\n{res}\n\n"
+            
+        final_data = await self.combiner.combine_cards(question, inputs, schema)
+        
+        if final_data:
+            # Post-process tags/types
+            for card in final_data.get('cards', []):
+                if 'tags' in card:
+                    card['tags'] = [tag.replace(' ', '') for tag in card['tags']]
+                if 'card_type' in card:
+                    card['card_type'] = card['card_type'].replace(' ', '')
+
+            save_archival(question, final_data)
+            return final_data
+        else:
+            print(f"  [Error] Failed to generate final JSON for '{question}'.")
+            return None
