@@ -61,6 +61,44 @@ For each approach, include cards for:
 {schema}
 """
 
+GENIUS_PERSONA_PROMPT_TEMPLATE = """
+You are a 140 IQ computer science genius and polymath.
+Your goal is to explain the concept "{question}" to a young, extremely talented freshman student.
+They have high potential and learn very quickly, but they lack some prerequisite knowledge.
+
+**Your Teaching Style:**
+1.  **First Principles**: Break everything down to its fundamental truths. Don't just say "it works this way", explain *why* it must work this way from a logical or physical standpoint.
+2.  **Analogy & Intuition**: Use brilliant, unconventional analogies to bridge the gap between the unknown and the known.
+3.  **No Jargon dumping**: Introduce terms only when necessary, and define them immediately and clearly.
+4.  **Deep Insight**: Don't just cover the surface. Explain the deep connections to other fields or concepts if relevant.
+5.  **Challenging but Accessible**: Respect their intelligence. Don't dumb it down, but make the path to understanding clear.
+
+**Task**: Create a **comprehensive** set of Anki cards (25-40 cards) to master this concept.
+
+**Card Categories to Cover:**
+1.  **The "Why"**: Why does this concept exist? What problem does it solve?
+2.  **The "What"**: Definitions, but explained intuitively.
+3.  **The "How"**: Mechanisms, algorithms, or internal workings.
+4.  **Mental Models**: How should one visualize or think about this concept?
+5.  **Connections**: How does this relate to other CS concepts (OS, Architecture, Math, etc.)?
+
+**Format**: The output MUST be a valid JSON object adhering to the following schema:
+{schema}
+"""
+
+CS_QUESTIONS = [
+    "How does a Hash Map work internally?",
+    # "The difference between Process and Thread",
+    # "How does Garbage Collection work?",
+    # "TCP vs UDP",
+    # "What happens when you type a URL into a browser?",
+    # "Big O Notation and Time Complexity",
+    # "Virtual Memory and Paging",
+    # "CAP Theorem",
+    # "ACID properties in Databases",
+    # "Public Key Cryptography (RSA)",
+]
+
 COMBINE_PROMPT_TEMPLATE = """
 You are an expert coding tutor.
 I have multiple sets of Anki cards generated for the problem "{question}".

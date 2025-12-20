@@ -53,11 +53,14 @@ class CerebrasProvider(LLMProvider):
             
         return None
 
-    async def generate_initial_cards(self, question: str, schema: Dict[str, Any]) -> str:
+    async def generate_initial_cards(self, question: str, schema: Dict[str, Any], prompt_template: Optional[str] = None) -> str:
         print(f"  [Cerebras:{self.model}] Generating initial cards for '{question}'...")
+        
+        template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
+        
         messages = [
             {"role": "system", "content": "You are a helpful assistant that generates Anki cards in JSON format."},
-            {"role": "user", "content": INITIAL_PROMPT_TEMPLATE.format(
+            {"role": "user", "content": template.format(
                 question=question,
                 schema=json.dumps(schema, indent=2)
             )},

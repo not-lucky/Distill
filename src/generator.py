@@ -10,7 +10,7 @@ class CardGenerator:
         self.providers = providers
         self.combiner = combiner
 
-    async def process_question(self, question: str) -> Optional[Dict]:
+    async def process_question(self, question: str, prompt_template: Optional[str] = None) -> Optional[Dict]:
         print(f"Processing '{question}'...")
         
         # 1. Generate Initial Cards (Parallel)
@@ -18,7 +18,7 @@ class CardGenerator:
         schema = LeetCodeProblem.model_json_schema()
         
         for provider in self.providers:
-            tasks.append(provider.generate_initial_cards(question, schema))
+            tasks.append(provider.generate_initial_cards(question, schema, prompt_template))
         
         results = await asyncio.gather(*tasks)
         

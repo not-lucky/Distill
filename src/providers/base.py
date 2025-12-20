@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 
 class LLMProvider(ABC):
     @abstractmethod
-    async def generate_initial_cards(self, question: str, schema: Dict[str, Any]) -> str:
+    async def generate_initial_cards(self, question: str, schema: Dict[str, Any], prompt_template: Optional[str] = None) -> str:
         """Generates initial cards for a given question."""
         pass
 

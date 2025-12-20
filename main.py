@@ -1,13 +1,24 @@
 import asyncio
 from dotenv import load_dotenv
 
-from src.config import QUESTIONS, CONCURRENT_REQUESTS
+import sys
+from src.config import QUESTIONS, CS_QUESTIONS, CONCURRENT_REQUESTS, GENIUS_PERSONA_PROMPT_TEMPLATE
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.utils import save_final_deck
 
 async def main():
     load_dotenv()
+    
+    # Mode Selection
+    mode = "leetcode"
+    if len(sys.argv) > 1 and sys.argv[1] == "cs":
+        mode = "cs"
+        
+    print(f"Running in {mode.upper()} mode.")
+    
+    target_questions = CS_QUESTIONS if mode == "cs" else QUESTIONS
+    prompt_template = GENIUS_PERSONA_PROMPT_TEMPLATE if mode == "cs" else None
     
     # Initialize Providers
     providers = await initialize_providers()
@@ -26,12 +37,12 @@ async def main():
 
     async def sem_task(question):
         async with semaphore:
-            result = await generator.process_question(question)
+            result = await generator.process_question(question, prompt_template)
             if result:
                 all_problems.append(result)
 
-    print(f"Starting generation for {len(QUESTIONS)} questions...")
-    tasks = [sem_task(q) for q in QUESTIONS]
+    print(f"Starting generation for {len(target_questions)} questions...")
+    tasks = [sem_task(q) for q in target_questions]
     await asyncio.gather(*tasks)
 
     # Save Results
