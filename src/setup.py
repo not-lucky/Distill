@@ -3,23 +3,41 @@ import os
 from random import shuffle
 from typing import List
 from gemini_webapi import GeminiClient
-from src.config import API_KEYS_FILE, GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI
+from src.config import CEREBRAS_KEYS_FILE_PATH, OPENROUTER_KEYS_FILE, GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI
 from src.providers.base import LLMProvider
 from src.providers.cerebras import CerebrasProvider
 from src.providers.gemini import GeminiProvider
+from src.providers.openrouter import OpenRouterProvider
 
-async def load_api_keys() -> List[str]:
-    if not API_KEYS_FILE.exists():
-        raise FileNotFoundError(f"API keys file not found: {API_KEYS_FILE}")
+async def load_cerebras_keys() -> List[str]:
+    if not CEREBRAS_KEYS_FILE_PATH.exists():
+        print(f"Warning: Cerebras API keys file not found: {CEREBRAS_KEYS_FILE_PATH}")
+        return []
     
-    with open(API_KEYS_FILE, "r") as f:
+    with open(CEREBRAS_KEYS_FILE_PATH, "r") as f:
         keys_data = json.load(f)
         
     api_keys = [item["api_key"] for item in keys_data if "api_key" in item]
     if not api_keys:
-        raise ValueError("No API keys found in the file.")
+        print("Warning: No Cerebras API keys found in the file.")
+        return []
     
-    # Shuffle the API keys to randomize the order
+    shuffle(api_keys)
+    return api_keys
+
+async def load_openrouter_keys() -> List[str]:
+    if not OPENROUTER_KEYS_FILE.exists():
+        print(f"Warning: OpenRouter API keys file not found: {OPENROUTER_KEYS_FILE}")
+        return []
+    
+    with open(OPENROUTER_KEYS_FILE, "r") as f:
+        keys_data = json.load(f)
+        
+    api_keys = [item["data"]["key"] for item in keys_data if "data" in item and "key" in item.get("data", {})]
+    if not api_keys:
+        print("Warning: No OpenRouter API keys found in the file.")
+        return []
+    
     shuffle(api_keys)
     return api_keys
 
@@ -44,25 +62,32 @@ async def initialize_providers() -> List[LLMProvider]:
     """Initializes and returns a list of configured LLM providers."""
     providers = []
     
-    # 1. Load API Keys for Cerebras
+    # 1. Load Cerebras Keys
     try:
-        api_keys = await load_api_keys()
-        if api_keys:
-            # Provider 1: Cerebras Primary
+        cerebras_keys = await load_cerebras_keys()
+        if cerebras_keys:
             providers.append(CerebrasProvider(
-                api_keys=api_keys, 
+                api_keys=cerebras_keys, 
                 model="gpt-oss-120b"
             ))
-            
-            # Provider 2: Secondary Cerebras model if available
-            # We pass the same list of keys; they will be rotated independently (or we could share the iterator if we wanted strict global rotation)
-            # Since we want to maximize throughput, passing the full list is good.
             providers.append(CerebrasProvider(
-                api_keys=api_keys, 
+                api_keys=cerebras_keys, 
                 model="zai-glm-4.6" 
             ))
     except Exception as e:
-        print(f"Warning: Could not load Cerebras API keys: {e}")
+        print(f"Warning: Error loading Cerebras providers: {e}")
+
+    # 2. Load OpenRouter Keys
+    try:
+        openrouter_keys = await load_openrouter_keys()
+        if openrouter_keys:
+            or_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
+            providers.append(OpenRouterProvider(
+                api_keys=openrouter_keys,
+                model=or_model
+            ))
+    except Exception as e:
+        print(f"Warning: Error loading OpenRouter providers: {e}")
 
     # 2. Initialize Gemini Providers
     if ENABLE_GEMINI:

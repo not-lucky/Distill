@@ -7,7 +7,8 @@ load_dotenv()
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 ARCHIVAL_DIR = BASE_DIR / "anki_cards_archival"
-API_KEYS_FILE = Path(os.getenv("API_KEYS_FILE_PATH", "api_keys.json"))
+CEREBRAS_KEYS_FILE_PATH = Path(os.getenv("CEREBRAS_KEYS_FILE_PATH", "api_keys.json"))
+OPENROUTER_KEYS_FILE = Path(os.getenv("OPENROUTER_KEYS_FILE_PATH", "openrouter_keys.json"))
 GEMINI_CREDENTIALS_FILE = Path(os.getenv("GEMINI_CREDENTIALS_FILE_PATH", "python3ds.json"))
 
 # Configuration
@@ -16,15 +17,32 @@ ENABLE_GEMINI = os.getenv("ENABLE_GEMINI", "False").lower() == "true"
 
 # Questions
 QUESTIONS = [
-    "Lowest Common Ancestor of a Binary Search Tree",
-    "Binary Tree Level Order Traversal",
-    "Binary Tree Right Side View",
-    "Count Good Nodes In Binary Tree",
-    "Validate Binary Search Tree",
-    "Kth Smallest Element In a Bst",
-    "Construct Binary Tree From Preorder And Inorder Traversal",
-    "Binary Tree Maximum Path Sum",
-    "Serialize And Deserialize Binary Tree",
+"Contains Duplicate",
+"Valid Anagram",
+"Two Sum",
+"Group Anagrams",
+"Top K Frequent Elements",
+"Encode and Decode Strings",
+"Product of Array Except Self",
+"Valid Sudoku",
+"Longest Consecutive Sequence",
+"Valid Palindrome",
+"Two Sum II Input Array Is Sorted",
+"3Sum",
+"Container With Most Water",
+"Trapping Rain Water",
+"Best Time to Buy And Sell Stock",
+"Longest Substring Without Repeating Characters",
+"Longest Repeating Character Replacement",
+"Permutation In String",
+"Minimum Window Substring",
+"Sliding Window Maximum",
+"Valid Parentheses",
+"Min Stack",
+"Evaluate Reverse Polish Notation",
+"Daily Temperatures",
+"Car Fleet",
+"Largest Rectangle In Histogram",
 ]
 
 # Prompts
