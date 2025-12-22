@@ -11,14 +11,16 @@ from typing import List, Dict, Any
 import markdown
 
 class AnkiDeckGenerator:
-    def __init__(self, json_file_path: str):
+    def __init__(self, json_file_path: str, mode: str = "leetcode"):
         """
         Initialize the Anki deck generator with a JSON file path.
         
         Args:
             json_file_path: Path to the JSON file containing card data
+            mode: Generation mode ('leetcode' or 'cs')
         """
         self.json_file_path = json_file_path
+        self.mode = mode
         self.decks = {}
         self.models = {}
         self.load_data()
@@ -429,8 +431,9 @@ class AnkiDeckGenerator:
             topic = problem_data['topic']
             difficulty = problem_data['difficulty']
             
-            # Create hierarchical deck structure: LeetCode::Topic::Title
-            deck_path = f"LeetCode::{topic}::{title}"
+            # Create hierarchical deck structure: Mode::Topic::Title
+            prefix = "CS" if self.mode == "cs" else "LeetCode"
+            deck_path = f"{prefix}::{topic}::{title}"
             deck = self.get_or_create_deck(deck_path)
             
             # Process each card in the deck
@@ -528,16 +531,27 @@ def main():
         help='Validate JSON schema before processing'
     )
     
+    parser.add_argument(
+        '--mode',
+        choices=['leetcode', 'cs'],
+        default='leetcode',
+        help='Generation mode (default: leetcode)'
+    )
+    
     args = parser.parse_args()
     
     # Check if input file exists
     if not Path(args.input_file).exists():
         print(f"❌ Error: Input file '{args.input_file}' not found!")
         return 1
+        
+    # Set default output filename if not provided
+    if args.output == 'leetcode_anki.apkg' and args.mode == 'cs':
+        args.output = 'cs_anki.apkg'
     
     try:
         # Create generator and process
-        generator = AnkiDeckGenerator(args.input_file)
+        generator = AnkiDeckGenerator(args.input_file, args.mode)
         
         # Optional: Validate data structure
         if args.validate:

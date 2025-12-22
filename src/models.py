@@ -14,3 +14,10 @@ class LeetCodeProblem(BaseModel):
     topic: str = Field(..., description="Main topic (e.g., 'Arrays', 'Linked Lists')")
     difficulty: str = Field(..., description="Difficulty level (Easy, Medium, Hard)")
     cards: List[AnkiCard]
+
+class CSProblem(BaseModel):
+    model_config = {'extra': 'forbid'}
+    title: str = Field(..., description="Title of the CS Concept")
+    topic: str = Field(..., description="Main topic (e.g., 'Operating Systems', 'Networking')")
+    difficulty: str = Field(..., description="Difficulty level (Basic, Intermediate, Advanced)")
+    cards: List[AnkiCard]

@@ -1,6 +1,7 @@
 import asyncio
 import json
 from typing import List, Dict, Optional
+from pydantic import BaseModel
 from src.models import LeetCodeProblem
 from src.providers.base import LLMProvider
 from src.utils import save_archival
@@ -10,12 +11,12 @@ class CardGenerator:
         self.providers = providers
         self.combiner = combiner
 
-    async def process_question(self, question: str, prompt_template: Optional[str] = None) -> Optional[Dict]:
+    async def process_question(self, question: str, prompt_template: Optional[str] = None, model_class: BaseModel = LeetCodeProblem) -> Optional[Dict]:
         print(f"Processing '{question}'...")
         
         # 1. Generate Initial Cards (Parallel)
         tasks = []
-        schema = LeetCodeProblem.model_json_schema()
+        schema = model_class.model_json_schema()
         
         for provider in self.providers:
             tasks.append(provider.generate_initial_cards(question, schema, prompt_template))

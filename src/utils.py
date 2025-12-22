@@ -22,9 +22,9 @@ def save_archival(question: str, data: Dict):
         json.dump(data, f, indent=2)
     print(f"  [Save] Archived to {filepath}")
 
-def save_final_deck(all_problems: List[Dict]):
+def save_final_deck(all_problems: List[Dict], filename_prefix: str = "leetcode_anki_deck"):
     timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
-    filename = f"leetcode_anki_deck_{timestamp}.json"
+    filename = f"{filename_prefix}_{timestamp}.json"
     
     with open(filename, "w") as f:
         json.dump(all_problems, f, indent=2)
