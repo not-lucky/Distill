@@ -522,8 +522,8 @@ def main():
     )
     parser.add_argument(
         '-o', '--output',
-        default='leetcode_anki.apkg',
-        help='Output file name (default: leetcode_anki.apkg)'
+        default=None,
+        help='Output file name (default: leetcode_anki.apkg or cs_anki.apkg based on mode)'
     )
     parser.add_argument(
         '--validate',
@@ -534,8 +534,8 @@ def main():
     parser.add_argument(
         '--mode',
         choices=['leetcode', 'cs'],
-        default='leetcode',
-        help='Generation mode (default: leetcode)'
+        default=None,
+        help='Generation mode (default: inferred from filename or leetcode)'
     )
     
     args = parser.parse_args()
@@ -545,9 +545,16 @@ def main():
         print(f"❌ Error: Input file '{args.input_file}' not found!")
         return 1
         
+    # Infer mode if not provided
+    if args.mode is None:
+        if "cs" in Path(args.input_file).name.lower() or "cs_" in Path(args.input_file).name.lower():
+            args.mode = 'cs'
+        else:
+            args.mode = 'leetcode'
+            
     # Set default output filename if not provided
-    if args.output == 'leetcode_anki.apkg' and args.mode == 'cs':
-        args.output = 'cs_anki.apkg'
+    if args.output is None:
+        args.output = 'cs_anki.apkg' if args.mode == 'cs' else 'leetcode_anki.apkg'
     
     try:
         # Create generator and process
