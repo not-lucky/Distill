@@ -2,7 +2,9 @@ import asyncio
 from dotenv import load_dotenv
 
 import sys
-from src.config import QUESTIONS, CS_QUESTIONS, CONCURRENT_REQUESTS, GENIUS_PERSONA_PROMPT_TEMPLATE
+from src.config import CONCURRENT_REQUESTS
+from src.questions import QUESTIONS, CS_QUESTIONS
+from src.prompts import GENIUS_PERSONA_PROMPT_TEMPLATE
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.utils import save_final_deck

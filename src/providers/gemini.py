@@ -3,16 +3,17 @@ from typing import Dict, Any, Optional
 from gemini_webapi import GeminiClient
 from gemini_webapi.constants import Model
 from src.providers.base import LLMProvider
-from src.config import INITIAL_PROMPT_TEMPLATE
+from src.prompts import INITIAL_PROMPT_TEMPLATE
 
 class GeminiProvider(LLMProvider):
     def __init__(self, client: GeminiClient):
         self.client = client
 
-    async def generate_initial_cards(self, question: str, schema: Dict[str, Any]) -> str:
+    async def generate_initial_cards(self, question: str, schema: Dict[str, Any], prompt_template: Optional[str] = None) -> str:
         print(f"  [Gemini] Generating initial cards for '{question}'...")
         try:
-            prompt = INITIAL_PROMPT_TEMPLATE.format(
+            template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
+            prompt = template.format(
                 question=question,
                 schema=json.dumps(schema, indent=2)
             )

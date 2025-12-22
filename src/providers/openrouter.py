@@ -4,7 +4,7 @@ import itertools
 from typing import Dict, Any, Optional, List
 from openai import AsyncOpenAI
 from src.providers.base import LLMProvider
-from src.config import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
 
 class OpenRouterProvider(LLMProvider):
     def __init__(self, api_keys: List[str], model: str):
