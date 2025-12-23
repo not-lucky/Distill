@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 import markdown
+import bleach
 
 class AnkiDeckGenerator:
     def __init__(self, json_file_path: str, mode: str = "leetcode"):
@@ -73,7 +74,26 @@ class AnkiDeckGenerator:
             }
         )
         
-        return html_content
+        # Sanitize HTML to escape invalid tags (like <target) while preserving valid ones
+        allowed_tags = [
+            'a', 'b', 'blockquote', 'br', 'code', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
+            'hr', 'i', 'li', 'ol', 'p', 'pre', 'span', 'strong', 'table', 'tbody', 'td', 'th', 
+            'thead', 'tr', 'ul'
+        ]
+        allowed_attrs = {
+            '*': ['class', 'style'],
+            'a': ['href', 'title', 'target'],
+            'img': ['src', 'alt', 'title'],
+        }
+        
+        clean_html = bleach.clean(
+            html_content, 
+            tags=allowed_tags, 
+            attributes=allowed_attrs, 
+            strip=False
+        )
+        
+        return clean_html
     
     def create_models(self):
         """Create Anki note models for different card types."""
