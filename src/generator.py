@@ -7,9 +7,10 @@ from src.providers.base import LLMProvider
 from src.utils import save_archival
 
 class CardGenerator:
-    def __init__(self, providers: List[LLMProvider], combiner: LLMProvider):
+    def __init__(self, providers: List[LLMProvider], combiner: LLMProvider, mode: str = "default"):
         self.providers = providers
         self.combiner = combiner
+        self.mode = mode
 
     async def process_question(self, question: str, prompt_template: Optional[str] = None, model_class: BaseModel = LeetCodeProblem) -> Optional[Dict]:
         print(f"Processing '{question}'...")
@@ -44,7 +45,7 @@ class CardGenerator:
                 if 'card_type' in card:
                     card['card_type'] = card['card_type'].replace(' ', '')
 
-            save_archival(question, final_data)
+            save_archival(question, final_data, subdir=self.mode)
             return final_data
         else:
             print(f"  [Error] Failed to generate final JSON for '{question}'.")

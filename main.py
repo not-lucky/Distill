@@ -33,7 +33,7 @@ async def main():
     combiner = providers[0]
 
     # Initialize Generator
-    generator = CardGenerator(providers, combiner)
+    generator = CardGenerator(providers, combiner, mode=mode)
     
     # Process Questions
     semaphore = asyncio.Semaphore(CONCURRENT_REQUESTS)

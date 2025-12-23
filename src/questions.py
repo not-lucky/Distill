@@ -30,14 +30,6 @@ QUESTIONS = [
 ]
 
 CS_QUESTIONS = [
-    "How does a Hash Map work internally?",
-    # "The difference between Process and Thread",
-    # "How does Garbage Collection work?",
-    # "TCP vs UDP",
-    # "What happens when you type a URL into a browser?",
-    # "Big O Notation and Time Complexity",
-    # "Virtual Memory and Paging",
-    # "CAP Theorem",
-    # "ACID properties in Databases",
-    # "Public Key Cryptography (RSA)",
+"Object-Oriented Programming in Python",
+"Infix, Prefix, and Postfix Expressions, convertors and evaluators",
 ]

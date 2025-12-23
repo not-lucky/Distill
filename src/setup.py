@@ -77,17 +77,17 @@ async def initialize_providers() -> List[LLMProvider]:
     except Exception as e:
         print(f"Warning: Error loading Cerebras providers: {e}")
 
-    # 2. Load OpenRouter Keys
-    try:
-        openrouter_keys = await load_openrouter_keys()
-        if openrouter_keys:
-            or_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
-            providers.append(OpenRouterProvider(
-                api_keys=openrouter_keys,
-                model=or_model
-            ))
-    except Exception as e:
-        print(f"Warning: Error loading OpenRouter providers: {e}")
+    # # 2. Load OpenRouter Keys
+    # try:
+    #     openrouter_keys = await load_openrouter_keys()
+    #     if openrouter_keys:
+    #         or_model = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
+    #         providers.append(OpenRouterProvider(
+    #             api_keys=openrouter_keys,
+    #             model=or_model
+    #         ))
+    # except Exception as e:
+    #     print(f"Warning: Error loading OpenRouter providers: {e}")
 
     # 2. Initialize Gemini Providers
     if ENABLE_GEMINI:

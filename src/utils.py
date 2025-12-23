@@ -11,12 +11,14 @@ def sanitize_filename(name: str) -> str:
     name = re.sub(r'[^\w\s-]', '', name).strip().lower()
     return re.sub(r'[-\s]+', '_', name)
 
-def save_archival(question: str, data: Dict):
-    ARCHIVAL_DIR.mkdir(parents=True, exist_ok=True)
+def save_archival(question: str, data: Dict, subdir: str = ""):
+    target_dir = ARCHIVAL_DIR / subdir if subdir else ARCHIVAL_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    
     timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
     sanitized_name = sanitize_filename(question)
     filename = f"{timestamp}_{sanitized_name}.json"
-    filepath = ARCHIVAL_DIR / filename
+    filepath = target_dir / filename
     
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
