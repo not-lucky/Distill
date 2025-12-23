@@ -1,4 +1,5 @@
 import json
+import re
 import asyncio
 import itertools
 from typing import Dict, Any, Optional, List
@@ -16,10 +17,10 @@ class OpenRouterProvider(LLMProvider):
         return AsyncOpenAI(
             api_key=next(self.api_keys),
             base_url=self.base_url,
-            default_headers={
-                "HTTP-Referer": "https://github.com/LLM2Deck", # Optional, for OpenRouter rankings
-                "X-Title": "LLM2Deck", # Optional
-            }
+            # default_headers={
+            #     "HTTP-Referer": "https://github.com/not-lucky/LLM2Deck", # Optional, for OpenRouter rankings
+            #     "X-Title": "LLM2Deck", # Optional
+            # }
         )
 
     async def _make_request(self, messages: List[Dict[str, Any]], schema: Dict[str, Any], retries: int = 3) -> Optional[str]:
@@ -33,13 +34,6 @@ class OpenRouterProvider(LLMProvider):
                 )
                 
                 content = completion.choices[0].message.content
-                if content:
-                    # Extract JSON if it's wrapped in markdown code blocks
-                    if "```json" in content:
-                        content = content.split("```json")[1].split("```")[0].strip()
-                    elif "```" in content:
-                        content = content.split("```")[1].split("```")[0].strip()
-                    return content
                 
                 print(f"  [OpenRouter:{self.model}] Attempt {attempt+1}/{retries}: Received None content. Retrying...")
                 
