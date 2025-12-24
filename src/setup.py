@@ -1,6 +1,7 @@
 import json
 import os
 from random import shuffle
+import itertools
 from typing import List
 from gemini_webapi import GeminiClient
 from src.config import CEREBRAS_KEYS_FILE_PATH, OPENROUTER_KEYS_FILE, GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI
@@ -66,13 +67,20 @@ async def initialize_providers() -> List[LLMProvider]:
     try:
         cerebras_keys = await load_cerebras_keys()
         if cerebras_keys:
+            # Create a shared iterator for all Cerebras providers
+            cerebras_key_iterator = itertools.cycle(cerebras_keys)
+            
             providers.append(CerebrasProvider(
-                api_keys=cerebras_keys, 
+                api_keys=cerebras_key_iterator, 
                 model="gpt-oss-120b"
             ))
             providers.append(CerebrasProvider(
-                api_keys=cerebras_keys, 
+                api_keys=cerebras_key_iterator, 
                 model="zai-glm-4.6" 
+            ))
+            providers.append(CerebrasProvider(
+                api_keys=cerebras_key_iterator, 
+                model="qwen-3-235b-a22b-instruct-2507" 
             ))
     except Exception as e:
         print(f"Warning: Error loading Cerebras providers: {e}")

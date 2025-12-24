@@ -7,13 +7,15 @@ from src.providers.base import LLMProvider
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
 
 class CerebrasProvider(LLMProvider):
-    def __init__(self, api_keys: List[str], model: str, reasoning_effort: str = "high"):
-        self.api_keys = itertools.cycle(api_keys)
+    def __init__(self, api_keys: Any, model: str, reasoning_effort: str = "high"):
+        self.api_keys = api_keys
         self.model = model
         self.reasoning_effort = reasoning_effort
 
     def _get_client(self) -> Cerebras:
-        return Cerebras(api_key=next(self.api_keys))
+        key = next(self.api_keys)
+        # print(f"  [DEBUG] Using key: ...{key[-4:]}")
+        return Cerebras(api_key=key)
 
     async def _make_request(self, messages: List[Dict[str, Any]], schema: Dict[str, Any], retries: int = 5) -> Optional[str]:
         for attempt in range(retries):
