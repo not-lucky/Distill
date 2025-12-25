@@ -15,7 +15,7 @@ class GeminiProvider(LLMProvider):
             template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
             prompt = template.format(
                 question=question,
-                schema=json.dumps(schema, indent=2)
+                schema=json.dumps(schema, indent=2, ensure_ascii=False)
             )
             response = await self.client.generate_content(prompt, model=Model.G_3_0_PRO)
             return response.text

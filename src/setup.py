@@ -15,7 +15,7 @@ async def load_cerebras_keys() -> List[str]:
         print(f"Warning: Cerebras API keys file not found: {CEREBRAS_KEYS_FILE_PATH}")
         return []
     
-    with open(CEREBRAS_KEYS_FILE_PATH, "r") as f:
+    with open(CEREBRAS_KEYS_FILE_PATH, "r", encoding="utf-8") as f:
         keys_data = json.load(f)
         
     api_keys = [item["api_key"] for item in keys_data if "api_key" in item]
@@ -31,7 +31,7 @@ async def load_openrouter_keys() -> List[str]:
         print(f"Warning: OpenRouter API keys file not found: {OPENROUTER_KEYS_FILE}")
         return []
     
-    with open(OPENROUTER_KEYS_FILE, "r") as f:
+    with open(OPENROUTER_KEYS_FILE, "r", encoding="utf-8") as f:
         keys_data = json.load(f)
         
     api_keys = [item["data"]["key"] for item in keys_data if "data" in item and "key" in item.get("data", {})]

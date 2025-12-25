@@ -20,14 +20,14 @@ def save_archival(question: str, data: Dict, subdir: str = ""):
     filename = f"{timestamp}_{sanitized_name}.json"
     filepath = target_dir / filename
     
-    with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
     print(f"  [Save] Archived to {filepath}")
 
 def save_final_deck(all_problems: List[Dict], filename_prefix: str = "leetcode_anki_deck"):
     timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
     filename = f"{filename_prefix}_{timestamp}.json"
     
-    with open(filename, "w") as f:
-        json.dump(all_problems, f, indent=2)
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(all_problems, f, indent=2, ensure_ascii=False)
     print(f"  [Save] Final deck saved to {filename}")

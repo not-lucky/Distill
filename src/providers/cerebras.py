@@ -64,7 +64,7 @@ class CerebrasProvider(LLMProvider):
             {"role": "system", "content": "You are a helpful assistant that generates Anki cards in JSON format."},
             {"role": "user", "content": template.format(
                 question=question,
-                schema=json.dumps(schema, indent=2)
+                schema=json.dumps(schema, indent=2, ensure_ascii=False)
             )},
         ]
         
