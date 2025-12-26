@@ -59,6 +59,16 @@ class AnkiDeckGenerator:
         """
         if not text:
             return ""
+
+        # Fix double-escaped newlines inside code blocks only using regex split
+        # This splits by code blocks (capturing the delimiters so we keep them)
+        parts = re.split(r'(```.*?```)', text, flags=re.DOTALL)
+        for i in range(len(parts)):
+            # If it starts and ends with ```, it's a code block
+            if parts[i].startswith('```') and parts[i].endswith('```'):
+                parts[i] = parts[i].replace('\\n', '\n')
+        
+        text = "".join(parts)
             
         # Configure extensions
         html_content = markdown.markdown(

@@ -95,10 +95,10 @@ async def initialize_providers() -> List[LLMProvider]:
             # Create a shared iterator for all Cerebras providers
             cerebras_key_iterator = itertools.cycle(cerebras_keys)
             
-            # providers.append(CerebrasProvider(
-            #     api_keys=cerebras_key_iterator, 
-            #     model="gpt-oss-120b"
-            # ))
+            providers.append(CerebrasProvider(
+                api_keys=cerebras_key_iterator, 
+                model="gpt-oss-120b"
+            ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_iterator, 
             #     model="zai-glm-4.6" 
@@ -132,10 +132,10 @@ async def initialize_providers() -> List[LLMProvider]:
             #     model="deepseek-ai/deepseek-r1" # Using r1 as recommended, or v3.2 as per snippet
             # ))
             # Also adding the one specifically requested in snippet, assuming it exists
-            providers.append(NvidiaProvider(
-                api_keys=nvidia_key_iterator,
-                model="deepseek-ai/deepseek-v3.2"
-            ))
+            # providers.append(NvidiaProvider(
+            #     api_keys=nvidia_key_iterator,
+            #     model="deepseek-ai/deepseek-v3.2"
+            # ))
     except Exception as e:
         print(f"Warning: Error loading NVIDIA providers: {e}")
 
