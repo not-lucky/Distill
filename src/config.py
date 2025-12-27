@@ -13,5 +13,5 @@ GEMINI_CREDENTIALS_FILE = Path(os.getenv("GEMINI_CREDENTIALS_FILE_PATH", "python
 NVIDIA_KEYS_FILE = Path(os.getenv("NVIDIA_KEYS_FILE_PATH", "nvidia_keys.json"))
 
 # Configuration
-CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", 5))
+CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", 30))
 ENABLE_GEMINI = os.getenv("ENABLE_GEMINI", "False").lower() == "true"

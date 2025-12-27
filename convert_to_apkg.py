@@ -10,6 +10,10 @@ from typing import List, Dict, Any
 
 import markdown
 import bleach
+from src.logging_config import setup_logging
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AnkiDeckGenerator:
     def __init__(self, json_file_path: str, mode: str = "leetcode"):
@@ -525,21 +529,21 @@ class AnkiDeckGenerator:
         # Write the package
         package.write_to_file(output_path)
         
-        # Print summary
-        print(f"\n✅ Anki package generated successfully!")
-        print(f"📦 Output file: {output_path}")
-        print(f"📚 Total decks created: {len(self.decks)}")
+        # Log summary
+        logger.info("\n✅ Anki package generated successfully!")
+        logger.info(f"📦 Output file: {output_path}")
+        logger.info(f"📚 Total decks created: {len(self.decks)}")
         
         total_cards = sum(len(deck.notes) for deck in self.decks.values())
-        print(f"🎴 Total cards created: {total_cards}")
+        logger.info(f"🎴 Total cards created: {total_cards}")
         
-        print("\n📂 Deck structure:")
+        logger.info("\n📂 Deck structure:")
         for deck_path in sorted(self.decks.keys()):
             deck = self.decks[deck_path]
             indent_level = deck_path.count('::')
             indent = "  " * indent_level
             deck_short_name = deck_path.split('::')[-1]
-            print(f"{indent}└─ {deck_short_name} ({len(deck.notes)} cards)")
+            logger.info(f"{indent}└─ {deck_short_name} ({len(deck.notes)} cards)")
 
 def main():
     """Main function to run the script."""
@@ -572,7 +576,7 @@ def main():
     
     # Check if input file exists
     if not Path(args.input_file).exists():
-        print(f"❌ Error: Input file '{args.input_file}' not found!")
+        logger.error(f"❌ Error: Input file '{args.input_file}' not found!")
         return 1
         
     # Infer mode if not provided
@@ -592,7 +596,7 @@ def main():
         
         # Optional: Validate data structure
         if args.validate:
-            print("✓ JSON structure validated successfully")
+            logger.info("✓ JSON structure validated successfully")
         
         # Generate the package
         generator.generate_package(args.output)
@@ -600,11 +604,12 @@ def main():
         return 0
         
     except json.JSONDecodeError as e:
-        print(f"❌ Error: Invalid JSON in input file - {e}")
+        logger.error(f"❌ Error: Invalid JSON in input file - {e}")
         return 1
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"❌ Error: {e}")
         return 1
 
 if __name__ == "__main__":
+    setup_logging()
     exit(main())

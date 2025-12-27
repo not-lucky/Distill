@@ -4,6 +4,9 @@ from typing import Dict, Any, Optional, List
 from openai import AsyncOpenAI
 from src.providers.base import LLMProvider
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+import logging
+
+logger = logging.getLogger(__name__)
 
 class NvidiaProvider(LLMProvider):
     def __init__(self, api_keys: Any, model: str):
@@ -30,26 +33,28 @@ class NvidiaProvider(LLMProvider):
                     top_p=0.95,
                     max_tokens=16384,
                     extra_body={
-                        "nvext": {"guided_json": schema},
+                        # "nvext": {"guided_json": schema},
                         "chat_template_kwargs": {"thinking":True}
                     }
                 )
                 
                 content = completion.choices[0].message.content
                 if content:
+                    if schema:
+                        content = content.lstrip('```json').rstrip('```').strip()
                     return content
                 
-                print(f"  [NVIDIA:{self.model}] Attempt {attempt+1}/{retries}: Received None content. Retrying...")
+                logger.warning(f"[{self.model}] Attempt {attempt+1}/{retries}: Received None content. Retrying...")
                 
             except Exception as e:
-                print(f"  [NVIDIA:{self.model}] Attempt {attempt+1}/{retries} Error: {e}")
+                logger.error(f"[{self.model}] Attempt {attempt+1}/{retries} Error: {e}")
                 
             await asyncio.sleep(1)
             
         return None
 
     async def generate_initial_cards(self, question: str, schema: Dict[str, Any], prompt_template: Optional[str] = None) -> str:
-        print(f"  [NVIDIA:{self.model}] Generating initial cards for '{question}'...")
+        # logger.info(f"[{self.model}] Generating initial cards for '{question}'...")
         
         template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
         
@@ -65,7 +70,7 @@ class NvidiaProvider(LLMProvider):
         return content if content else ""
 
     async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        print(f"  [NVIDIA:{self.model}] Combining cards for '{question}'...")
+        # logger.info(f"[{self.model}] Combining cards for '{question}'...")
         messages = [
             {"role": "system", "content": "You are a helpful assistant that generates Anki cards in JSON format."},
             {"role": "user", "content": COMBINE_PROMPT_TEMPLATE.format(
@@ -79,6 +84,6 @@ class NvidiaProvider(LLMProvider):
             try:
                 return json.loads(content)
             except json.JSONDecodeError as e:
-                print(f"  [NVIDIA:{self.model}] JSON Decode Error: {e}")
+                logger.error(f"[{self.model}] JSON Decode Error: {e}")
                 return None
         return None

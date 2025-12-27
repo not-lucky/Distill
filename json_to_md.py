@@ -1,6 +1,10 @@
 import json
 import os
 from pathlib import Path
+from src.logging_config import setup_logging
+import logging
+
+logger = logging.getLogger(__name__)
 
 def convert_json_to_md(source_dir, target_dir):
     """
@@ -10,21 +14,21 @@ def convert_json_to_md(source_dir, target_dir):
     target_path = Path(target_dir)
     
     if not source_path.exists():
-        print(f"Error: Source directory '{source_dir}' does not exist.")
+        logger.error(f"Error: Source directory '{source_dir}' does not exist.")
         return
 
     # Create target directory if it doesn't exist
     target_path.mkdir(parents=True, exist_ok=True)
-    print(f"Output directory: {target_path.resolve()}")
+    logger.info(f"Output directory: {target_path.resolve()}")
 
     # Find all JSON files recursively
     json_files = list(source_path.rglob("*.json"))
     
     if not json_files:
-        print("No JSON files found.")
+        logger.warning("No JSON files found.")
         return
 
-    print(f"Found {len(json_files)} JSON files. Starting conversion...")
+    logger.info(f"Found {len(json_files)} JSON files. Starting conversion...")
 
     for json_file in json_files:
         try:
@@ -49,7 +53,7 @@ def convert_json_to_md(source_dir, target_dir):
                     if 'cards' in cards:
                         cards = cards['cards']
                     else:
-                        print(f"Warning: {json_file.name} is a dict but has no 'cards' key.")
+                        logger.warning(f"Warning: {json_file.name} is a dict but has no 'cards' key.")
                         continue
 
                 if isinstance(cards, list):
@@ -77,18 +81,19 @@ def convert_json_to_md(source_dir, target_dir):
                         
                         md_file.write("---\n\n")
                 else:
-                    print(f"Warning: {json_file.name} does not contain a list of cards (found {type(cards)}).")
+                    logger.warning(f"Warning: {json_file.name} does not contain a list of cards (found {type(cards)}).")
             
-            print(f"Converted: {json_file.name} -> {md_filename}")
+            logger.info(f"Converted: {json_file.name} -> {md_filename}")
             
         except json.JSONDecodeError:
-            print(f"Error: Failed to decode JSON from {json_file.name}")
+            logger.error(f"Error: Failed to decode JSON from {json_file.name}")
         except Exception as e:
-            print(f"Error processing {json_file.name}: {e}")
+            logger.error(f"Error processing {json_file.name}: {e}")
 
-    print("\nConversion complete.")
+    logger.info("\nConversion complete.")
 
 if __name__ == "__main__":
+    setup_logging()
     SOURCE_DIR = "anki_cards_archival"
     TARGET_DIR = "anki_cards_markdown"
     convert_json_to_md(SOURCE_DIR, TARGET_DIR)

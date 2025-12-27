@@ -5,6 +5,11 @@ from pydantic import BaseModel
 from src.models import LeetCodeProblem
 from src.providers.base import LLMProvider
 from src.utils import save_archival
+import logging
+
+from src.logging_utils import log_section, log_status, console
+
+logger = logging.getLogger(__name__)
 
 class CardGenerator:
     def __init__(self, providers: List[LLMProvider], combiner: LLMProvider, mode: str = "default"):
@@ -13,21 +18,21 @@ class CardGenerator:
         self.mode = mode
 
     async def process_question(self, question: str, prompt_template: Optional[str] = None, model_class: BaseModel = LeetCodeProblem) -> Optional[Dict]:
-        print(f"Processing '{question}'...")
-        
-        # 1. Generate Initial Cards (Parallel)
-        tasks = []
-        schema = model_class.model_json_schema()
-        
-        for provider in self.providers:
-            tasks.append(provider.generate_initial_cards(question, schema, prompt_template))
-        
-        results = await asyncio.gather(*tasks)
+        with log_section(f"Processing: {question}"):
+            # 1. Generate Initial Cards (Parallel)
+            with log_status(f"Generating initial ideas for '{question}'..."):
+                tasks = []
+                schema = model_class.model_json_schema()
+                
+                for provider in self.providers:
+                    tasks.append(provider.generate_initial_cards(question, schema, prompt_template))
+                
+                results = await asyncio.gather(*tasks)
         
         valid_results = [r for r in results if r]
         
         if not valid_results:
-            print(f"  [Error] All providers failed for '{question}'. Skipping.")
+            logger.error(f"All providers failed for '{question}'. Skipping.")
             return None
 
         # 2. Combine Cards
@@ -35,7 +40,7 @@ class CardGenerator:
         for i, res in enumerate(valid_results):
             inputs += f"Set {i+1}:\n{res}\n\n"
             
-        final_data = await self.combiner.combine_cards(question, inputs, schema)
+            final_data = await self.combiner.combine_cards(question, inputs, schema)
         
         if final_data:
             # Post-process tags/types
@@ -48,5 +53,5 @@ class CardGenerator:
             save_archival(question, final_data, subdir=self.mode)
             return final_data
         else:
-            print(f"  [Error] Failed to generate final JSON for '{question}'.")
+            logger.error(f"Failed to generate final JSON for '{question}'.")
             return None

@@ -3,6 +3,9 @@ import os
 from random import shuffle
 import itertools
 from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
 from gemini_webapi import GeminiClient
 from src.config import CEREBRAS_KEYS_FILE_PATH, OPENROUTER_KEYS_FILE, GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI, NVIDIA_KEYS_FILE
 from src.providers.base import LLMProvider
@@ -13,7 +16,7 @@ from src.providers.nvidia import NvidiaProvider
 
 async def load_cerebras_keys() -> List[str]:
     if not CEREBRAS_KEYS_FILE_PATH.exists():
-        print(f"Warning: Cerebras API keys file not found: {CEREBRAS_KEYS_FILE_PATH}")
+        logger.warning(f"Cerebras API keys file not found: {CEREBRAS_KEYS_FILE_PATH}")
         return []
     
     with open(CEREBRAS_KEYS_FILE_PATH, "r", encoding="utf-8") as f:
@@ -21,7 +24,7 @@ async def load_cerebras_keys() -> List[str]:
         
     api_keys = [item["api_key"] for item in keys_data if "api_key" in item]
     if not api_keys:
-        print("Warning: No Cerebras API keys found in the file.")
+        logger.warning("No Cerebras API keys found in the file.")
         return []
     
     shuffle(api_keys)
@@ -29,7 +32,7 @@ async def load_cerebras_keys() -> List[str]:
 
 async def load_openrouter_keys() -> List[str]:
     if not OPENROUTER_KEYS_FILE.exists():
-        print(f"Warning: OpenRouter API keys file not found: {OPENROUTER_KEYS_FILE}")
+        logger.warning(f"OpenRouter API keys file not found: {OPENROUTER_KEYS_FILE}")
         return []
     
     with open(OPENROUTER_KEYS_FILE, "r", encoding="utf-8") as f:
@@ -37,7 +40,7 @@ async def load_openrouter_keys() -> List[str]:
         
     api_keys = [item["data"]["key"] for item in keys_data if "data" in item and "key" in item.get("data", {})]
     if not api_keys:
-        print("Warning: No OpenRouter API keys found in the file.")
+        logger.warning("No OpenRouter API keys found in the file.")
         return []
     
     shuffle(api_keys)
@@ -46,7 +49,7 @@ async def load_openrouter_keys() -> List[str]:
 
 async def load_nvidia_keys() -> List[str]:
     if not NVIDIA_KEYS_FILE.exists():
-        print(f"Warning: NVIDIA keys file not found: {NVIDIA_KEYS_FILE}")
+        logger.warning(f"NVIDIA keys file not found: {NVIDIA_KEYS_FILE}")
         return []
     
     with open(NVIDIA_KEYS_FILE, "r", encoding="utf-8") as f:
@@ -61,7 +64,7 @@ async def load_nvidia_keys() -> List[str]:
             api_keys = [item["api_key"] for item in keys_data if "api_key" in item]
             
     if not api_keys:
-        print("Warning: No NVIDIA API keys found in the file.")
+        logger.warning("No NVIDIA API keys found in the file.")
         return []
     
     shuffle(api_keys)
@@ -81,7 +84,7 @@ async def load_gemini_clients() -> List[GeminiClient]:
             await client.init(auto_refresh=True)
             clients.append(client)
         except Exception as e:
-            print(f"Failed to initialize Gemini client: {e}")
+            logger.error(f"Failed to initialize Gemini client: {e}")
     return clients
 
 async def initialize_providers() -> List[LLMProvider]:
@@ -108,7 +111,7 @@ async def initialize_providers() -> List[LLMProvider]:
             #     model="qwen-3-235b-a22b-instruct-2507" 
             # ))
     except Exception as e:
-        print(f"Warning: Error loading Cerebras providers: {e}")
+        logger.warning(f"Error loading Cerebras providers: {e}")
 
     # # 2. Load OpenRouter Keys
     # try:
@@ -120,24 +123,24 @@ async def initialize_providers() -> List[LLMProvider]:
     #             model=or_model
     #         ))
     # except Exception as e:
-    #     print(f"Warning: Error loading OpenRouter providers: {e}")
+    #     logger.warning(f"Error loading OpenRouter providers: {e}")
 
     # 3. Load NVIDIA Keys
     try:
         nvidia_keys = await load_nvidia_keys()
         if nvidia_keys:
             nvidia_key_iterator = itertools.cycle(nvidia_keys)
-            # providers.append(NvidiaProvider(
-            #     api_keys=nvidia_key_iterator,
-            #     model="deepseek-ai/deepseek-r1" # Using r1 as recommended, or v3.2 as per snippet
-            # ))
+            providers.append(NvidiaProvider(
+                api_keys=nvidia_key_iterator,
+                model="moonshotai/kimi-k2-thinking" # Using r1 as recommended, or v3.2 as per snippet
+            ))
             # Also adding the one specifically requested in snippet, assuming it exists
-            # providers.append(NvidiaProvider(
-            #     api_keys=nvidia_key_iterator,
-            #     model="deepseek-ai/deepseek-v3.2"
-            # ))
+            providers.append(NvidiaProvider(
+                api_keys=nvidia_key_iterator,
+                model="deepseek-ai/deepseek-v3.2"
+            ))
     except Exception as e:
-        print(f"Warning: Error loading NVIDIA providers: {e}")
+        logger.warning(f"Error loading NVIDIA providers: {e}")
 
     # 4. Initialize Gemini Providers
     if ENABLE_GEMINI:
@@ -146,9 +149,9 @@ async def initialize_providers() -> List[LLMProvider]:
             for client in gemini_clients:
                 providers.append(GeminiProvider(client))
         except Exception as e:
-            print(f"Warning: Could not load Gemini clients: {e}")
+            logger.warning(f"Could not load Gemini clients: {e}")
 
     if not providers:
-        print("Error: No providers could be initialized.")
+        logger.error("No providers could be initialized.")
         
     return providers

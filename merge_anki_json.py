@@ -3,6 +3,10 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any
+from src.logging_config import setup_logging
+import logging
+
+logger = logging.getLogger(__name__)
 
 def merge_json_files(mode: str) -> None:
     """
@@ -16,17 +20,17 @@ def merge_json_files(mode: str) -> None:
     source_dir = base_dir / mode
     
     if not source_dir.exists():
-        print(f"❌ Error: Directory '{source_dir}' does not exist.")
+        logger.error(f"❌ Error: Directory '{source_dir}' does not exist.")
         return
 
     # Find all JSON files
     json_files = list(source_dir.glob("*.json"))
     
     if not json_files:
-        print(f"⚠️ No JSON files found in '{source_dir}'.")
+        logger.warning(f"⚠️ No JSON files found in '{source_dir}'.")
         return
 
-    print(f"Found {len(json_files)} JSON files in '{source_dir}'.")
+    logger.info(f"Found {len(json_files)} JSON files in '{source_dir}'.")
 
     merged_data: List[Dict[str, Any]] = []
     
@@ -39,14 +43,14 @@ def merge_json_files(mode: str) -> None:
                 if isinstance(data, dict):
                     merged_data.append(data)
                 else:
-                    print(f"⚠️ Warning: Skipping '{file_path.name}' - expected a JSON object, got {type(data).__name__}.")
+                    logger.warning(f"⚠️ Warning: Skipping '{file_path.name}' - expected a JSON object, got {type(data).__name__}.")
         except json.JSONDecodeError as e:
-            print(f"❌ Error: Failed to parse '{file_path.name}' - {e}")
+            logger.error(f"❌ Error: Failed to parse '{file_path.name}' - {e}")
         except Exception as e:
-            print(f"❌ Error: processing '{file_path.name}' - {e}")
+            logger.error(f"❌ Error: processing '{file_path.name}' - {e}")
 
     if not merged_data:
-        print("❌ No valid data found to merge.")
+        logger.error("❌ No valid data found to merge.")
         return
 
     # Generate output filename
@@ -59,11 +63,11 @@ def merge_json_files(mode: str) -> None:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(merged_data, f, indent=2, ensure_ascii=False)
         
-        print(f"\n✅ Successfully merged {len(merged_data)} files.")
-        print(f"📄 Output saved to: {output_path.absolute()}")
+        logger.info(f"\n✅ Successfully merged {len(merged_data)} files.")
+        logger.info(f"📄 Output saved to: {output_path.absolute()}")
         
     except Exception as e:
-        print(f"❌ Error: Failed to write output file - {e}")
+        logger.error(f"❌ Error: Failed to write output file - {e}")
 
 def main():
     parser = argparse.ArgumentParser(
@@ -79,4 +83,5 @@ def main():
     merge_json_files(args.mode)
 
 if __name__ == "__main__":
+    setup_logging()
     main()

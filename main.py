@@ -9,8 +9,10 @@ from src.prompts import GENIUS_PERSONA_PROMPT_TEMPLATE
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.utils import save_final_deck
+from src.logging_config import setup_logging
 
 async def main():
+    setup_logging()
     load_dotenv()
     
     # Mode Selection

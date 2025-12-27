@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Dict, List
 
 from src.config import ARCHIVAL_DIR
+import logging
+
+logger = logging.getLogger(__name__)
 
 def sanitize_filename(name: str) -> str:
     # Remove special characters and spaces
@@ -22,7 +25,7 @@ def save_archival(question: str, data: Dict, subdir: str = ""):
     
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print(f"  [Save] Archived to {filepath}")
+    logger.info(f"Archived to {filepath}")
 
 def save_final_deck(all_problems: List[Dict], filename_prefix: str = "leetcode_anki_deck"):
     timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
@@ -30,4 +33,4 @@ def save_final_deck(all_problems: List[Dict], filename_prefix: str = "leetcode_a
     
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(all_problems, f, indent=2, ensure_ascii=False)
-    print(f"  [Save] Final deck saved to {filename}")
+    logger.info(f"Final deck saved to {filename}")

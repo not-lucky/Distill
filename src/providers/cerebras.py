@@ -5,6 +5,9 @@ from typing import Dict, Any, Optional, List
 from cerebras.cloud.sdk import Cerebras
 from src.providers.base import LLMProvider
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CerebrasProvider(LLMProvider):
     def __init__(self, api_keys: Any, model: str, reasoning_effort: str = "high"):
@@ -14,7 +17,7 @@ class CerebrasProvider(LLMProvider):
 
     def _get_client(self) -> Cerebras:
         key = next(self.api_keys)
-        # print(f"  [DEBUG] Using key: ...{key[-4:]}")
+        # logger.debug(f"Using key: ...{key[-4:]}")
         return Cerebras(api_key=key)
 
     async def _make_request(self, messages: List[Dict[str, Any]], schema: Dict[str, Any], retries: int = 7) -> Optional[str]:
@@ -45,10 +48,10 @@ class CerebrasProvider(LLMProvider):
                 if content:
                     return content
                 
-                print(f"  [Cerebras:{self.model}] Attempt {attempt+1}/{retries}: Received None content. Retrying...")
+                logger.warning(f"[{self.model}] Attempt {attempt+1}/{retries}: Received None content. Retrying...")
                 
             except Exception as e:
-                print(f"  [Cerebras:{self.model}] Attempt {attempt+1}/{retries} Error: {e}")
+                logger.error(f"[{self.model}] Attempt {attempt+1}/{retries} Error: {e}")
                 
             # Optional: Add a small delay between retries if needed
             await asyncio.sleep(1)
@@ -56,7 +59,7 @@ class CerebrasProvider(LLMProvider):
         return None
 
     async def generate_initial_cards(self, question: str, schema: Dict[str, Any], prompt_template: Optional[str] = None) -> str:
-        print(f"  [Cerebras:{self.model}] Generating initial cards for '{question}'...")
+        # logger.info(f"[{self.model}] Generating initial cards for '{question}'...")
         
         template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
         
@@ -72,7 +75,7 @@ class CerebrasProvider(LLMProvider):
         return content if content else ""
 
     async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        print(f"  [Cerebras:{self.model}] Combining cards for '{question}'...")
+        # logger.info(f"[{self.model}] Combining cards for '{question}'...")
         messages = [
             {"role": "system", "content": "You are a helpful assistant that generates Anki cards in JSON format."},
             {"role": "user", "content": COMBINE_PROMPT_TEMPLATE.format(
@@ -86,6 +89,6 @@ class CerebrasProvider(LLMProvider):
             try:
                 return json.loads(content)
             except json.JSONDecodeError as e:
-                print(f"  [Cerebras:{self.model}] JSON Decode Error: {e}")
+                logger.error(f"[{self.model}] JSON Decode Error: {e}")
                 return None
         return None

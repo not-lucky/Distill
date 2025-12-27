@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pygments>=2.19.2",
     "python-dotenv>=1.2.1",
+    "rich>=13.0.0",
     "selenium>=4.35.0",
     "zendriver>=0.14.0",
 ]
