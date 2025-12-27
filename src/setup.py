@@ -130,10 +130,10 @@ async def initialize_providers() -> List[LLMProvider]:
         nvidia_keys = await load_nvidia_keys()
         if nvidia_keys:
             nvidia_key_iterator = itertools.cycle(nvidia_keys)
-            providers.append(NvidiaProvider(
-                api_keys=nvidia_key_iterator,
-                model="moonshotai/kimi-k2-thinking" # Using r1 as recommended, or v3.2 as per snippet
-            ))
+            # providers.append(NvidiaProvider(
+            #     api_keys=nvidia_key_iterator,
+            #     model="moonshotai/kimi-k2-thinking"
+            # ))
             # Also adding the one specifically requested in snippet, assuming it exists
             providers.append(NvidiaProvider(
                 api_keys=nvidia_key_iterator,

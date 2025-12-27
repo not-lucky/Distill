@@ -1,7 +1,7 @@
 import json
 import asyncio
 from typing import Dict, Any, Optional, List
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError, APITimeoutError
 from src.providers.base import LLMProvider
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
 import logging
@@ -16,9 +16,9 @@ class NvidiaProvider(LLMProvider):
 
     def _get_client(self) -> AsyncOpenAI:
         key = next(self.api_keys)
-        return AsyncOpenAI(api_key=key, base_url=self.base_url)
+        return AsyncOpenAI(api_key=key, base_url=self.base_url, timeout=900.0)
 
-    async def _make_request(self, messages: List[Dict[str, Any]], schema: Dict[str, Any], retries: int = 3) -> Optional[str]:
+    async def _make_request(self, messages: List[Dict[str, Any]], schema: Dict[str, Any], retries: int = 5) -> Optional[str]:
         for attempt in range(retries):
             try:
                 client = self._get_client()
@@ -46,8 +46,16 @@ class NvidiaProvider(LLMProvider):
                 
                 logger.warning(f"[{self.model}] Attempt {attempt+1}/{retries}: Received None content. Retrying...")
                 
+
             except Exception as e:
                 logger.error(f"[{self.model}] Attempt {attempt+1}/{retries} Error: {e}")
+                if isinstance(e, RateLimitError):
+                    # Exponential backoff for rate limits
+                    logger.warning(f"[{self.model}] Rate limit hit. Backing off...")
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
+                if isinstance(e, APITimeoutError):
+                    logger.warning(f"[{self.model}] Request timed out.")
                 
             await asyncio.sleep(1)
             
