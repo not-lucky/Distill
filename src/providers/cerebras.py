@@ -84,11 +84,14 @@ class CerebrasProvider(LLMProvider):
             )},
         ]
         
-        content = await self._make_request(messages, schema)
-        if content:
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError as e:
-                logger.error(f"[{self.model}] JSON Decode Error: {e}")
-                return None
+        for attempt in range(3):
+            content = await self._make_request(messages, schema)
+            if content:
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"[{self.model}] Attempt {attempt+1}/3: JSON Decode Error: {e}. Retrying...")
+                    continue
+        
+        logger.error(f"[{self.model}] Failed to decode JSON after 3 attempts.")
         return None
