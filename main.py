@@ -3,9 +3,9 @@ from dotenv import load_dotenv
 
 import sys
 from src.config import CONCURRENT_REQUESTS
-from src.questions import QUESTIONS, CS_QUESTIONS
-from src.models import CSProblem, LeetCodeProblem
-from src.prompts import GENIUS_PERSONA_PROMPT_TEMPLATE
+from src.questions import QUESTIONS, CS_QUESTIONS, PHYSICS_QUESTIONS
+from src.models import CSProblem, LeetCodeProblem, PhysicsProblem
+from src.prompts import GENIUS_PERSONA_PROMPT_TEMPLATE, PHYSICS_PROMPT_TEMPLATE
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.utils import save_final_deck
@@ -19,12 +19,14 @@ async def main():
     mode = "leetcode"
     if len(sys.argv) > 1 and sys.argv[1] == "cs":
         mode = "cs"
+    elif len(sys.argv) > 1 and sys.argv[1] == "physics":
+        mode = "physics"
         
     print(f"Running in {mode.upper()} mode.")
     
-    target_questions = CS_QUESTIONS if mode == "cs" else QUESTIONS
-    prompt_template = GENIUS_PERSONA_PROMPT_TEMPLATE if mode == "cs" else None
-    target_model = CSProblem if mode == "cs" else LeetCodeProblem
+    target_questions = CS_QUESTIONS if mode == "cs" else (PHYSICS_QUESTIONS if mode == "physics" else QUESTIONS)
+    prompt_template = GENIUS_PERSONA_PROMPT_TEMPLATE if mode == "cs" else (PHYSICS_PROMPT_TEMPLATE if mode == "physics" else None)
+    target_model = CSProblem if mode == "cs" else (PhysicsProblem if mode == "physics" else LeetCodeProblem)
     
     # Initialize Providers
     providers = await initialize_providers()
@@ -53,7 +55,7 @@ async def main():
 
     # Save Results
     if all_problems:
-        filename = f"cs_anki_deck" if mode == "cs" else "leetcode_anki_deck"
+        filename = f"cs_anki_deck" if mode == "cs" else (f"physics_anki_deck" if mode == "physics" else "leetcode_anki_deck")
         save_final_deck(all_problems, filename)
     else:
         print("No cards generated.")

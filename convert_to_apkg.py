@@ -22,7 +22,7 @@ class AnkiDeckGenerator:
         
         Args:
             json_file_path: Path to the JSON file containing card data
-            mode: Generation mode ('leetcode' or 'cs')
+            mode: Generation mode ('leetcode' or 'cs' or 'physics')
         """
         self.json_file_path = json_file_path
         self.mode = mode
@@ -466,7 +466,13 @@ class AnkiDeckGenerator:
             difficulty = problem_data['difficulty']
             
             # Create hierarchical deck structure: Mode::Topic::Title
-            prefix = "CS" if self.mode == "cs" else "LeetCode"
+            if self.mode == "cs":
+                prefix = "CS"
+            elif self.mode == "physics":
+                prefix = "Physics"
+            else:
+                prefix = "LeetCode"
+                
             deck_path = f"{prefix}::{topic}::{title}"
             deck = self.get_or_create_deck(deck_path)
             
@@ -567,7 +573,7 @@ def main():
     
     parser.add_argument(
         '--mode',
-        choices=['leetcode', 'cs'],
+        choices=['leetcode', 'cs', 'physics'],
         default=None,
         help='Generation mode (default: inferred from filename or leetcode)'
     )
@@ -583,12 +589,19 @@ def main():
     if args.mode is None:
         if "cs" in Path(args.input_file).name.lower() or "cs_" in Path(args.input_file).name.lower():
             args.mode = 'cs'
+        elif "physics" in Path(args.input_file).name.lower():
+            args.mode = 'physics'
         else:
             args.mode = 'leetcode'
             
     # Set default output filename if not provided
     if args.output is None:
-        args.output = 'cs_anki.apkg' if args.mode == 'cs' else 'leetcode_anki.apkg'
+        if args.mode == 'cs':
+            args.output = 'cs_anki.apkg'
+        elif args.mode == 'physics':
+            args.output = 'physics_anki.apkg'
+        else:
+            args.output = 'leetcode_anki.apkg'
     
     try:
         # Create generator and process

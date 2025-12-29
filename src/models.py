@@ -21,3 +21,10 @@ class CSProblem(BaseModel):
     topic: str = Field(..., description="Main topic (e.g., 'Operating Systems', 'Networking')")
     difficulty: str = Field(..., description="Difficulty level (Basic, Intermediate, Advanced)")
     cards: List[AnkiCard]
+
+class PhysicsProblem(BaseModel):
+    model_config = {'extra': 'forbid'}
+    title: str = Field(..., description="Title of the Physics Concept")
+    topic: str = Field(..., description="Main topic (e.g., 'Mechanics', 'Thermodynamics')")
+    difficulty: str = Field(..., description="Difficulty level (Basic, Intermediate, Advanced)")
+    cards: List[AnkiCard]

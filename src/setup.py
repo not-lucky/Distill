@@ -102,6 +102,10 @@ async def initialize_providers() -> List[LLMProvider]:
                 api_keys=cerebras_key_iterator, 
                 model="gpt-oss-120b"
             ))
+            providers.append(CerebrasProvider(
+                api_keys=cerebras_key_iterator, 
+                model="gpt-oss-120b"
+            ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_iterator, 
             #     model="zai-glm-4.6" 
@@ -135,10 +139,10 @@ async def initialize_providers() -> List[LLMProvider]:
             #     model="moonshotai/kimi-k2-thinking"
             # ))
             # Also adding the one specifically requested in snippet, assuming it exists
-            providers.append(NvidiaProvider(
-                api_keys=nvidia_key_iterator,
-                model="deepseek-ai/deepseek-v3.2"
-            ))
+            # providers.append(NvidiaProvider(
+            #     api_keys=nvidia_key_iterator,
+            #     model="deepseek-ai/deepseek-v3.2"
+            # ))
     except Exception as e:
         logger.warning(f"Error loading NVIDIA providers: {e}")
 
