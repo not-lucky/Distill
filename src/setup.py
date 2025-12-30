@@ -13,6 +13,7 @@ from src.providers.cerebras import CerebrasProvider
 from src.providers.gemini import GeminiProvider
 from src.providers.openrouter import OpenRouterProvider
 from src.providers.nvidia import NvidiaProvider
+from src.providers.g4f_provider import G4FProvider
 
 async def load_cerebras_keys() -> List[str]:
     if not CEREBRAS_KEYS_FILE_PATH.exists():
@@ -102,10 +103,10 @@ async def initialize_providers() -> List[LLMProvider]:
                 api_keys=cerebras_key_iterator, 
                 model="gpt-oss-120b"
             ))
-            providers.append(CerebrasProvider(
-                api_keys=cerebras_key_iterator, 
-                model="gpt-oss-120b"
-            ))
+            # providers.append(CerebrasProvider(
+            #     api_keys=cerebras_key_iterator, 
+            #     model="gpt-oss-120b"
+            # ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_iterator, 
             #     model="zai-glm-4.6" 
@@ -139,12 +140,22 @@ async def initialize_providers() -> List[LLMProvider]:
             #     model="moonshotai/kimi-k2-thinking"
             # ))
             # Also adding the one specifically requested in snippet, assuming it exists
-            # providers.append(NvidiaProvider(
-            #     api_keys=nvidia_key_iterator,
-            #     model="deepseek-ai/deepseek-v3.2"
-            # ))
+            providers.append(NvidiaProvider(
+                api_keys=nvidia_key_iterator,
+                model="deepseek-ai/deepseek-v3.2"
+            ))
     except Exception as e:
         logger.warning(f"Error loading NVIDIA providers: {e}")
+
+    # 4. Initialize G4F Provider (Experimental)
+    # try:
+    #     # Using LMArena and the specific model as requested
+    #     providers.append(G4FProvider(
+    #         model="claude-opus-4-5-20251101-thinking-32k",
+    #         provider="LMArena"
+    #     ))
+    # except Exception as e:
+    #      logger.warning(f"Error initializing G4F provider: {e}")
 
     # 4. Initialize Gemini Providers
     if ENABLE_GEMINI:
