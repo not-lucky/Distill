@@ -8,6 +8,6 @@ class LLMProvider(ABC):
         pass
 
     @abstractmethod
-    async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any], combine_prompt_template: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Combines multiple sets of cards into a single deck."""
         pass

@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel
 from src.models import LeetCodeProblem
 from src.providers.base import LLMProvider
+from src.prompts import MCQ_COMBINE_PROMPT_TEMPLATE
 from src.utils import save_archival
 import logging
 
@@ -39,8 +40,10 @@ class CardGenerator:
         inputs = ""
         for i, res in enumerate(valid_results):
             inputs += f"Set {i+1}:\n{res}\n\n"
-            
-            final_data = await self.combiner.combine_cards(question, inputs, schema)
+        
+        # Use MCQ combine prompt if mode contains 'mcq'
+        combine_prompt = MCQ_COMBINE_PROMPT_TEMPLATE if 'mcq' in self.mode else None
+        final_data = await self.combiner.combine_cards(question, inputs, schema, combine_prompt)
         
         if final_data:
             # Post-process tags/types

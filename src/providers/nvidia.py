@@ -77,11 +77,12 @@ class NvidiaProvider(LLMProvider):
         content = await self._make_request(messages, schema)
         return content if content else ""
 
-    async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any], combine_prompt_template: Optional[str] = None) -> Optional[Dict[str, Any]]:
         # logger.info(f"[{self.model}] Combining cards for '{question}'...")
+        template = combine_prompt_template if combine_prompt_template else COMBINE_PROMPT_TEMPLATE
         messages = [
             {"role": "system", "content": "You are a helpful assistant that generates Anki cards in JSON format."},
-            {"role": "user", "content": COMBINE_PROMPT_TEMPLATE.format(
+            {"role": "user", "content": template.format(
                 question=question,
                 inputs=inputs
             )},

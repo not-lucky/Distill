@@ -26,7 +26,7 @@ class GeminiProvider(LLMProvider):
             logger.error(f"[Gemini] Error: {e}")
             return ""
 
-    async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any], combine_prompt_template: Optional[str] = None) -> Optional[Dict[str, Any]]:
         # Gemini webapi might not be best for strict JSON schema enforcement in the same way as OpenAI
         # But we can try prompting it.
         # For now, let's assume we rely on OpenAI/Cerebras for the combination step as per original logic,

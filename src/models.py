@@ -28,3 +28,19 @@ class PhysicsProblem(BaseModel):
     topic: str = Field(..., description="Main topic (e.g., 'Mechanics', 'Thermodynamics')")
     difficulty: str = Field(..., description="Difficulty level (Basic, Intermediate, Advanced)")
     cards: List[AnkiCard]
+
+class MCQCard(BaseModel):
+    model_config = {'extra': 'forbid'}
+    card_type: str = Field(..., description="Type of the card (e.g., 'Concept', 'Application', 'Tricky'). Use PascalCase.")
+    tags: List[str] = Field(..., description="Tags for the card. Use PascalCase.")
+    question: str = Field(..., description="The question stem (Markdown supported)")
+    options: List[str] = Field(..., description="Exactly 4 answer options labeled A, B, C, D")
+    correct_answer: str = Field(..., description="The correct answer (A, B, C, or D)")
+    explanation: str = Field(..., description="Explanation of why the correct answer is right (Markdown supported)")
+
+class MCQProblem(BaseModel):
+    model_config = {'extra': 'forbid'}
+    title: str = Field(..., description="Title of the topic/concept")
+    topic: str = Field(..., description="Main topic (e.g., 'Data Structures', 'Algorithms')")
+    difficulty: str = Field(..., description="Difficulty level (Easy, Medium, Hard)")
+    cards: List[MCQCard]
