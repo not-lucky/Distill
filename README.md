@@ -1,16 +1,18 @@
 # LLM2Deck
 
-LLM2Deck is a powerful tool designed to generate high-quality Anki decks using Large Language Models (LLMs). It automates the creation of study materials for LeetCode problems and Computer Science concepts, supporting multiple LLM providers and ensuring rich, formatted output.
+LLM2Deck is a powerful tool designed to generate high-quality Anki decks using Large Language Models (LLMs). It automates the creation of study materials for LeetCode problems, Computer Science concepts, and Physics topics, ensuring rich, formatted output with support for standard Q&A and Multiple Choice Questions (MCQs).
 
 ## Features
 
 - **Multi-Provider Support**: Seamlessly integrates with Cerebras, NVIDIA, and Google Gemini.
-- **Dual Modes**: 
-    - **LeetCode Mode** (Default): Generates cards for algorithmic problems.
-    - **CS Mode**: Generates cards for fundamental Computer Science concepts.
-- **Rich Formatting**: Supports code syntax highlighting and Markdown rendering in Anki cards.
+- **Multiple Modes**:
+    - **LeetCode Mode** (Default): Generates detailed cards for algorithmic problems (Code, Complexity, approaches).
+    - **CS Mode**: Generates deep-dive cards for Computer Science concepts.
+    - **Physics Mode**: Generates extensive cards for Physics concepts (Definitions, Formulas, Concepts).
+- **MCQ Support**: Generates high-quality Multiple Choice Questions with shuffled options and detailed explanations.
+- **Rich Formatting**: Supports code syntax highlighting (Catppuccin theme) and Markdown rendering in Anki cards.
+- **Modular Architecture**: Clean, extensible design with separate concerns for logic, styles, and data.
 - **Automated Export**: Converts generated JSON data directly into importable Anki Package (`.apkg`) files.
-- **Markdown Archival**: Converts Anki cards to Markdown files for readable archiving.
 
 ## Prerequisites
 
@@ -30,10 +32,6 @@ LLM2Deck is a powerful tool designed to generate high-quality Anki decks using L
    ```bash
    uv sync
    ```
-   Or using pip:
-   ```bash
-   pip install -r requirements.txt
-   ```
 
 ## Configuration
 
@@ -42,83 +40,96 @@ Create a `.env` file in the root directory. You can use the following template:
 
 ```ini
 # Configuration
-CONCURRENT_REQUESTS=14
-ENABLE_GEMINI=False
+CONCURRENT_REQUESTS=10
 
-# Custom Key File Paths (Optional - defaults shown)
+# Custom Key File Paths (Optional)
 # CEREBRAS_KEYS_FILE_PATH=api_keys.json
 # OPENROUTER_KEYS_FILE_PATH=openrouter_keys.json
 # NVIDIA_KEYS_FILE_PATH=nvidia_keys.json
-# GEMINI_CREDENTIALS_FILE_PATH=python3ds.json
+# GEMINI_CREDENTIALS_FILE_PATH=google_secret.json
 ```
 
 ### API Keys
-The project uses JSON files to manage API keys. Ensure you have the necessary files in your root directory based on the providers you intend to use.
+The project uses JSON files to manage API keys.
+*   **Cerebras**: `api_keys.json` (`[{"api_key": "..."}]`)
+*   **NVIDIA**: `nvidia_keys.json` (`["key1", "key2"]`)
+*   **Gemini**: `python3ds.json` (Cookie JSON)
 
-**Cerebras** (`api_keys.json`):
-```json
-[
-  { "api_key": "your_cerebras_key_here" }
-]
-```
-
-**NVIDIA** (`nvidia_keys.json`):
-```json
-[
-  "your_nvidia_key_here"
-]
-```
-*Note: A list of objects with an "api_key" field is also supported.*
-
-**Gemini** (`python3ds.json`):
-```json
-[
-  {
-    "Secure_1PSID": "...",
-    "Secure_1PSIDTS": "..."
-  }
-]
-```
+### Subject Configuration
+Subject-specific settings (prompts, models, target questions) are configured in `src/config/subjects.py`.
+Questions and Prompts are externalized in `src/data/`.
 
 ## Usage
 
-### Generating Cards
+### 1. Generating Cards (JSON)
 
-**Run in LeetCode Mode (Default):**
-This generates cards based on problems defined in `src/questions.py` (`QUESTIONS` list).
+Use `main.py` to generate the raw card data in JSON format.
+
+**Standard Mode:**
 ```bash
+# Default (LeetCode)
 uv run main.py
-```
 
-**Run in CS Mode:**
-This generates cards based on concepts defined in `src/questions.py` (`CS_QUESTIONS` list).
-```bash
+# Computer Science
 uv run main.py cs
+
+# Physics
+uv run main.py physics
 ```
-*Output will be saved as JSON files (e.g., `leetcode_anki_deck_...json`).*
 
-### Creating Anki Packages (`.apkg`)
-
-After generating the JSON deck, convert it to an Anki importable package:
+**MCQ Mode:**
+Append `mcq` to generate multiple choice questions.
 ```bash
-uv run convert_to_apkg.py
+# Physics MCQs (Targeting "Very Hard" difficulty)
+uv run main.py physics mcq
+
+# CS MCQs
+uv run main.py cs mcq
 ```
-This script will process the generated JSON files and create `.apkg` files in the root directory.
+*Output will be saved as JSON files (e.g., `physics_mcq_anki_deck_<timestamp>.json`).*
 
-### Archiving to Markdown
+### 2. Creating Anki Packages (.apkg)
 
+Use `convert_to_apkg.py` to convert the generated JSON into an importable Anki package.
+
+**Syntax:**
+```bash
+uv run convert_to_apkg.py <input_json_file> --mode <mode>
+```
+
+**Examples:**
+```bash
+# Convert Physics MCQs
+uv run convert_to_apkg.py physics_mcq_anki_deck_20251226.json --mode physics_mcq
+
+# Convert LeetCode Deck
+uv run convert_to_apkg.py leetcode_anki_deck_20251226.json --mode leetcode
+```
+*Successfully created .apkg files can be directly imported into Anki.*
+
+### 3. Archiving to Markdown (Optional)
 To save your Anki cards as readable Markdown files:
 ```bash
 uv run json_to_md.py
 ```
-This will read the JSON decks and output Markdown files to `anki_cards_markdown/`.
 
 ## Project Structure
 
-- `src/`: Core source code.
-    - `generator.py`: Main logic for calling LLMs and processing responses.
-    - `providers/`: Integration logic for different LLM APIs.
-    - `questions.py`: Definitions of problems and concepts to generate cards for.
-    - `prompts.py`: System prompts for the LLMs.
-- `anki_cards_archival/`: Directory where generated JSON decks are stored.
-- `anki_cards_markdown/`: Directory for Markdown exports.
+```
+LLM2Deck/
+├── src/
+│   ├── anki/               # Anki generation logic (Modular)
+│   │   ├── generator.py    # Deck generation logic
+│   │   ├── models.py       # Genanki model definitions
+│   │   ├── renderer.py     # Markdown to HTML rendering
+│   │   └── styles.py       # CSS themes
+│   ├── config/             # Configuration & Registry
+│   ├── data/               # Externalized Data
+│   │   ├── prompts/        # Markdown prompt templates
+│   │   └── questions.json  # Target questions list
+│   ├── providers/          # LLM Provider integrations
+│   └── ...
+├── convert_to_apkg.py      # CLI tool for Anki package creation
+├── main.py                 # Entry point for card generation
+└── README.md
+```

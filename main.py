@@ -1,11 +1,9 @@
 import asyncio
 from dotenv import load_dotenv
-
 import sys
+
 from src.config import CONCURRENT_REQUESTS
-from src.questions import QUESTIONS, CS_QUESTIONS, PHYSICS_QUESTIONS
-from src.models import CSProblem, LeetCodeProblem, PhysicsProblem, MCQProblem
-from src.prompts import GENIUS_PERSONA_PROMPT_TEMPLATE, PHYSICS_PROMPT_TEMPLATE, MCQ_PROMPT_TEMPLATE, PHYSICS_MCQ_PROMPT_TEMPLATE
+from src.config.subjects import SubjectRegistry
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.utils import save_final_deck
@@ -16,12 +14,10 @@ async def main():
     load_dotenv()
     
     # Parse arguments: subject [card_type]
-    # Subject: leetcode, cs, physics
-    # Card Type: mcq (optional, default is traditional/standard)
     args = sys.argv[1:]
     
     subject = "leetcode"
-    card_type = "standard"  # or "mcq"
+    card_type = "standard"
     
     for arg in args:
         if arg in ["cs", "physics", "leetcode"]:
@@ -31,36 +27,16 @@ async def main():
     
     print(f"Running: Subject={subject.upper()}, Card Type={card_type.upper()}")
     
-    # Configure subject-specific settings (questions)
-    if subject == "cs":
-        target_questions = CS_QUESTIONS
-    elif subject == "physics":
-        target_questions = PHYSICS_QUESTIONS
-    else:  # leetcode
-        target_questions = QUESTIONS
+    # Retrieve configuration from Registry
+    is_mcq = (card_type == "mcq")
+    config = SubjectRegistry.get_config(subject, is_mcq)
     
-    # Configure card type-specific settings (prompt and model)
-    if card_type == "mcq":
-        # Use subject-specific MCQ prompts
-        if subject == "physics":
-            prompt_template = PHYSICS_MCQ_PROMPT_TEMPLATE
-        else:
-            prompt_template = MCQ_PROMPT_TEMPLATE
-        target_model = MCQProblem
-    else:
-        # Standard card types based on subject
-        if subject == "cs":
-            prompt_template = GENIUS_PERSONA_PROMPT_TEMPLATE
-            target_model = CSProblem
-        elif subject == "physics":
-            prompt_template = PHYSICS_PROMPT_TEMPLATE
-            target_model = PhysicsProblem
-        else:  # leetcode
-            prompt_template = None
-            target_model = LeetCodeProblem
+    target_questions = config.target_questions
+    prompt_template = config.prompt_template
+    target_model = config.target_model
     
-    # Combine subject and card_type for mode identifier
-    mode = f"{subject}_{card_type}" if card_type == "mcq" else subject
+    # Configure mode identifier
+    mode = f"{subject}_{card_type}" if is_mcq else subject
     
     # Initialize Providers
     providers = await initialize_providers()

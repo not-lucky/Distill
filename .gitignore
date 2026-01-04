@@ -20,3 +20,5 @@ anki_cards_archival
 anki_cards_markdown
 *apkg
 app.log
+!src/data/questions.json
+

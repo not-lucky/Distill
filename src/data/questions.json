@@ -1,0 +1,38 @@
+{
+    "leetcode": [
+        "Contains Duplicate",
+        "Valid Anagram",
+        "Two Sum",
+        "Group Anagrams",
+        "Top K Frequent Elements",
+        "Encode and Decode Strings",
+        "Product of Array Except Self",
+        "Valid Sudoku",
+        "Longest Consecutive Sequence",
+        "Valid Palindrome",
+        "Two Sum II Input Array Is Sorted",
+        "3Sum",
+        "Container With Most Water",
+        "Trapping Rain Water",
+        "Best Time to Buy And Sell Stock",
+        "Longest Substring Without Repeating Characters",
+        "Longest Repeating Character Replacement",
+        "Permutation In String",
+        "Minimum Window Substring",
+        "Sliding Window Maximum",
+        "Valid Parentheses",
+        "Min Stack",
+        "Evaluate Reverse Polish Notation",
+        "Daily Temperatures",
+        "Car Fleet",
+        "Largest Rectangle In Histogram"
+    ],
+    "cs": [
+        "Linked List, implementation of common operations (both iterative and recursive) and time complexity"
+    ],
+    "physics": [
+        "Lande g-factor",
+        "Zeeman effect (normal)",
+        "Zeeman effect (anomalous)"
+    ]
+}
