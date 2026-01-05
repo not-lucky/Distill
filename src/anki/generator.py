@@ -4,7 +4,7 @@ import json
 import genanki
 import random
 import hashlib
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from src.anki.models import AnkiModelFactory
 from src.anki.renderer import render_markdown
@@ -49,6 +49,45 @@ class DeckGenerator:
             self.decks[deck_path] = genanki.Deck(deck_id, deck_path)
         return self.decks[deck_path]
     
+    def _get_prefix(self) -> str:
+        """Get the deck prefix based on mode."""
+        subject = self.mode.replace('_mcq', '')
+        is_mcq_mode = '_mcq' in self.mode or self.mode == 'mcq'
+        
+        if subject == "cs":
+            return "CS_MCQ" if is_mcq_mode else "CS"
+        elif subject == "physics":
+            return "Physics_MCQ" if is_mcq_mode else "Physics"
+        else:
+            return "LeetCode_MCQ" if is_mcq_mode else "LeetCode"
+    
+    def _build_deck_path(
+        self, 
+        title: str, 
+        topic: str,
+        category_index: Optional[int] = None,
+        category_name: Optional[str] = None,
+        problem_index: Optional[int] = None
+    ) -> str:
+        """
+        Build the deck path with optional numbered prefixes.
+        
+        If category metadata is provided, uses format:
+            Prefix::001 Category Name::001 Problem Title
+        Otherwise falls back to:
+            Prefix::Topic::Title
+        """
+        prefix = self._get_prefix()
+        
+        if category_index is not None and category_name is not None and problem_index is not None:
+            # Use explicit category metadata with numbering
+            cat_str = f"{category_index:03d} {category_name}"
+            prob_str = f"{problem_index:03d} {title}"
+            return f"{prefix}::{cat_str}::{prob_str}"
+        else:
+            # Fall back to topic-based naming (legacy behavior)
+            return f"{prefix}::{topic}::{title}"
+    
     def process(self):
         """Process all cards from the JSON data and add them to appropriate decks."""
         for problem_data in self.data:
@@ -56,18 +95,18 @@ class DeckGenerator:
             topic = problem_data.get('topic', 'Unknown Topic')
             difficulty = problem_data.get('difficulty', 'Unknown').replace(" ", "_")
             
-            # Determine logic for prefix based on mode
-            subject = self.mode.replace('_mcq', '')
-            is_mcq_mode = '_mcq' in self.mode or self.mode == 'mcq'
+            # Get category metadata if available
+            category_index = problem_data.get('category_index')
+            category_name = problem_data.get('category_name')
+            problem_index = problem_data.get('problem_index')
             
-            if subject == "cs":
-                prefix = "CS_MCQ" if is_mcq_mode else "CS"
-            elif subject == "physics":
-                prefix = "Physics_MCQ" if is_mcq_mode else "Physics"
-            else:
-                prefix = "LeetCode_MCQ" if is_mcq_mode else "LeetCode"
-                
-            deck_path = f"{prefix}::{topic}::{title}"
+            deck_path = self._build_deck_path(
+                title, 
+                topic,
+                category_index=category_index,
+                category_name=category_name,
+                problem_index=problem_index
+            )
             deck = self.get_or_create_deck(deck_path)
             
             for card_data in problem_data.get('cards', []):

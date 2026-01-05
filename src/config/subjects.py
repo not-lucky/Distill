@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Type, Optional, Any
+from typing import List, Type, Optional, Any, Dict, Union
 from pydantic import BaseModel
 
 from src.models import (
@@ -21,12 +21,17 @@ from src.questions import (
     PHYSICS_QUESTIONS
 )
 
+# Type aliases
+CategorizedQuestions = Dict[str, List[str]]
+FlatQuestions = List[str]
+
 @dataclass
 class SubjectConfig:
     """Configuration for a specific subject/mode."""
-    target_questions: List[str]
+    target_questions: Union[CategorizedQuestions, FlatQuestions]
     prompt_template: Optional[str]
     target_model: Type[BaseModel]
+    is_categorized: bool = False  # True if questions are in category dict format
     
 class SubjectRegistry:
     @staticmethod
@@ -43,12 +48,14 @@ class SubjectRegistry:
             subject = "leetcode"
 
         # 1. Select Questions
+        is_categorized = False
         if subject == "cs":
             questions = CS_QUESTIONS
         elif subject == "physics":
             questions = PHYSICS_QUESTIONS
         else:
             questions = QUESTIONS
+            is_categorized = isinstance(questions, dict)  # leetcode uses categorized format
 
         # 2. Select Model & Prompt
         if is_mcq:
@@ -71,5 +78,6 @@ class SubjectRegistry:
         return SubjectConfig(
             target_questions=questions,
             prompt_template=prompt,
-            target_model=model
+            target_model=model,
+            is_categorized=is_categorized
         )

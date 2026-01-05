@@ -18,7 +18,29 @@ class CardGenerator:
         self.combiner = combiner
         self.mode = mode
 
-    async def process_question(self, question: str, prompt_template: Optional[str] = None, model_class: BaseModel = LeetCodeProblem) -> Optional[Dict]:
+    async def process_question(
+        self, 
+        question: str, 
+        prompt_template: Optional[str] = None, 
+        model_class: BaseModel = LeetCodeProblem,
+        category_index: Optional[int] = None,
+        category_name: Optional[str] = None,
+        problem_index: Optional[int] = None
+    ) -> Optional[Dict]:
+        """
+        Process a single question and generate cards.
+        
+        Args:
+            question: The question/problem name
+            prompt_template: Optional prompt template
+            model_class: Pydantic model for the card structure
+            category_index: 1-based index of the category (for ordering)
+            category_name: Name of the category
+            problem_index: 1-based index of the problem within its category
+            
+        Returns:
+            Dict with card data including category metadata if provided
+        """
         with log_section(f"Processing: {question}"):
             # 1. Generate Initial Cards (Parallel)
             with log_status(f"Generating initial ideas for '{question}'..."):
@@ -52,6 +74,14 @@ class CardGenerator:
                     card['tags'] = [tag.replace(' ', '') for tag in card['tags']]
                 if 'card_type' in card:
                     card['card_type'] = card['card_type'].replace(' ', '')
+            
+            # Add category metadata if provided (for ordered deck generation)
+            if category_index is not None:
+                final_data['category_index'] = category_index
+            if category_name is not None:
+                final_data['category_name'] = category_name
+            if problem_index is not None:
+                final_data['problem_index'] = problem_index
 
             save_archival(question, final_data, subdir=self.mode)
             return final_data
