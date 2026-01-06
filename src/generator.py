@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 class CardGenerator:
     def __init__(self, providers: List[LLMProvider], combiner: LLMProvider, mode: str = "default"):
-        self.providers = providers
-        self.combiner = combiner
-        self.mode = mode
+        self.llm_providers = providers
+        self.card_combiner = combiner
+        self.generation_mode = mode
 
     async def process_question(
         self, 
@@ -44,32 +44,32 @@ class CardGenerator:
         with log_section(f"Processing: {question}"):
             # 1. Generate Initial Cards (Parallel)
             with log_status(f"Generating initial ideas for '{question}'..."):
-                tasks = []
-                schema = model_class.model_json_schema()
+                generation_tasks = []
+                json_schema = model_class.model_json_schema()
                 
-                for provider in self.providers:
-                    tasks.append(provider.generate_initial_cards(question, schema, prompt_template))
+                for provider in self.llm_providers:
+                    generation_tasks.append(provider.generate_initial_cards(question, json_schema, prompt_template))
                 
-                results = await asyncio.gather(*tasks)
+                provider_results = await asyncio.gather(*generation_tasks)
         
-        valid_results = [r for r in results if r]
+        valid_provider_results = [result for result in provider_results if result]
         
-        if not valid_results:
+        if not valid_provider_results:
             logger.error(f"All providers failed for '{question}'. Skipping.")
             return None
 
         # 2. Combine Cards
-        inputs = ""
-        for i, res in enumerate(valid_results):
-            inputs += f"Set {i+1}:\n{res}\n\n"
+        combined_inputs = ""
+        for set_index, provider_result in enumerate(valid_provider_results):
+            combined_inputs += f"Set {set_index+1}:\n{provider_result}\n\n"
         
         # Use MCQ combine prompt if mode contains 'mcq'
-        combine_prompt = MCQ_COMBINE_PROMPT_TEMPLATE if 'mcq' in self.mode else None
-        final_data = await self.combiner.combine_cards(question, inputs, schema, combine_prompt)
+        combine_prompt = MCQ_COMBINE_PROMPT_TEMPLATE if 'mcq' in self.generation_mode else None
+        final_card_data = await self.card_combiner.combine_cards(question, combined_inputs, json_schema, combine_prompt)
         
-        if final_data:
+        if final_card_data:
             # Post-process tags/types
-            for card in final_data.get('cards', []):
+            for card in final_card_data.get('cards', []):
                 if 'tags' in card:
                     card['tags'] = [tag.replace(' ', '') for tag in card['tags']]
                 if 'card_type' in card:
@@ -77,14 +77,14 @@ class CardGenerator:
             
             # Add category metadata if provided (for ordered deck generation)
             if category_index is not None:
-                final_data['category_index'] = category_index
+                final_card_data['category_index'] = category_index
             if category_name is not None:
-                final_data['category_name'] = category_name
+                final_card_data['category_name'] = category_name
             if problem_index is not None:
-                final_data['problem_index'] = problem_index
+                final_card_data['problem_index'] = problem_index
 
-            save_archival(question, final_data, subdir=self.mode)
-            return final_data
+            save_archival(question, final_card_data, subdir=self.generation_mode)
+            return final_card_data
         else:
             logger.error(f"Failed to generate final JSON for '{question}'.")
             return None

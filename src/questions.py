@@ -18,55 +18,55 @@ def load_questions() -> Tuple[Union[CategorizedQuestions, List[str]], List[str],
         - cs_questions: List[str] - flat list
         - physics_questions: List[str] - flat list
     """
-    current_file = Path(__file__)
-    project_root = current_file.parent.parent
-    data_path = project_root / "src" / "data" / "questions.json"
+    current_file_path = Path(__file__)
+    project_root_path = current_file_path.parent.parent
+    questions_data_path = project_root_path / "src" / "data" / "questions.json"
     
-    if not data_path.exists():
-        logger.error(f"Questions data file not found: {data_path}")
+    if not questions_data_path.exists():
+        logger.error(f"Questions data file not found: {questions_data_path}")
         return {}, [], []
         
     try:
-        with open(data_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get("leetcode", {}), data.get("cs", []), data.get("physics", [])
-    except Exception as e:
-        logger.error(f"Failed to load questions: {e}")
+        with open(questions_data_path, "r", encoding="utf-8") as questions_file:
+            questions_data = json.load(questions_file)
+            return questions_data.get("leetcode", {}), questions_data.get("cs", []), questions_data.get("physics", [])
+    except Exception as error:
+        logger.error(f"Failed to load questions: {error}")
         return {}, [], []
 
 
-def flatten_categorized_questions(categorized: CategorizedQuestions) -> List[str]:
+def flatten_categorized_questions(categorized_questions: CategorizedQuestions) -> List[str]:
     """
     Flatten a categorized question dict to a simple list.
     
     Args:
-        categorized: Dict mapping category names to lists of problems
+        categorized_questions: Dict mapping category names to lists of problems
         
     Returns:
         Flat list of all problems
     """
-    result = []
-    for problems in categorized.values():
-        result.extend(problems)
-    return result
+    flattened_result = []
+    for problem_list in categorized_questions.values():
+        flattened_result.extend(problem_list)
+    return flattened_result
 
 
-def get_indexed_questions(categorized: CategorizedQuestions) -> List[Tuple[int, str, int, str]]:
+def get_indexed_questions(categorized_questions: CategorizedQuestions) -> List[Tuple[int, str, int, str]]:
     """
     Get questions with their category and problem indices.
     
     Args:
-        categorized: Dict mapping category names to lists of problems
+        categorized_questions: Dict mapping category names to lists of problems
         
     Returns:
         List of tuples: (category_index, category_name, problem_index, problem_name)
         Indices are 1-based for display purposes.
     """
-    result = []
-    for cat_idx, (category_name, problems) in enumerate(categorized.items(), start=1):
-        for prob_idx, problem_name in enumerate(problems, start=1):
-            result.append((cat_idx, category_name, prob_idx, problem_name))
-    return result
+    indexed_result = []
+    for category_index, (category_name, problem_list) in enumerate(categorized_questions.items(), start=1):
+        for problem_index, problem_name in enumerate(problem_list, start=1):
+            indexed_result.append((category_index, category_name, problem_index, problem_name))
+    return indexed_result
 
 
 # Load at module level

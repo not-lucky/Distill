@@ -8,79 +8,79 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def merge_json_files(mode: str) -> None:
+def merge_json_files(generation_mode: str) -> None:
     """
     Merge all JSON files from the archival directory for the given mode.
     
     Args:
-        mode: 'cs' or 'leetcode'
+        generation_mode: 'cs' or 'leetcode'
     """
     # Define source directory
-    base_dir = Path("anki_cards_archival")
-    source_dir = base_dir / mode
+    base_directory = Path("anki_cards_archival")
+    source_directory = base_directory / generation_mode
     
-    if not source_dir.exists():
-        logger.error(f"❌ Error: Directory '{source_dir}' does not exist.")
+    if not source_directory.exists():
+        logger.error(f"❌ Error: Directory '{source_directory}' does not exist.")
         return
 
     # Find all JSON files
-    json_files = list(source_dir.glob("*.json"))
+    json_file_list = list(source_directory.glob("*.json"))
     
-    if not json_files:
-        logger.warning(f"⚠️ No JSON files found in '{source_dir}'.")
+    if not json_file_list:
+        logger.warning(f"⚠️ No JSON files found in '{source_directory}'.")
         return
 
-    logger.info(f"Found {len(json_files)} JSON files in '{source_dir}'.")
+    logger.info(f"Found {len(json_file_list)} JSON files in '{source_directory}'.")
 
-    merged_data: List[Dict[str, Any]] = []
+    merged_card_data: List[Dict[str, Any]] = []
     
     # Read and merge files
-    for file_path in json_files:
+    for json_file_path in json_file_list:
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            with open(json_file_path, 'r', encoding='utf-8') as input_file:
+                file_data = json.load(input_file)
                 # Ensure we are adding a dictionary (object)
-                if isinstance(data, dict):
-                    merged_data.append(data)
+                if isinstance(file_data, dict):
+                    merged_card_data.append(file_data)
                 else:
-                    logger.warning(f"⚠️ Warning: Skipping '{file_path.name}' - expected a JSON object, got {type(data).__name__}.")
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Error: Failed to parse '{file_path.name}' - {e}")
-        except Exception as e:
-            logger.error(f"❌ Error: processing '{file_path.name}' - {e}")
+                    logger.warning(f"⚠️ Warning: Skipping '{json_file_path.name}' - expected a JSON object, got {type(file_data).__name__}.")
+        except json.JSONDecodeError as decode_error:
+            logger.error(f"❌ Error: Failed to parse '{json_file_path.name}' - {decode_error}")
+        except Exception as error:
+            logger.error(f"❌ Error: processing '{json_file_path.name}' - {error}")
 
-    if not merged_data:
+    if not merged_card_data:
         logger.error("❌ No valid data found to merge.")
         return
 
     # Generate output filename
-    timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
-    output_filename = f"{mode}_anki_deck_{timestamp}.json"
-    output_path = Path(output_filename)
+    current_timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+    output_filename = f"{generation_mode}_anki_deck_{current_timestamp}.json"
+    output_file_path = Path(output_filename)
 
     # Write merged data
     try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(merged_data, f, indent=2, ensure_ascii=False)
+        with open(output_file_path, 'w', encoding='utf-8') as output_file:
+            json.dump(merged_card_data, output_file, indent=2, ensure_ascii=False)
         
-        logger.info(f"\n✅ Successfully merged {len(merged_data)} files.")
-        logger.info(f"📄 Output saved to: {output_path.absolute()}")
+        logger.info(f"\n✅ Successfully merged {len(merged_card_data)} files.")
+        logger.info(f"📄 Output saved to: {output_file_path.absolute()}")
         
-    except Exception as e:
-        logger.error(f"❌ Error: Failed to write output file - {e}")
+    except Exception as error:
+        logger.error(f"❌ Error: Failed to write output file - {error}")
 
 def main():
-    parser = argparse.ArgumentParser(
+    argument_parser = argparse.ArgumentParser(
         description='Merge Anki JSON files from archival directory'
     )
-    parser.add_argument(
+    argument_parser.add_argument(
         'mode',
         choices=['cs', 'leetcode'],
         help='Mode to run: cs or leetcode'
     )
     
-    args = parser.parse_args()
-    merge_json_files(args.mode)
+    parsed_arguments = argument_parser.parse_args()
+    merge_json_files(parsed_arguments.mode)
 
 if __name__ == "__main__":
     setup_logging()

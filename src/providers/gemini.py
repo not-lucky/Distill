@@ -9,24 +9,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 class GeminiProvider(LLMProvider):
-    def __init__(self, client: GeminiClient):
-        self.client = client
+    def __init__(self, gemini_client: GeminiClient):
+        self.gemini_client = gemini_client
 
-    async def generate_initial_cards(self, question: str, schema: Dict[str, Any], prompt_template: Optional[str] = None) -> str:
+    async def generate_initial_cards(self, question: str, json_schema: Dict[str, Any], prompt_template: Optional[str] = None) -> str:
         # logger.info(f"[Gemini] Generating initial cards for '{question}'...")
         try:
-            template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
-            prompt = template.format(
+            active_template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
+            formatted_prompt = active_template.format(
                 question=question,
-                schema=json.dumps(schema, indent=2, ensure_ascii=False)
+                schema=json.dumps(json_schema, indent=2, ensure_ascii=False)
             )
-            response = await self.client.generate_content(prompt, model=Model.G_3_0_PRO)
-            return response.text
-        except Exception as e:
-            logger.error(f"[Gemini] Error: {e}")
+            api_response = await self.gemini_client.generate_content(formatted_prompt, model=Model.G_3_0_PRO)
+            return api_response.text
+        except Exception as error:
+            logger.error(f"[Gemini] Error: {error}")
             return ""
 
-    async def combine_cards(self, question: str, inputs: str, schema: Dict[str, Any], combine_prompt_template: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def combine_cards(self, question: str, combined_inputs: str, json_schema: Dict[str, Any], combine_prompt_template: Optional[str] = None) -> Optional[Dict[str, Any]]:
         # Gemini webapi might not be best for strict JSON schema enforcement in the same way as OpenAI
         # But we can try prompting it.
         # For now, let's assume we rely on OpenAI/Cerebras for the combination step as per original logic,

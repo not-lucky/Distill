@@ -10,17 +10,17 @@ logger = logging.getLogger(__name__)
 def main():
     setup_logging()
     
-    parser = argparse.ArgumentParser(description="Convert LLM JSON output to Anki .apkg")
-    parser.add_argument("json_file", help="Path to the JSON file containing synthesized cards")
-    parser.add_argument("--mode", default="leetcode", 
+    argument_parser = argparse.ArgumentParser(description="Convert LLM JSON output to Anki .apkg")
+    argument_parser.add_argument("json_file", help="Path to the JSON file containing synthesized cards")
+    argument_parser.add_argument("--mode", default="leetcode", 
                         choices=["cs", "physics", "leetcode", "cs_mcq", "physics_mcq", "leetcode_mcq", "mcq"],
                         help="Mode of generation")
     
-    args = parser.parse_args()
+    parsed_arguments = argument_parser.parse_args()
     
-    input_path = Path(args.json_file)
-    if not input_path.exists():
-        logger.error(f"Input file not found: {input_path}")
+    input_file_path = Path(parsed_arguments.json_file)
+    if not input_file_path.exists():
+        logger.error(f"Input file not found: {input_file_path}")
         sys.exit(1)
         
     # Determine output filename
@@ -29,7 +29,7 @@ def main():
     
     # Simple logic: {mode}_anki.apkg
     # Or preserve original filename stem
-    output_filename = f"{input_path.stem}.apkg"
+    output_filename = f"{input_file_path.stem}.apkg"
     
     # Better yet, use the logic from the old script to keep consistent simple names if desired:
     # but using stem is safer for multiple files.
@@ -39,21 +39,21 @@ def main():
     # The old logic seemed to output `{mode}_anki.apkg` which overwrites.
     
     # Let's try to match the mode to the filename for cleaner output if possible
-    final_output = f"{args.mode}_anki.apkg"
+    final_output_path = f"{parsed_arguments.mode}_anki.apkg"
     
     # Wait, the user logic before was a bit weird on filenames. 
     # Let's just output to {input_filename_stem}.apkg to be safe and avoid overwrites
-    final_output = f"{input_path.stem}.apkg"
+    final_output_path = f"{input_file_path.stem}.apkg"
 
-    logger.info(f"Converting {input_path} to {final_output} in mode {args.mode}")
+    logger.info(f"Converting {input_file_path} to {final_output_path} in mode {parsed_arguments.mode}")
     
     try:
-        generator = DeckGenerator(str(input_path), mode=args.mode)
-        generator.process()
-        generator.save_package(final_output)
-        print(f"Successfully created: {final_output}")
-    except Exception as e:
-        logger.error(f"Failed to create Anki deck: {e}")
+        deck_generator = DeckGenerator(str(input_file_path), mode=parsed_arguments.mode)
+        deck_generator.process()
+        deck_generator.save_package(final_output_path)
+        print(f"Successfully created: {final_output_path}")
+    except Exception as error:
+        logger.error(f"Failed to create Anki deck: {error}")
         sys.exit(1)
 
 if __name__ == "__main__":

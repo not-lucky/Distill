@@ -8,20 +8,20 @@ class AnkiModelFactory:
         self.basic_model = self._create_basic_model()
         self.mcq_model = self._create_mcq_model()
 
-    def _generate_id(self, text: str) -> int:
+    def _generate_id(self, text_content: str) -> int:
         """
         Generate a unique ID based on text content.
         
         Args:
-            text: Text to generate ID from
+            text_content: Text to generate ID from
             
         Returns:
             A unique integer ID
         """
         # Use hash to generate consistent IDs
-        hash_obj = hashlib.md5(text.encode())
+        hash_object = hashlib.md5(text_content.encode())
         # Take first 8 bytes and convert to int
-        return int(hash_obj.hexdigest()[:8], 16)
+        return int(hash_object.hexdigest()[:8], 16)
 
     def _create_basic_model(self) -> genanki.Model:
         return genanki.Model(
