@@ -13,7 +13,9 @@ from src.prompts import (
     PHYSICS_PROMPT_TEMPLATE, 
     MCQ_PROMPT_TEMPLATE,
     PHYSICS_MCQ_PROMPT_TEMPLATE,
-    INITIAL_PROMPT_TEMPLATE
+    INITIAL_PROMPT_TEMPLATE,
+    INITIAL_LEETCODE_PROMPT_TEMPLATE,
+    COMBINE_LEETCODE_PROMPT_TEMPLATE
 )
 from src.questions import (
     QUESTIONS, 
@@ -73,7 +75,7 @@ class SubjectRegistry:
                 prompt_template = PHYSICS_PROMPT_TEMPLATE
             else: # leetcode
                 target_model_class = LeetCodeProblem
-                prompt_template = None # Usage of generic/initial prompt implied or handled by Logic
+                prompt_template = INITIAL_LEETCODE_PROMPT_TEMPLATE
 
         return SubjectConfig(
             target_questions=question_list,

@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel
 from src.models import LeetCodeProblem
 from src.providers.base import LLMProvider
-from src.prompts import MCQ_COMBINE_PROMPT_TEMPLATE
+from src.prompts import MCQ_COMBINE_PROMPT_TEMPLATE, COMBINE_LEETCODE_PROMPT_TEMPLATE
 from src.utils import save_archival
 import logging
 
@@ -63,8 +63,13 @@ class CardGenerator:
         for set_index, provider_result in enumerate(valid_provider_results):
             combined_inputs += f"Set {set_index+1}:\n{provider_result}\n\n"
         
-        # Use MCQ combine prompt if mode contains 'mcq'
-        combine_prompt = MCQ_COMBINE_PROMPT_TEMPLATE if 'mcq' in self.generation_mode else None
+        # Select appropriate combining prompt based on mode
+        if 'mcq' in self.generation_mode:
+            combine_prompt = MCQ_COMBINE_PROMPT_TEMPLATE
+        elif 'leetcode' in self.generation_mode:
+            combine_prompt = COMBINE_LEETCODE_PROMPT_TEMPLATE
+        else:
+            combine_prompt = None
         final_card_data = await self.card_combiner.combine_cards(question, combined_inputs, json_schema, combine_prompt)
         
         if final_card_data:

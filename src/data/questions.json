@@ -1,13 +1,8 @@
 {
     "leetcode": {
-        "Binary Search": [
-            "Binary Search",
-            "Search a 2D Matrix",
-            "Koko Eating Bananas",
-            "Find Minimum In Rotated Sorted Array",
-            "Search In Rotated Sorted Array",
-            "Time Based Key Value Store",
-            "Median of Two Sorted Arrays"
+        "Sliding Window": [
+            "Best Time to Buy And Sell Stock",
+            "Longest Substring Without Repeating Characters"
         ]
     },
     "cs": [
