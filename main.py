@@ -47,6 +47,8 @@ async def main():
     # Combiner (Use the first provider as the combiner)
     card_combiner_provider = llm_providers[0]
 
+    llm_providers.reverse()
+
     # Initialize Generator
     card_generator = CardGenerator(llm_providers, card_combiner_provider, mode=generation_mode)
     

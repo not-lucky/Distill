@@ -85,7 +85,7 @@ class CerebrasProvider(LLMProvider):
             )},
         ]
         
-        for attempt_number in range(3):
+        for attempt_number in range(7):
             response_content = await self._make_request(chat_messages, json_schema)
             if response_content:
                 try:

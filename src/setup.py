@@ -7,13 +7,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 from gemini_webapi import GeminiClient
-from src.config import CEREBRAS_KEYS_FILE_PATH, OPENROUTER_KEYS_FILE, GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI, NVIDIA_KEYS_FILE
+from src.config import CEREBRAS_KEYS_FILE_PATH, OPENROUTER_KEYS_FILE, GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI, NVIDIA_KEYS_FILE, CANOPYWAVE_KEYS_FILE
 from src.providers.base import LLMProvider
 from src.providers.cerebras import CerebrasProvider
 from src.providers.gemini import GeminiProvider
 from src.providers.openrouter import OpenRouterProvider
 from src.providers.nvidia import NvidiaProvider
 from src.providers.g4f_provider import G4FProvider
+from src.providers.canopywave import CanopywaveProvider
 
 async def load_cerebras_keys() -> List[str]:
     if not CEREBRAS_KEYS_FILE_PATH.exists():
@@ -45,7 +46,6 @@ async def load_openrouter_keys() -> List[str]:
         return []
     
     shuffle(api_key_list)
-    shuffle(api_key_list)
     return api_key_list
 
 async def load_nvidia_keys() -> List[str]:
@@ -66,6 +66,29 @@ async def load_nvidia_keys() -> List[str]:
             
     if not api_key_list:
         logger.warning("No NVIDIA API keys found in the file.")
+        return []
+    
+    shuffle(api_key_list)
+    return api_key_list
+
+async def load_canopywave_keys() -> List[str]:
+    if not CANOPYWAVE_KEYS_FILE.exists():
+        logger.warning(f"Canopywave API keys file not found: {CANOPYWAVE_KEYS_FILE}")
+        return []
+    
+    with open(CANOPYWAVE_KEYS_FILE, "r", encoding="utf-8") as keys_file:
+        keys_json_data = json.load(keys_file)
+    
+    # Support both list of strings or list of dicts with 'api_key'
+    api_key_list = []
+    if isinstance(keys_json_data, list) and len(keys_json_data) > 0:
+        if isinstance(keys_json_data[0], str):
+            api_key_list = keys_json_data
+        elif isinstance(keys_json_data[0], dict) and "api_key" in keys_json_data[0]:
+            api_key_list = [item["api_key"] for item in keys_json_data if "api_key" in item]
+            
+    if not api_key_list:
+        logger.warning("No Canopywave API keys found in the file.")
         return []
     
     shuffle(api_key_list)
@@ -107,10 +130,10 @@ async def initialize_providers() -> List[LLMProvider]:
             #     api_keys=cerebras_key_cycle, 
             #     model="gpt-oss-120b"
             # ))
-            active_providers.append(CerebrasProvider(
-                api_keys=cerebras_key_cycle, 
-                model="zai-glm-4.6" 
-            ))
+            # active_providers.append(CerebrasProvider(
+            #     api_keys=cerebras_key_cycle, 
+            #     model="zai-glm-4.6" 
+            # ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_cycle, 
             #     model="qwen-3-235b-a22b-instruct-2507" 
@@ -122,7 +145,7 @@ async def initialize_providers() -> List[LLMProvider]:
     # try:
     #     openrouter_api_keys = await load_openrouter_keys()
     #     if openrouter_api_keys:
-    #         openrouter_model_name = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
+    #         openrouter_model_name = os.getenv("OPENROUTER_MODEL", "xiaomi/mimo-v2-flash:free")
     #         active_providers.append(OpenRouterProvider(
     #             api_keys=openrouter_api_keys,
     #             model=openrouter_model_name
@@ -146,6 +169,18 @@ async def initialize_providers() -> List[LLMProvider]:
             # ))
     except Exception as error:
         logger.warning(f"Error loading NVIDIA providers: {error}")
+
+    # 3.5. Load Canopywave Keys
+    try:
+        canopywave_api_keys = await load_canopywave_keys()
+        if canopywave_api_keys:
+            active_providers.append(CanopywaveProvider(
+                api_keys=canopywave_api_keys,
+                model="deepseek/deepseek-chat-v3.2"
+            ))
+            logger.info(f"Initialized Canopywave provider with {len(canopywave_api_keys)} key(s)")
+    except Exception as error:
+        logger.warning(f"Error loading Canopywave providers: {error}")
 
     # 4. Initialize G4F Provider (Experimental)
     # try:
