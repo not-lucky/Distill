@@ -180,7 +180,19 @@ async def initialize_providers() -> List[LLMProvider]:
     # except Exception as error:
     #      logger.warning(f"Error initializing G4F provider: {error}")
 
-    # 4. Initialize Gemini Providers
+    # 5. Load Canopywave Keys
+    try:
+        canopywave_api_keys = await load_canopywave_keys()
+        if canopywave_api_keys:
+            canopywave_key_cycle = itertools.cycle(canopywave_api_keys)
+            active_providers.append(CanopywaveProvider(
+                api_keys=canopywave_key_cycle,
+                model="deepseek/deepseek-chat-v3.2"
+            ))
+    except Exception as error:
+        logger.warning(f"Error loading Canopywave providers: {error}")
+
+    # 6. Initialize Gemini Providers
     if ENABLE_GEMINI:
         try:
             gemini_client_list = await load_gemini_clients()
