@@ -170,18 +170,6 @@ async def initialize_providers() -> List[LLMProvider]:
     except Exception as error:
         logger.warning(f"Error loading NVIDIA providers: {error}")
 
-    # 3.5. Load Canopywave Keys
-    try:
-        canopywave_api_keys = await load_canopywave_keys()
-        if canopywave_api_keys:
-            active_providers.append(CanopywaveProvider(
-                api_keys=canopywave_api_keys,
-                model="deepseek/deepseek-chat-v3.2"
-            ))
-            logger.info(f"Initialized Canopywave provider with {len(canopywave_api_keys)} key(s)")
-    except Exception as error:
-        logger.warning(f"Error loading Canopywave providers: {error}")
-
     # 4. Initialize G4F Provider (Experimental)
     # try:
     #     # Using LMArena and the specific model as requested

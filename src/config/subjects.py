@@ -75,7 +75,7 @@ class SubjectRegistry:
                 prompt_template = PHYSICS_PROMPT_TEMPLATE
             else: # leetcode
                 target_model_class = LeetCodeProblem
-                prompt_template = INITIAL_LEETCODE_PROMPT_TEMPLATE
+                prompt_template = None # Usage of generic/initial prompt implied or handled by Logic
 
         return SubjectConfig(
             target_questions=question_list,
