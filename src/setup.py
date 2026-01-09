@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 from gemini_webapi import GeminiClient
-from src.config import CEREBRAS_KEYS_FILE_PATH, OPENROUTER_KEYS_FILE, GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI, NVIDIA_KEYS_FILE, CANOPYWAVE_KEYS_FILE, BASETEN_KEYS_FILE
+from src.config import CEREBRAS_KEYS_FILE_PATH, OPENROUTER_KEYS_FILE, GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI, NVIDIA_KEYS_FILE, CANOPYWAVE_KEYS_FILE, BASETEN_KEYS_FILE, GOOGLE_GENAI_KEYS_FILE
 from src.providers.base import LLMProvider
 from src.providers.cerebras import CerebrasProvider
 from src.providers.gemini import GeminiProvider
@@ -16,6 +16,7 @@ from src.providers.nvidia import NvidiaProvider
 from src.providers.g4f_provider import G4FProvider
 from src.providers.canopywave import CanopywaveProvider
 from src.providers.baseten import BasetenProvider
+from src.providers.google_genai import GoogleGenAIProvider
 
 async def load_cerebras_keys() -> List[str]:
     if not CEREBRAS_KEYS_FILE_PATH.exists():
@@ -115,6 +116,29 @@ async def load_baseten_keys() -> List[str]:
         logger.warning("No Baseten API keys found in the file.")
         return []
     
+    shuffle(api_key_list)
+    return api_key_list
+
+async def load_google_genai_keys() -> List[str]:
+    if not GOOGLE_GENAI_KEYS_FILE.exists():
+        logger.warning(f"Google GenAI API keys file not found: {GOOGLE_GENAI_KEYS_FILE}")
+        return []
+
+    with open(GOOGLE_GENAI_KEYS_FILE, "r", encoding="utf-8") as keys_file:
+        keys_json_data = json.load(keys_file)
+
+    # Support both list of strings or list of dicts with 'api_key'
+    api_key_list = []
+    if isinstance(keys_json_data, list) and len(keys_json_data) > 0:
+        if isinstance(keys_json_data[0], str):
+            api_key_list = keys_json_data
+        elif isinstance(keys_json_data[0], dict) and "api_key" in keys_json_data[0]:
+            api_key_list = [item["api_key"] for item in keys_json_data if "api_key" in item]
+
+    if not api_key_list:
+        logger.warning("No Google GenAI API keys found in the file.")
+        return []
+
     shuffle(api_key_list)
     return api_key_list
 
@@ -227,6 +251,18 @@ async def initialize_providers() -> List[LLMProvider]:
             ))
     except Exception as error:
         logger.warning(f"Error loading Baseten providers: {error}")
+
+    # 7. Initialize Google GenAI Provider
+    try:
+        google_genai_keys = await load_google_genai_keys()
+        if google_genai_keys:
+            google_genai_key_cycle = itertools.cycle(google_genai_keys)
+            active_providers.append(GoogleGenAIProvider(
+                api_keys=google_genai_key_cycle,
+                model="gemini-3-pro-preview" # Default model
+            ))
+    except Exception as error:
+        logger.warning(f"Error loading Google GenAI provider: {error}")
 
     # 7. Initialize Gemini Providers
     if ENABLE_GEMINI:

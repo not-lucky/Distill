@@ -13,6 +13,7 @@ GEMINI_CREDENTIALS_FILE = Path(os.getenv("GEMINI_CREDENTIALS_FILE_PATH", "python
 NVIDIA_KEYS_FILE = Path(os.getenv("NVIDIA_KEYS_FILE_PATH", "nvidia_keys.json"))
 CANOPYWAVE_KEYS_FILE = Path(os.getenv("CANOPYWAVE_KEYS_FILE_PATH", "canopywave_keys.json"))
 BASETEN_KEYS_FILE = Path(os.getenv("BASETEN_KEYS_FILE_PATH", "baseten_keys.json"))
+GOOGLE_GENAI_KEYS_FILE = Path(os.getenv("GOOGLE_GENAI_KEYS_FILE_PATH", "google_genai_keys.json"))
 
 # Configuration
 CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", 6))
@@ -30,6 +31,7 @@ __all__ = [
     'NVIDIA_KEYS_FILE',
     'CANOPYWAVE_KEYS_FILE',
     'BASETEN_KEYS_FILE',
+    'GOOGLE_GENAI_KEYS_FILE',
     'CONCURRENT_REQUESTS',
     'ENABLE_GEMINI',
     'SubjectRegistry',
