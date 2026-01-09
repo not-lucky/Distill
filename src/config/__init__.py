@@ -12,9 +12,10 @@ OPENROUTER_KEYS_FILE = Path(os.getenv("OPENROUTER_KEYS_FILE_PATH", "openrouter_k
 GEMINI_CREDENTIALS_FILE = Path(os.getenv("GEMINI_CREDENTIALS_FILE_PATH", "python3ds.json"))
 NVIDIA_KEYS_FILE = Path(os.getenv("NVIDIA_KEYS_FILE_PATH", "nvidia_keys.json"))
 CANOPYWAVE_KEYS_FILE = Path(os.getenv("CANOPYWAVE_KEYS_FILE_PATH", "canopywave_keys.json"))
+BASETEN_KEYS_FILE = Path(os.getenv("BASETEN_KEYS_FILE_PATH", "baseten_keys.json"))
 
 # Configuration
-CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", 5))
+CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", 6))
 ENABLE_GEMINI = os.getenv("ENABLE_GEMINI", "False").lower() == "true"
 
 # Re-export subject config
@@ -28,6 +29,7 @@ __all__ = [
     'GEMINI_CREDENTIALS_FILE',
     'NVIDIA_KEYS_FILE',
     'CANOPYWAVE_KEYS_FILE',
+    'BASETEN_KEYS_FILE',
     'CONCURRENT_REQUESTS',
     'ENABLE_GEMINI',
     'SubjectRegistry',
