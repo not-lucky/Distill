@@ -1,112 +1,173 @@
 import json
-import logging
 import asyncio
-from typing import Dict, Any, Optional, Iterator
+import itertools
+from typing import Dict, Any, Optional, List, Iterator
 from google import genai
 from google.genai import types
-
 from src.providers.base import LLMProvider
-from src.prompts import INITIAL_PROMPT_TEMPLATE, MCQ_COMBINE_PROMPT_TEMPLATE
+from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+import logging
 
 logger = logging.getLogger(__name__)
 
+
 class GoogleGenAIProvider(LLMProvider):
-    def __init__(self, api_keys: Iterator[str], model: str = "gemini-3-pro-preview"):
+    """
+    Provider for Google's official Gemini API using the google-genai package.
+    Supports Gemini 3 models with thinking_level and other advanced features.
+    """
+    
+    def __init__(
+        self, 
+        api_keys: Iterator[str], 
+        model: str = "gemini-3-flash-preview",
+        thinking_level: str = "high"
+    ):
         """
-        Initialize the Google GenAI provider.
+        Initialize the GoogleGenAIProvider.
         
         Args:
-            api_keys: An iterator that yields API keys (e.g. itertools.cycle).
-            model: The model identifier to use (default: gemini-3-pro-preview).
+            api_keys: An iterator (e.g., itertools.cycle) of API keys for rotation.
+            model: The model ID to use (e.g., "gemini-3-pro-preview", "gemini-3-flash-preview").
+            thinking_level: The thinking level for Gemini 3 models ("low", "medium", "high", "minimal").
+                           Note: "medium" and "minimal" are only supported by Gemini 3 Flash.
         """
-        self.api_keys = api_keys
-        self.model = model
-
+        self.api_key_iterator = api_keys
+        self.model_name = model
+        self.thinking_level = thinking_level
+    
     def _get_client(self) -> genai.Client:
-        """Get a client instance with the next API key."""
-        try:
-            api_key = next(self.api_keys)
-            return genai.Client(api_key=api_key)
-        except StopIteration:
-            logger.error("No Google GenAI API keys available.")
-            raise ValueError("No Google GenAI API keys available.")
-
-    async def generate_initial_cards(self, question: str, json_schema: Dict[str, Any], prompt_template: Optional[str] = None) -> str:
-        """Generates initial cards using Google GenAI."""
-        # logger.info(f"[GoogleGenAI] Generating initial cards for '{question}' with model {self.model}...")
-        client = self._get_client()
+        """Get a new client with the next API key in rotation."""
+        current_api_key = next(self.api_key_iterator)
+        return genai.Client(api_key=current_api_key)
+    
+    async def _make_request(
+        self, 
+        contents: str, 
+        json_schema: Optional[Dict[str, Any]] = None,
+        max_retries: int = 5
+    ) -> Optional[str]:
+        """
+        Make a request to the Gemini API with retry logic.
+        
+        Args:
+            contents: The prompt/contents to send to the model.
+            json_schema: Optional JSON schema for structured output.
+            max_retries: Maximum number of retry attempts.
+            
+        Returns:
+            The response text or None if all retries failed.
+        """
+        for attempt_number in range(max_retries):
+            try:
+                client = self._get_client()
+                
+                # Build the config
+                config_dict: Dict[str, Any] = {
+                    "thinking_config": types.ThinkingConfig(
+                        thinking_level=self.thinking_level
+                    ),
+                    "temperature": 1.0,  # Gemini 3 recommends keeping temperature at 1.0
+                }
+                
+                # Add JSON schema for structured output if provided
+                if json_schema:
+                    config_dict["response_mime_type"] = "application/json"
+                    config_dict["response_json_schema"] = json_schema
+                
+                config = types.GenerateContentConfig(**config_dict)
+                
+                # Make the API call in a thread to avoid blocking
+                response = await asyncio.to_thread(
+                    client.models.generate_content,
+                    model=self.model_name,
+                    contents=contents,
+                    config=config
+                )
+                
+                if response.text:
+                    return response.text
+                
+                logger.warning(
+                    f"[{self.model_name}] Attempt {attempt_number + 1}/{max_retries}: "
+                    "Received empty response. Retrying..."
+                )
+                
+            except Exception as error:
+                logger.error(
+                    f"[{self.model_name}] Attempt {attempt_number + 1}/{max_retries} "
+                    f"Error: {error}"
+                )
+            
+            # Small delay between retries
+            await asyncio.sleep(1)
+        
+        return None
+    
+    async def generate_initial_cards(
+        self, 
+        question: str, 
+        json_schema: Dict[str, Any], 
+        prompt_template: Optional[str] = None
+    ) -> str:
+        """
+        Generates initial Anki cards for a given question.
+        
+        Args:
+            question: The question/topic to generate cards for.
+            json_schema: The JSON schema for the response format.
+            prompt_template: Optional custom prompt template.
+            
+        Returns:
+            The generated content as a string, or empty string on failure.
+        """
         active_template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
         
-        # We include the schema in the prompt text as well, as the template expects it.
-        # This double-reinforces the structure.
         formatted_prompt = active_template.format(
             question=question,
             schema=json.dumps(json_schema, indent=2, ensure_ascii=False)
         )
-
-        def _call_api():
-            try:
-                response = client.models.generate_content(
-                    model=self.model,
-                    contents=formatted_prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=json_schema,
-                        thinking_config=types.ThinkingConfig(thinking_level="high") if "flash" not in self.model else types.ThinkingConfig(thinking_level="medium")
-                    )
-                )
-                return response.text
-            except Exception as e:
-                logger.error(f"[GoogleGenAI] API call failed: {e}")
-                raise
-
-        try:
-            loop = asyncio.get_running_loop()
-            response_text = await loop.run_in_executor(None, _call_api)
-            return response_text if response_text else ""
-        except Exception as error:
-            logger.error(f"[GoogleGenAI] Error generating cards: {error}")
-            return ""
-
-    async def combine_cards(self, question: str, combined_inputs: str, json_schema: Dict[str, Any], combine_prompt_template: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Combines multiple sets of cards into a single deck."""
-        # logger.info(f"[GoogleGenAI] Combining cards for '{question}'...")
-        client = self._get_client()
         
-        prompt_template = combine_prompt_template if combine_prompt_template else MCQ_COMBINE_PROMPT_TEMPLATE
-        if prompt_template:
-             formatted_prompt = prompt_template.format(
-                question=question,
-                combined_inputs=combined_inputs,
-                schema=json.dumps(json_schema, indent=2, ensure_ascii=False)
-            )
-        else:
-             # Fallback if no template provided, though unlikely given logic in generator.py
-             formatted_prompt = f"Combine these inputs for {question}:\n{combined_inputs}"
-
-        def _call_api():
-            try:
-                response = client.models.generate_content(
-                    model=self.model,
-                    contents=formatted_prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=json_schema
-                    )
-                )
-                return response.text
-            except Exception as e:
-                logger.error(f"[GoogleGenAI] API call failed during combination: {e}")
-                raise
-
-        try:
-            loop = asyncio.get_running_loop()
-            response_text = await loop.run_in_executor(None, _call_api)
+        response_content = await self._make_request(formatted_prompt, json_schema)
+        return response_content if response_content else ""
+    
+    async def combine_cards(
+        self, 
+        question: str, 
+        combined_inputs: str, 
+        json_schema: Dict[str, Any], 
+        combine_prompt_template: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Combines multiple sets of cards into a single deck.
+        
+        Args:
+            question: The question/topic for the cards.
+            combined_inputs: The combined input from multiple card generations.
+            json_schema: The JSON schema for the response format.
+            combine_prompt_template: Optional custom combine prompt template.
             
-            if not response_text:
-                return None
-                
-            return json.loads(response_text)
-        except Exception as error:
-            logger.error(f"[GoogleGenAI] Error combining cards: {error}")
-            return None
+        Returns:
+            The combined cards as a dictionary, or None on failure.
+        """
+        active_template = combine_prompt_template if combine_prompt_template else COMBINE_PROMPT_TEMPLATE
+        
+        formatted_prompt = active_template.format(
+            question=question,
+            inputs=combined_inputs
+        )
+        
+        for attempt_number in range(5):
+            response_content = await self._make_request(formatted_prompt, json_schema)
+            if response_content:
+                try:
+                    return json.loads(response_content)
+                except json.JSONDecodeError as decode_error:
+                    logger.warning(
+                        f"[{self.model_name}] Attempt {attempt_number + 1}/5: "
+                        f"JSON Decode Error: {decode_error}. Retrying..."
+                    )
+                    continue
+        
+        logger.error(f"[{self.model_name}] Failed to decode JSON after 5 attempts.")
+        return None
