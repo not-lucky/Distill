@@ -1,12 +1,47 @@
 {
     "leetcode": {
-        "Stack": [
-            "Number of atoms"
+        "Binary Search": [
+            "Binary Search",
+            "Search a 2D Matrix",
+            "Koko Eating Bananas",
+            "Find Minimum In Rotated Sorted Array",
+            "Search In Rotated Sorted Array",
+            "Time Based Key Value Store",
+            "Median of Two Sorted Arrays"
+        ],
+        "Linked List": [
+            "Reverse Linked List",
+            "Merge Two Sorted Lists",
+            "Linked List Cycle",
+            "Reorder List",
+            "Remove Nth Node From End of List",
+            "Copy List With Random Pointer",
+            "Add Two Numbers",
+            "Find The Duplicate Number",
+            "LRU Cache",
+            "Merge K Sorted Lists",
+            "Reverse Nodes In K Group"
         ]
     },
-    "cs": [
-        "Linked List, implementation of common operations (both iterative and recursive) and time complexity"
-    ],
+    "cs": {
+        "Recursion": [
+            "Tower of Hanoi"
+        ],
+        "Sorting and Searching": [
+            "Binary Search",
+            "Bubble Sort",
+            "Selection Sort",
+            "Insertion Sort",
+            "Merge Sort",
+            "Quick Sort",
+            "Counting Sort",
+            "Heap Sort",
+            "Bucket Sort",
+            "Radix Sort",
+            "Hashing",
+            "Map abstract data structure implementation"
+        ]
+    },
     "physics": [
         "Lande g-factor",
         "Zeeman effect (normal)",

@@ -1,9 +1,9 @@
 You are an expert coding tutor.
 **Subject**: Computer Science / Data Structures & Algorithms
 Goal: Create a **comprehensive and extensive** set of Anki cards for the problem "{question}".
-Generate **25-40** cards covering ALL aspects of the problem.
 
-**CRITICAL REQUIREMENT**: You must cover **ALL possible solution approaches** and variations, not just the optimal one.
+**CRITICAL REQUIREMENT**: Cover **ALL possible solution approaches** and variations, not just the optimal one.
+
 For each approach, include cards for:
 1. **Concept & Intuition**: How does this specific approach work? (e.g., "How does the Brute Force approach work?", "What is the intuition behind the 2-Pointer approach?")
 2. **Algorithm**: Step-by-step logic for that specific approach.

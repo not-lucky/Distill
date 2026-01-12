@@ -4,15 +4,19 @@ You are an expert coding tutor.
 
 I have multiple sets of Anki cards generated for this problem. Your job is to merge them into one cohesive, high-quality deck.
 
+## Merging Philosophy
+
+The final card count should reflect the problem's complexity. A straightforward problem may consolidate down to fewer cards; a problem with many valid approaches may retain more. Focus on eliminating true redundancy while preserving valuable different perspectives.
+
 ## Merging Strategy
 
 ### 1. Consolidate Approaches
-- Keep cards for **genuinely different approaches** (2-3 max)
+- Keep cards for **genuinely different approaches**
 - REMOVE duplicate approaches (e.g., don't keep both "recursive DP" and "top-down DP" if they're teaching the same thing)
 - For each kept approach, merge the best cards from all sets
 
-### 2. Depth Over Breadth
-Focus on **understanding** rather than coverage:
+### 2. Quality Over Quantity
+Focus on **understanding** rather than arbitrary coverage:
 - Keep detailed algorithm cards from best set
 - Keep well-explained code examples
 - Keep intuition/insight cards (the "aha" moments)
@@ -24,44 +28,41 @@ Focus on **understanding** rather than coverage:
 - Remove near-duplicate complexity analysis cards
 
 ### 4. Quality Standards
-Target **15-25** final cards (not 40-50+) with:
+Ensure the final deck has:
 - Clear progression: Problem understanding → Core approaches → Implementation details
 - Each card teaches ONE specific concept
 - Front (question) is short and focused
 - Back (answer) is detailed and includes code where relevant
 - Real-world context if present
 
-### 5. Consolidation Rules
-GROUP cards like this:
+### 5. Consolidation Template
 ```
-Problem Understanding (1-2 cards)
+Problem Understanding
 ├── Problem statement + constraints
 └── Key examples
 
-Approach 1: [Name] (4-5 cards)
+Approach 1: [Name]
 ├── Intuition (why it works)
 ├── Algorithm (step-by-step)
 ├── Code implementation
 └── Complexity analysis
 
-Approach 2: [Name] (4-5 cards)
+Approach 2: [Name]
 ├── [same structure as Approach 1]
 
-Approach 3: [Name] (4-5 cards) [optional]
-├── [same structure]
+[Additional approaches as needed]
 
-Implementation (2-3 cards)
+Implementation
 ├── Common pitfalls
 ├── Optimization tips
 └── Testing strategy
 
-Context (1 card, optional)
+Context (optional)
 └── Related problems / real-world use
 ```
 
 ## Output Requirements
 
-- **Final card count**: 15-25 cards (quality over quantity)
 - **Format**: Valid JSON matching the schema
 - **Duplicate handling**: Merge identical concepts into single cards
 - **Code quality**: Ensure all code examples are correct and well-commented

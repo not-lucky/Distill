@@ -16,7 +16,7 @@ BASETEN_KEYS_FILE = Path(os.getenv("BASETEN_KEYS_FILE_PATH", "baseten_keys.json"
 GOOGLE_GENAI_KEYS_FILE = Path(os.getenv("GOOGLE_GENAI_KEYS_FILE_PATH", "google_genai_keys.json"))
 
 # Configuration
-CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", 6))
+CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", 5))
 ENABLE_GEMINI = os.getenv("ENABLE_GEMINI", "False").lower() == "true"
 
 # Re-export subject config

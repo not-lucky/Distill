@@ -68,6 +68,10 @@ class GoogleGenAIProvider(LLMProvider):
                         thinking_level=self.thinking_level
                     ),
                     "temperature": 1.0,  # Gemini 3 recommends keeping temperature at 1.0
+                    # "tools": [
+                    #     {"google_search": {}},
+                    #     {"url_context": {}}
+                    # ],
                 }
                 
                 # Add JSON schema for structured output if provided

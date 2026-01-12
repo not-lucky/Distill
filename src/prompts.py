@@ -16,10 +16,12 @@ def load_prompt(prompt_filename: str) -> str:
 # Load prompts at module level (or could be lazy loaded)
 INITIAL_PROMPT_TEMPLATE = load_prompt("initial.md")
 INITIAL_LEETCODE_PROMPT_TEMPLATE = load_prompt("initial_leetcode.md")
-GENIUS_PERSONA_PROMPT_TEMPLATE = load_prompt("genius_cs.md")
+INITIAL_CS_PROMPT_TEMPLATE = load_prompt("initial_cs.md")
 COMBINE_PROMPT_TEMPLATE = load_prompt("combine.md")
 COMBINE_LEETCODE_PROMPT_TEMPLATE = load_prompt("combine_leetcode.md")
+COMBINE_CS_PROMPT_TEMPLATE = load_prompt("combine_cs.md")
 MCQ_COMBINE_PROMPT_TEMPLATE = load_prompt("mcq_combine.md")
 PHYSICS_PROMPT_TEMPLATE = load_prompt("physics.md")
 MCQ_PROMPT_TEMPLATE = load_prompt("mcq.md")
 PHYSICS_MCQ_PROMPT_TEMPLATE = load_prompt("physics_mcq.md")
+

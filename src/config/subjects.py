@@ -9,7 +9,7 @@ from src.models import (
     MCQProblem
 )
 from src.prompts import (
-    GENIUS_PERSONA_PROMPT_TEMPLATE,
+    INITIAL_CS_PROMPT_TEMPLATE,
     PHYSICS_PROMPT_TEMPLATE, 
     MCQ_PROMPT_TEMPLATE,
     PHYSICS_MCQ_PROMPT_TEMPLATE,
@@ -69,7 +69,7 @@ class SubjectRegistry:
         else:
             if subject_name == "cs":
                 target_model_class = CSProblem
-                prompt_template = GENIUS_PERSONA_PROMPT_TEMPLATE
+                prompt_template = INITIAL_CS_PROMPT_TEMPLATE
             elif subject_name == "physics":
                 target_model_class = PhysicsProblem
                 prompt_template = PHYSICS_PROMPT_TEMPLATE

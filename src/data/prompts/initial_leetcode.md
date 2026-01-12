@@ -3,16 +3,18 @@ You are an expert coding tutor and software interview coach.
 **Subject**: LeetCode Problem - {question}
 **Goal**: Create a focused, high-quality set of Anki cards that deeply covers this problem.
 
-## Card Generation Strategy
+## Card Generation Philosophy
 
-Generate **15-25** high-quality cards covering:
+Generate as many cards as the problem genuinely requires. A straightforward problem might need fewer cards, while a problem with many valid approaches or subtle edge cases might need more. Let the problem's depth determine the quantity.
 
-### 1. Problem Foundation (3-4 cards)
+## Card Categories
+
+### 1. Problem Foundation
 - **Problem Understanding**: Clear restatement, what we're solving for
 - **Constraints & Edge Cases**: Key constraints that affect solution design
 - **Example Walkthrough**: Trace through 1-2 examples to clarify the problem
 
-### 2. Common Solution Approaches (Focus on 3-4 most relevant)
+### 2. Solution Approaches
 
 For EACH approach, include ONLY if it's a genuinely different strategy:
 
@@ -24,7 +26,7 @@ For EACH approach, include ONLY if it's a genuinely different strategy:
 - **Complexity Analysis**: Time/Space with explanation of where complexity comes from
 - **When to Use**: When is this approach preferred? Trade-offs vs other approaches
 
-**Approaches to Consider** (pick the 3-4 most relevant):
+**Approaches to Consider** (pick the most relevant):
 - Brute Force (only if it's instructive, not obvious)
 - Two Pointers / Sliding Window
 - Dynamic Programming (bottom-up)
@@ -43,12 +45,12 @@ For EACH approach, include ONLY if it's a genuinely different strategy:
 - Overly obscure or academic (unless it's a genuinely common interview technique)
 - Less efficient without learning value
 
-### 3. Implementation Mastery (3-4 cards)
+### 3. Implementation Mastery
 - **Common Pitfalls**: Mistakes people make implementing this solution
 - **Optimization Tips**: How to write cleaner, faster code
 - **Testing Strategy**: Key test cases beyond examples (boundary cases, large inputs)
 
-### 4. Problem Context (1-2 cards)
+### 4. Problem Context
 - **Related Problems**: Other LeetCode problems using same technique
 - **Real-World Application**: Where this pattern appears in practice
 
@@ -72,7 +74,6 @@ For EACH approach, include ONLY if it's a genuinely different strategy:
 **Filtering Rules**:
 - NO duplicate approaches (e.g., don't include both "recursive DP" and "memoization" separately)
 - NO academic deep-dives into unrelated topics
-- NO more than 3-4 variations of the same approach
-- Focus on DEPTH not BREADTH
+- Focus on BOTH depth AND breadth - thorough coverage of each approach while exploring multiple valid strategies
 
 Output MUST be valid JSON matching the schema.

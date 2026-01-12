@@ -170,10 +170,10 @@ async def initialize_providers() -> List[LLMProvider]:
             # Create a shared iterator for all Cerebras providers
             cerebras_key_cycle = itertools.cycle(cerebras_api_keys)
             
-            # active_providers.append(CerebrasProvider(
-            #     api_keys=cerebras_key_cycle, 
-            #     model="gpt-oss-120b"
-            # ))
+            active_providers.append(CerebrasProvider(
+                api_keys=cerebras_key_cycle, 
+                model="gpt-oss-120b"
+            ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_cycle, 
             #     model="gpt-oss-120b"
