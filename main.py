@@ -54,16 +54,8 @@ async def main():
     
     # Build question list with metadata
     # Format: List of (category_index, category_name, problem_index, problem_name)
-    # For flat lists (cs, physics): (None, None, idx, problem_name)
-    questions_with_metadata: List[Tuple] = []
-    
-    if subject_config.is_categorized:
-        # Categorized format (leetcode)
-        questions_with_metadata = get_indexed_questions(subject_config.target_questions)
-    else:
-        # Flat list format (cs, physics)
-        for question_index, question_text in enumerate(subject_config.target_questions, start=1):
-            questions_with_metadata.append((None, None, question_index, question_text))
+    # All subjects now use categorized format
+    questions_with_metadata: List[Tuple] = get_indexed_questions(subject_config.target_questions)
     
     # Process Questions
     concurrency_semaphore = asyncio.Semaphore(CONCURRENT_REQUESTS)

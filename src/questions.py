@@ -1,22 +1,20 @@
 import json
 from pathlib import Path
 import logging
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 # Type alias for the categorized structure
 CategorizedQuestions = Dict[str, List[str]]  # {"category": ["problem1", "problem2"]}
 
-def load_questions() -> Tuple[Union[CategorizedQuestions, List[str]], List[str], List[str]]:
+def load_questions() -> Tuple[CategorizedQuestions, CategorizedQuestions, CategorizedQuestions]:
     """
     Load questions from src/data/questions.json
     
     Returns:
         Tuple of (leetcode_questions, cs_questions, physics_questions)
-        - leetcode_questions: Dict[str, List[str]] - categorized by topic
-        - cs_questions: List[str] - flat list
-        - physics_questions: List[str] - flat list
+        All are Dict[str, List[str]] - categorized by topic
     """
     current_file_path = Path(__file__)
     project_root_path = current_file_path.parent.parent
@@ -24,15 +22,15 @@ def load_questions() -> Tuple[Union[CategorizedQuestions, List[str]], List[str],
     
     if not questions_data_path.exists():
         logger.error(f"Questions data file not found: {questions_data_path}")
-        return {}, [], []
+        return {}, {}, {}
         
     try:
         with open(questions_data_path, "r", encoding="utf-8") as questions_file:
             questions_data = json.load(questions_file)
-            return questions_data.get("leetcode", {}), questions_data.get("cs", []), questions_data.get("physics", [])
+            return questions_data.get("leetcode", {}), questions_data.get("cs", {}), questions_data.get("physics", {})
     except Exception as error:
         logger.error(f"Failed to load questions: {error}")
-        return {}, [], []
+        return {}, {}, {}
 
 
 def flatten_categorized_questions(categorized_questions: CategorizedQuestions) -> List[str]:

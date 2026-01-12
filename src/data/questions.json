@@ -42,9 +42,25 @@
             "Map abstract data structure implementation"
         ]
     },
-    "physics": [
-        "Lande g-factor",
-        "Zeeman effect (normal)",
-        "Zeeman effect (anomalous)"
-    ]
+    "physics": {
+        "Classical Mechanics": [
+            "Kinematics",
+            "Newton's Laws of Motion",
+            "Work and Energy",
+            "Linear Momentum",
+            "Rotational Motion",
+            "Universal Gravitation"
+        ],
+        "Electromagnetism": [
+            "Electrostatics",
+            "Electric Circuits",
+            "Magnetic Fields",
+            "Electromagnetic Induction"
+        ],
+        "Thermodynamics": [
+            "Laws of Thermodynamics",
+            "Kinetic Theory of Gases",
+            "Heat Transfer"
+        ]
+    }
 }

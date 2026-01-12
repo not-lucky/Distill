@@ -49,15 +49,14 @@ class SubjectRegistry:
         if subject_name not in ["cs", "physics", "leetcode"]:
             subject_name = "leetcode"
 
-        # 1. Select Questions
-        is_categorized_format = False
+        # 1. Select Questions (all subjects use categorized format now)
         if subject_name == "cs":
             question_list = CS_QUESTIONS
         elif subject_name == "physics":
             question_list = PHYSICS_QUESTIONS
         else:
             question_list = QUESTIONS
-            is_categorized_format = isinstance(question_list, dict)  # leetcode uses categorized format
+        is_categorized_format = isinstance(question_list, dict)
 
         # 2. Select Model & Prompt
         if is_multiple_choice:
