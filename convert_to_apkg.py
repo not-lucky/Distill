@@ -1,4 +1,5 @@
 import argparse
+import re
 import sys
 from pathlib import Path
 from src.anki.generator import DeckGenerator
@@ -7,16 +8,54 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+VALID_MODES = ["cs", "physics", "leetcode", "cs_mcq", "physics_mcq", "leetcode_mcq", "mcq"]
+
+def detect_mode_from_filename(filename: str) -> str:
+    """
+    Auto-detect mode from JSON filename.
+    
+    Examples:
+        cs_anki_deck_20251230.json -> cs
+        physics_mcq_anki_deck_20251230.json -> physics_mcq
+        leetcode_anki_deck_20251230.json -> leetcode
+    
+    Returns:
+        Detected mode, or 'leetcode' as fallback
+    """
+    stem = Path(filename).stem.lower()
+    
+    # Try to match mcq variants first (more specific)
+    for mode in ["cs_mcq", "physics_mcq", "leetcode_mcq"]:
+        if stem.startswith(mode):
+            return mode
+    
+    # Then try base modes
+    for mode in ["cs", "physics", "leetcode"]:
+        if stem.startswith(mode):
+            return mode
+    
+    # Check for generic mcq
+    if "mcq" in stem:
+        return "mcq"
+    
+    return "leetcode"  # Default fallback
+
 def main():
     setup_logging()
     
     argument_parser = argparse.ArgumentParser(description="Convert LLM JSON output to Anki .apkg")
     argument_parser.add_argument("json_file", help="Path to the JSON file containing synthesized cards")
-    argument_parser.add_argument("--mode", default="leetcode", 
-                        choices=["cs", "physics", "leetcode", "cs_mcq", "physics_mcq", "leetcode_mcq", "mcq"],
-                        help="Mode of generation")
+    argument_parser.add_argument("--mode", default=None, 
+                        choices=VALID_MODES,
+                        help="Mode of generation (auto-detected from filename if not specified)")
     
     parsed_arguments = argument_parser.parse_args()
+    
+    # Auto-detect mode if not specified
+    if parsed_arguments.mode is None:
+        detected_mode = detect_mode_from_filename(parsed_arguments.json_file)
+        logger.info(f"Auto-detected mode: {detected_mode}")
+        parsed_arguments.mode = detected_mode
     
     input_file_path = Path(parsed_arguments.json_file)
     if not input_file_path.exists():
