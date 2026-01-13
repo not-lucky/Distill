@@ -1,10 +1,14 @@
 # LLM2Deck
 
+![Version](https://img.shields.io/badge/version-0.1.2-blue)
+![Python](https://img.shields.io/badge/python-%3E%3D3.12-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 LLM2Deck is a powerful tool designed to generate high-quality Anki decks using Large Language Models (LLMs). It automates the creation of study materials for LeetCode problems, Computer Science concepts, and Physics topics, with support for both standard Q&A and Multiple Choice Questions (MCQs).
 
 ## Features
 
-- **Multi-Provider Support**: Integrates with Cerebras, NVIDIA, OpenRouter, and Google Gemini
+- **Multi-Provider Support**: Integrates with 8 LLM providers: Cerebras, NVIDIA, OpenRouter, Gemini (Web API), Google GenAI, Canopywave, Baseten, and G4F (experimental/free)
 - **Multiple Modes**:
   - **LeetCode Mode** (Default): Generates detailed cards for algorithmic problems (Code, Complexity, approaches)
   - **CS Mode**: Generates deep-dive cards for Computer Science concepts
@@ -47,9 +51,12 @@ CONCURRENT_REQUESTS=5
 # CEREBRAS_KEYS_FILE_PATH=api_keys.json
 # OPENROUTER_KEYS_FILE_PATH=openrouter_keys.json
 # NVIDIA_KEYS_FILE_PATH=nvidia_keys.json
-# GEMINI_CREDENTIALS_FILE_PATH=google_secret.json
+# GEMINI_CREDENTIALS_FILE_PATH=python3ds.json
+# GOOGLE_GENAI_KEYS_FILE_PATH=google_genai_keys.json
+# CANOPYWAVE_KEYS_FILE_PATH=canopywave_keys.json
+# BASETEN_KEYS_FILE_PATH=baseten_keys.json
 
-# Enable Gemini Provider (disabled by default)
+# Enable Gemini Web API Provider (disabled by default, requires browser cookies)
 # ENABLE_GEMINI=true
 ```
 
@@ -57,12 +64,21 @@ CONCURRENT_REQUESTS=5
 
 The project uses JSON files to manage API keys:
 
-| Provider   | File                  | Format                          |
-|------------|----------------------|---------------------------------|
-| Cerebras   | `api_keys.json`      | `[{"api_key": "..."}]`          |
-| NVIDIA     | `nvidia_keys.json`   | `["key1", "key2", ...]`         |
-| OpenRouter | `openrouter_keys.json` | `["key1", "key2", ...]`       |
-| Gemini     | `python3ds.json`     | Cookie JSON from browser        |
+| Provider     | File                     | Format                                              |
+|--------------|--------------------------|-----------------------------------------------------|
+| Cerebras     | `api_keys.json`          | `[{"api_key": "..."}]`                              |
+| NVIDIA       | `nvidia_keys.json`       | `["key1", ...]` or `[{"api_key": "..."}]`           |
+| OpenRouter   | `openrouter_keys.json`   | `[{"data": {"key": "..."}}]`                        |
+| Gemini (Web) | `python3ds.json`         | `[{"Secure_1PSID": "...", "Secure_1PSIDTS": "..."}]`|
+| Google GenAI | `google_genai_keys.json` | `["key1", ...]` or `[{"api_key": "..."}]`           |
+| Canopywave   | `canopywave_keys.json`   | `["key1", ...]` or `[{"api_key": "..."}]`           |
+| Baseten      | `baseten_keys.json`      | `["key1", ...]` or `[{"api_key": "..."}]`           |
+| G4F          | N/A                      | No keys required (experimental, free tier)          |
+
+**Notes:**
+- **Gemini (Web)**: Uses reverse-engineered browser cookies. Requires `ENABLE_GEMINI=true`.
+- **Google GenAI**: Official Google API with Gemini 3 support (recommended over Gemini Web).
+- **G4F**: Uses the [g4f](https://github.com/xtekky/gpt4free) library for free model access.
 
 ### Questions Configuration
 
@@ -134,19 +150,17 @@ Output is saved as timestamped JSON files (e.g., `leetcode_anki_deck_20251227T14
 ### 2. Creating Anki Packages (.apkg)
 
 Use `convert_to_apkg.py` to convert generated JSON into an importable Anki package.
+Mode is auto-detected from the filename if `--mode` is not specified.
 
 ```bash
-uv run convert_to_apkg.py <input_json_file> --mode <mode>
+# Auto-detect mode from filename
+uv run convert_to_apkg.py leetcode_anki_deck_20251227T140625.json
+
+# Explicit mode override
+uv run convert_to_apkg.py output.json --mode physics_mcq
 ```
 
-**Examples:**
-```bash
-# Convert LeetCode deck
-uv run convert_to_apkg.py leetcode_anki_deck_20251227T140625.json --mode leetcode
-
-# Convert Physics MCQs
-uv run convert_to_apkg.py physics_mcq_anki_deck_20251226.json --mode physics_mcq
-```
+**Valid modes:** `leetcode`, `cs`, `physics`, `leetcode_mcq`, `cs_mcq`, `physics_mcq`, `mcq`
 
 ### 3. Merging Archival Cards
 
@@ -182,10 +196,15 @@ LLM2Deck/
 │   │   ├── prompts/          # Markdown prompt templates
 │   │   └── questions.json    # Target questions (categorized)
 │   ├── providers/            # LLM Provider integrations
-│   │   ├── cerebras.py
-│   │   ├── nvidia.py
-│   │   ├── openrouter.py
-│   │   └── gemini.py
+│   │   ├── base.py           # Abstract base class
+│   │   ├── cerebras.py       # Cerebras Cloud SDK
+│   │   ├── nvidia.py         # NVIDIA NIM API
+│   │   ├── openrouter.py     # OpenRouter API
+│   │   ├── gemini.py         # Gemini Web API (cookie-based)
+│   │   ├── google_genai.py   # Official Google GenAI API
+│   │   ├── canopywave.py     # Canopywave API
+│   │   ├── baseten.py        # Baseten API
+│   │   └── g4f_provider.py   # G4F library (experimental)
 │   ├── generator.py          # Card generation logic
 │   ├── questions.py          # Question loading utilities
 │   └── prompts.py            # Prompt templates
