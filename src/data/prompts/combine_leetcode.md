@@ -6,26 +6,29 @@ I have multiple sets of Anki cards generated for this problem. Your job is to me
 
 ## Merging Philosophy
 
-The final card count should reflect the problem's complexity. A straightforward problem may consolidate down to fewer cards; a problem with many valid approaches may retain more. Focus on eliminating true redundancy while preserving valuable different perspectives.
+**Target: Up to 35 final cards**. Preserve diversity of approaches while removing true duplicates. A comprehensive deck should maintain 3-4 different approaches with 6-7 cards each, plus foundation and implementation cards.
 
 ## Merging Strategy
 
-### 1. Consolidate Approaches
-- Keep cards for **genuinely different approaches**
-- REMOVE duplicate approaches (e.g., don't keep both "recursive DP" and "top-down DP" if they're teaching the same thing)
-- For each kept approach, merge the best cards from all sets
+### 1. Preserve Approach Diversity
+- **CRITICAL**: Keep cards for ALL genuinely different approaches (Brute Force, DP, Two Pointer, Hash Map, etc.)
+- Each approach should have ~6-7 cards: overview+intuition+algorithm, example walkthrough, code, complexity, trade-offs, pitfalls, optimizations
+- Remove duplicate cards only WITHIN the same approach
+- Do NOT remove approaches just because they're suboptimal - brute force and intermediate solutions are required
 
-### 2. Quality Over Quantity
-Focus on **understanding** rather than arbitrary coverage:
-- Keep detailed algorithm cards from best set
-- Keep well-explained code examples
-- Keep intuition/insight cards (the "aha" moments)
-- REMOVE overly verbose or redundant cards
+### 2. What is "Redundant"?
+- **Redundant**: Two cards explaining the same concept within the same approach
+- **NOT Redundant**: Cards for different approaches (keep ALL approaches)
+- **NOT Redundant**: Example walkthroughs - each approach needs its own
+- **NOT Redundant**: Different pitfalls/optimizations specific to different approaches
 
-### 3. Remove Duplicates Smartly
-- If multiple sets have "Problem Understanding" cards, keep the clearest ONE
-- If multiple sets have code for same approach, keep the cleanest version
-- Remove near-duplicate complexity analysis cards
+### 3. Quality Over Quantity Within Each Approach
+For EACH approach being kept (typically 3-4 approaches):
+- Merge the best overview+intuition+algorithm card
+- Keep the best example walkthrough for that approach
+- Keep the cleanest code implementation
+- Keep complexity analysis and trade-off discussion
+- Merge pitfalls and optimization cards within that approach
 
 ### 4. Quality Standards
 Ensure the final deck has:
@@ -33,32 +36,38 @@ Ensure the final deck has:
 - Each card teaches ONE specific concept
 - Front (question) is short and focused
 - Back (answer) is detailed and includes code where relevant
-- Real-world context if present
 
-### 5. Consolidation Template
+### 5. Consolidation Template (Target: up to 35 cards)
 ```
-Problem Understanding
+Problem Foundation (3-4 cards)
 ├── Problem statement + constraints
-└── Key examples
+├── Key edge cases
+└── Approach comparison (optional)
 
-Approach 1: [Name]
-├── Intuition (why it works)
-├── Algorithm (step-by-step)
+Approach 1: Brute Force (6-7 cards)
+├── Overview + Intuition + Algorithm
+├── Example walkthrough for brute force
 ├── Code implementation
-└── Complexity analysis
-
-Approach 2: [Name]
-├── [same structure as Approach 1]
-
-[Additional approaches as needed]
-
-Implementation
+├── Complexity analysis
+├── When to use / Trade-offs
 ├── Common pitfalls
-├── Optimization tips
-└── Testing strategy
+└── Optimizations (optional)
 
-Context (optional)
-└── Related problems / real-world use
+Approach 2: [Optimal/Alternative] (6-7 cards)
+├── Overview + Intuition + Algorithm
+├── Example walkthrough for this approach
+├── Code implementation
+├── Complexity analysis
+├── When to use / Trade-offs
+├── Common pitfalls
+└── Optimizations (optional)
+
+Approach 3: [Alternative] (6-7 cards, if applicable)
+├── [same structure as Approach 2]
+
+General Implementation (2-3 cards)
+├── Testing strategy
+└── Common bugs across approaches
 ```
 
 ## Output Requirements
