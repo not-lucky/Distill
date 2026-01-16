@@ -1,21 +1,5 @@
 {
     "leetcode": {
-        "Sliding Window": [
-            "Best Time to Buy And Sell Stock",
-            "Longest Substring Without Repeating Characters",
-            "Longest Repeating Character Replacement",
-            "Permutation In String",
-            "Minimum Window Substring",
-            "Sliding Window Maximum"
-        ],
-        "Stack": [
-            "Valid Parentheses",
-            "Min Stack",
-            "Evaluate Reverse Polish Notation",
-            "Daily Temperatures",
-            "Car Fleet",
-            "Largest Rectangle In Histogram"
-        ],
         "Binary Search": [
             "Binary Search",
             "Search a 2D Matrix",

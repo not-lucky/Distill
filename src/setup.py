@@ -17,6 +17,7 @@ from src.providers.g4f_provider import G4FProvider
 from src.providers.canopywave import CanopywaveProvider
 from src.providers.baseten import BasetenProvider
 from src.providers.google_genai import GoogleGenAIProvider
+from src.providers.google_antigravity import GoogleAntigravityProvider
 
 async def load_cerebras_keys() -> List[str]:
     if not CEREBRAS_KEYS_FILE_PATH.exists():
@@ -170,18 +171,18 @@ async def initialize_providers() -> List[LLMProvider]:
             # Create a shared iterator for all Cerebras providers
             cerebras_key_cycle = itertools.cycle(cerebras_api_keys)
             
-            # active_providers.append(CerebrasProvider(
-            #     api_keys=cerebras_key_cycle, 
-            #     model="gpt-oss-120b"
-            # ))
+            active_providers.append(CerebrasProvider(
+                api_keys=cerebras_key_cycle, 
+                model="gpt-oss-120b"
+            ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_cycle, 
             #     model="gpt-oss-120b"
             # ))
-            active_providers.append(CerebrasProvider(
-                api_keys=cerebras_key_cycle, 
-                model="zai-glm-4.6" 
-            ))
+            # active_providers.append(CerebrasProvider(
+            #     api_keys=cerebras_key_cycle, 
+            #     model="zai-glm-4.6" 
+            # ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_cycle, 
             #     model="qwen-3-235b-a22b-instruct-2507" 
@@ -233,10 +234,6 @@ async def initialize_providers() -> List[LLMProvider]:
         canopywave_api_keys = await load_canopywave_keys()
         if canopywave_api_keys:
             canopywave_key_cycle = itertools.cycle(canopywave_api_keys)
-            active_providers.append(CanopywaveProvider(
-                api_keys=canopywave_key_cycle,
-                model="mimo-v2-flash"
-            ))
             # active_providers.append(CanopywaveProvider(
             #     api_keys=canopywave_key_cycle,
             #     model="zai/glm-4.7"
@@ -270,13 +267,21 @@ async def initialize_providers() -> List[LLMProvider]:
         google_genai_keys = await load_google_genai_keys()
         if google_genai_keys:
             google_genai_key_cycle = itertools.cycle(google_genai_keys)
-            active_providers.append(GoogleGenAIProvider(
-                api_keys=google_genai_key_cycle,
-                model="gemini-3-flash-preview",
-                thinking_level="high"
-            ))
+            # active_providers.append(GoogleGenAIProvider(
+            #     api_keys=google_genai_key_cycle,
+            #     model="gemini-3-flash-preview",
+            #     thinking_level="high"
+            # ))
     except Exception as error:
         logger.warning(f"Error loading Google GenAI providers: {error}")
+
+    # Antigravity provider (no need for api key auth, its local only)
+    active_providers.append(GoogleAntigravityProvider(
+        model="gemini-3-pro-preview"
+    ))
+    active_providers.append(GoogleAntigravityProvider(
+        model="gemini-claude-sonnet-4-5-thinking"
+    ))
 
     if not active_providers:
         logger.error("No providers could be initialized.")
