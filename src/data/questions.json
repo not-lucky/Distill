@@ -1,25 +1,48 @@
 {
-    "leetcode": {},
-    "cs": {
-        "Trees and Tree Algorithms": [
-            "Trees",
-            "Trees representation",
-            "Tree traversals",
-            "Priority Queues with Binary Heaps",
-            "Binary Search Trees and Operations",
-            "Blanaced binary search trees",
-            "AVL Tree and its performance",
-            "Red Black binary trees and its performance"
+    "leetcode": {
+        "Sliding Window": [
+            "Best Time to Buy And Sell Stock",
+            "Longest Substring Without Repeating Characters",
+            "Longest Repeating Character Replacement",
+            "Permutation In String",
+            "Minimum Window Substring",
+            "Sliding Window Maximum"
         ],
-        "Graphs and Graph Algorithms": [
-            "Graphs",
-            "Graph representation",
-            "Graph traversals",
-            "Shortest Path Algorithms",
-            "Minimum Spanning Tree Algorithms",
-            "Word Ladder Problem",
-            "The Knight's Tour Problem",
-            "Topological Sorting"
+        "Stack": [
+            "Valid Parentheses",
+            "Min Stack",
+            "Evaluate Reverse Polish Notation",
+            "Daily Temperatures",
+            "Car Fleet",
+            "Largest Rectangle In Histogram"
+        ],
+        "Binary Search": [
+            "Binary Search",
+            "Search a 2D Matrix",
+            "Koko Eating Bananas",
+            "Find Minimum In Rotated Sorted Array",
+            "Search In Rotated Sorted Array",
+            "Time Based Key Value Store",
+            "Median of Two Sorted Arrays"
+        ],
+        "Linked List": [
+            "Reverse Linked List",
+            "Merge Two Sorted Lists",
+            "Linked List Cycle",
+            "Reorder List",
+            "Remove Nth Node From End of List",
+            "Copy List With Random Pointer",
+            "Add Two Numbers",
+            "Find The Duplicate Number",
+            "LRU Cache",
+            "Merge K Sorted Lists",
+            "Reverse Nodes In K Group"
+        ]
+    },
+    "cs": {
+        "Binary Search": [
+            "Bisect Left",
+            "Bisect Right"
         ]
     },
     "physics": {

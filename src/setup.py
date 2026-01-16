@@ -170,18 +170,18 @@ async def initialize_providers() -> List[LLMProvider]:
             # Create a shared iterator for all Cerebras providers
             cerebras_key_cycle = itertools.cycle(cerebras_api_keys)
             
-            active_providers.append(CerebrasProvider(
-                api_keys=cerebras_key_cycle, 
-                model="gpt-oss-120b"
-            ))
+            # active_providers.append(CerebrasProvider(
+            #     api_keys=cerebras_key_cycle, 
+            #     model="gpt-oss-120b"
+            # ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_cycle, 
             #     model="gpt-oss-120b"
             # ))
-            # active_providers.append(CerebrasProvider(
-            #     api_keys=cerebras_key_cycle, 
-            #     model="zai-glm-4.6" 
-            # ))
+            active_providers.append(CerebrasProvider(
+                api_keys=cerebras_key_cycle, 
+                model="zai-glm-4.6" 
+            ))
             # providers.append(CerebrasProvider(
             #     api_keys=cerebras_key_cycle, 
             #     model="qwen-3-235b-a22b-instruct-2507" 
@@ -189,17 +189,17 @@ async def initialize_providers() -> List[LLMProvider]:
     except Exception as error:
         logger.warning(f"Error loading Cerebras providers: {error}")
 
-    # # 2. Load OpenRouter Keys
-    # try:
-    #     openrouter_api_keys = await load_openrouter_keys()
-    #     if openrouter_api_keys:
-    #         openrouter_model_name = os.getenv("OPENROUTER_MODEL", "xiaomi/mimo-v2-flash:free")
-    #         active_providers.append(OpenRouterProvider(
-    #             api_keys=openrouter_api_keys,
-    #             model=openrouter_model_name
-    #         ))
-    # except Exception as error:
-    #     logger.warning(f"Error loading OpenRouter providers: {error}")
+    # 2. Load OpenRouter Keys
+    try:
+        openrouter_api_keys = await load_openrouter_keys()
+        # if openrouter_api_keys:
+        #     openrouter_model_name = os.getenv("OPENROUTER_MODEL", "xiaomi/mimo-v2-flash:free")
+        #     active_providers.append(OpenRouterProvider(
+        #         api_keys=openrouter_api_keys,
+        #         model=openrouter_model_name
+        #     ))
+    except Exception as error:
+        logger.warning(f"Error loading OpenRouter providers: {error}")
 
     # 3. Load NVIDIA Keys
     try:
@@ -228,17 +228,21 @@ async def initialize_providers() -> List[LLMProvider]:
     # except Exception as error:
     #      logger.warning(f"Error initializing G4F provider: {error}")
 
-    # # 5. Load Canopywave Keys
-    # try:
-    #     canopywave_api_keys = await load_canopywave_keys()
-    #     if canopywave_api_keys:
-    #         canopywave_key_cycle = itertools.cycle(canopywave_api_keys)
-    #         active_providers.append(CanopywaveProvider(
-    #             api_keys=canopywave_key_cycle,
-    #             model="deepseek/deepseek-chat-v3.2"
-    #         ))
-    # except Exception as error:
-    #     logger.warning(f"Error loading Canopywave providers: {error}")
+    # 5. Load Canopywave Keys
+    try:
+        canopywave_api_keys = await load_canopywave_keys()
+        if canopywave_api_keys:
+            canopywave_key_cycle = itertools.cycle(canopywave_api_keys)
+            active_providers.append(CanopywaveProvider(
+                api_keys=canopywave_key_cycle,
+                model="mimo-v2-flash"
+            ))
+            # active_providers.append(CanopywaveProvider(
+            #     api_keys=canopywave_key_cycle,
+            #     model="zai/glm-4.7"
+            # ))
+    except Exception as error:
+        logger.warning(f"Error loading Canopywave providers: {error}")
 
     # 6. Initialize Baseten Keys
     try:

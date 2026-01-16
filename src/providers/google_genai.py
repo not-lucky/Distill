@@ -16,16 +16,16 @@ class GoogleGenAIProvider(LLMProvider):
     Provider for Google's official Gemini API using the google-genai package.
     Supports Gemini 3 models with thinking_level and other advanced features.
     """
-    
+
     def __init__(
-        self, 
-        api_keys: Iterator[str], 
+        self,
+        api_keys: Iterator[str],
         model: str = "gemini-3-flash-preview",
-        thinking_level: str = "high"
+        thinking_level: str = "high",
     ):
         """
         Initialize the GoogleGenAIProvider.
-        
+
         Args:
             api_keys: An iterator (e.g., itertools.cycle) of API keys for rotation.
             model: The model ID to use (e.g., "gemini-3-pro-preview", "gemini-3-flash-preview").
@@ -35,33 +35,41 @@ class GoogleGenAIProvider(LLMProvider):
         self.api_key_iterator = api_keys
         self.model_name = model
         self.thinking_level = thinking_level
-    
+
+    @property
+    def name(self) -> str:
+        return "llm2deck_google_genai"
+
+    @property
+    def model(self) -> str:
+        return self.model_name
+
     def _get_client(self) -> genai.Client:
         """Get a new client with the next API key in rotation."""
         current_api_key = next(self.api_key_iterator)
         return genai.Client(api_key=current_api_key)
-    
+
     async def _make_request(
-        self, 
-        contents: str, 
+        self,
+        contents: str,
         json_schema: Optional[Dict[str, Any]] = None,
-        max_retries: int = 5
+        max_retries: int = 5,
     ) -> Optional[str]:
         """
         Make a request to the Gemini API with retry logic.
-        
+
         Args:
             contents: The prompt/contents to send to the model.
             json_schema: Optional JSON schema for structured output.
             max_retries: Maximum number of retry attempts.
-            
+
         Returns:
             The response text or None if all retries failed.
         """
         for attempt_number in range(max_retries):
             try:
                 client = self._get_client()
-                
+
                 # Build the config
                 config_dict: Dict[str, Any] = {
                     "thinking_config": types.ThinkingConfig(
@@ -73,94 +81,99 @@ class GoogleGenAIProvider(LLMProvider):
                     #     {"url_context": {}}
                     # ],
                 }
-                
+
                 # Add JSON schema for structured output if provided
                 if json_schema:
                     config_dict["response_mime_type"] = "application/json"
                     config_dict["response_json_schema"] = json_schema
-                
+
                 config = types.GenerateContentConfig(**config_dict)
-                
+
                 # Make the API call in a thread to avoid blocking
                 response = await asyncio.to_thread(
                     client.models.generate_content,
                     model=self.model_name,
                     contents=contents,
-                    config=config
+                    config=config,
                 )
-                
+
                 if response.text:
                     return response.text
-                
+
                 logger.warning(
                     f"[{self.model_name}] Attempt {attempt_number + 1}/{max_retries}: "
                     "Received empty response. Retrying..."
                 )
-                
+
             except Exception as error:
                 logger.error(
                     f"[{self.model_name}] Attempt {attempt_number + 1}/{max_retries} "
                     f"Error: {error}"
                 )
-            
+
             # Small delay between retries
             await asyncio.sleep(1)
-        
+
         return None
-    
+
     async def generate_initial_cards(
-        self, 
-        question: str, 
-        json_schema: Dict[str, Any], 
-        prompt_template: Optional[str] = None
+        self,
+        question: str,
+        json_schema: Dict[str, Any],
+        prompt_template: Optional[str] = None,
     ) -> str:
         """
         Generates initial Anki cards for a given question.
-        
+
         Args:
             question: The question/topic to generate cards for.
             json_schema: The JSON schema for the response format.
             prompt_template: Optional custom prompt template.
-            
+
         Returns:
             The generated content as a string, or empty string on failure.
         """
-        active_template = prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
-        
+        active_template = (
+            prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
+        )
+
         formatted_prompt = active_template.format(
             question=question,
-            schema=json.dumps(json_schema, indent=2, ensure_ascii=False)
+            schema=json.dumps(json_schema, indent=2, ensure_ascii=False),
         )
-        
+
         response_content = await self._make_request(formatted_prompt, json_schema)
         return response_content if response_content else ""
-    
+
     async def combine_cards(
-        self, 
-        question: str, 
-        combined_inputs: str, 
-        json_schema: Dict[str, Any], 
-        combine_prompt_template: Optional[str] = None
+        self,
+        question: str,
+        combined_inputs: str,
+        json_schema: Dict[str, Any],
+        combine_prompt_template: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Combines multiple sets of cards into a single deck.
-        
+
         Args:
             question: The question/topic for the cards.
             combined_inputs: The combined input from multiple card generations.
             json_schema: The JSON schema for the response format.
             combine_prompt_template: Optional custom combine prompt template.
-            
+
         Returns:
             The combined cards as a dictionary, or None on failure.
         """
-        active_template = combine_prompt_template if combine_prompt_template else COMBINE_PROMPT_TEMPLATE
-        
-        formatted_prompt = active_template.format(
-            question=question,
-            inputs=combined_inputs
+        active_template = (
+            combine_prompt_template
+            if combine_prompt_template
+            else COMBINE_PROMPT_TEMPLATE
         )
-        
+
+        formatted_prompt = active_template.format(
+            question=question, inputs=combined_inputs
+        )
+
         for attempt_number in range(5):
             response_content = await self._make_request(formatted_prompt, json_schema)
             if response_content:
@@ -172,6 +185,6 @@ class GoogleGenAIProvider(LLMProvider):
                         f"JSON Decode Error: {decode_error}. Retrying..."
                     )
                     continue
-        
+
         logger.error(f"[{self.model_name}] Failed to decode JSON after 5 attempts.")
         return None

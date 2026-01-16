@@ -22,3 +22,6 @@ anki_cards_markdown
 app.log
 !src/data/questions.json
 
+# Database
+llm2deck.db
+
