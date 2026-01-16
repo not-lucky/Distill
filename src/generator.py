@@ -102,7 +102,7 @@ class CardGenerator:
                 try:
                     result_json = json.loads(result)
                     card_count = len(result_json.get("cards", []))
-                except:
+                except (json.JSONDecodeError, KeyError, TypeError):
                     card_count = None
 
                 create_provider_result(
@@ -204,44 +204,4 @@ class CardGenerator:
                 processing_time_seconds=time.time() - start_time,
             )
             session.close()
-            return None
-
-        # 2. Combine Cards
-        combined_inputs = ""
-        for set_index, provider_result in enumerate(valid_provider_results):
-            combined_inputs += f"Set {set_index + 1}:\n{provider_result}\n\n"
-
-        # Select appropriate combining prompt based on mode
-        if "mcq" in self.generation_mode:
-            combine_prompt = MCQ_COMBINE_PROMPT_TEMPLATE
-        elif "leetcode" in self.generation_mode:
-            combine_prompt = COMBINE_LEETCODE_PROMPT_TEMPLATE
-        elif "cs" in self.generation_mode:
-            combine_prompt = COMBINE_CS_PROMPT_TEMPLATE
-        else:
-            combine_prompt = None
-        final_card_data = await self.card_combiner.combine_cards(
-            question, combined_inputs, json_schema, combine_prompt
-        )
-
-        if final_card_data:
-            # Post-process tags/types
-            for card in final_card_data.get("cards", []):
-                if "tags" in card:
-                    card["tags"] = [tag.replace(" ", "") for tag in card["tags"]]
-                if "card_type" in card:
-                    card["card_type"] = card["card_type"].replace(" ", "")
-
-            # Add category metadata if provided (for ordered deck generation)
-            if category_index is not None:
-                final_card_data["category_index"] = category_index
-            if category_name is not None:
-                final_card_data["category_name"] = category_name
-            if problem_index is not None:
-                final_card_data["problem_index"] = problem_index
-
-            save_archival(question, final_card_data, subdir=self.generation_mode)
-            return final_card_data
-        else:
-            logger.error(f"Failed to generate final JSON for '{question}'.")
             return None
