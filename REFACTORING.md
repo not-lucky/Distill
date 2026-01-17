@@ -127,76 +127,91 @@ except:
 
 ---
 
-## Priority 4: Low (Nice to Have)
+## Priority 4: Low (Nice to Have) - COMPLETED
 
-### 4.1 Add Test Coverage
+### 4.1 ~~Add Test Coverage~~ DONE
 
-**Issue:** Zero test files exist.
-
-**Action:** Add tests in `tests/` directory:
+**Files created:**
 ```
 tests/
-  conftest.py
-  test_providers/
-    test_base.py
-    test_openai_compatible.py
-  test_generator.py
-  test_config.py
-  test_anki/
-    test_generator.py
+├── conftest.py                   # Shared pytest fixtures
+├── test_config.py                # SubjectRegistry and SubjectConfig tests
+├── test_generator.py             # CardGenerator unit tests
+├── test_integration.py           # Integration test with real Cerebras API
+├── test_providers/
+│   ├── __init__.py
+│   └── test_cerebras.py          # CerebrasProvider unit tests
+└── test_anki/
+    ├── __init__.py
+    └── test_generator.py         # DeckGenerator unit tests
 ```
 
-**Focus areas:**
-1. Provider base class methods
-2. JSON schema validation
-3. Card combination logic
-4. Anki deck generation
+**Test configuration added to `pyproject.toml`:**
+- pytest and pytest-asyncio dependencies
+- asyncio_mode = "auto"
+- Markers for integration tests
+
+**Run tests:**
+```bash
+uv run pytest tests/ -v                    # All tests
+uv run pytest tests/ -v -m "not integration"  # Unit tests only
+uv run pytest tests/ -v -m integration     # Integration tests only
+```
 
 ---
 
-### 4.2 Improve Error Handling
+### 4.2 ~~Improve Error Handling~~ DONE
 
-**Files:** All providers
+**Files created:**
+- `src/exceptions.py` - Custom exception hierarchy
 
-**Issue:**
-- Inconsistent retry counts (3 vs 5 vs 7)
-- No structured error types
-- Failures return `None` with no context
+**Exception classes:**
+- `LLM2DeckError` - Base exception
+- `ProviderError` - Base for provider errors
+- `APIKeyError` - Missing/invalid API keys
+- `GenerationError` - Card generation failures
+- `CombinationError` - Card combination failures
+- `JSONParseError` - JSON parsing failures
+- `ConfigurationError` - Configuration issues
+- `SubjectError` - Invalid subject configuration
+- `DatabaseError` - Database operation failures
 
-**Action:**
-1. Create `src/exceptions.py` with custom exceptions
-2. Standardize retry behavior in base class
-3. Use structured error responses
+**Standardized retry behavior:**
+- Added constants to `LLMProvider` base class:
+  - `DEFAULT_MAX_RETRIES = 5`
+  - `DEFAULT_JSON_PARSE_RETRIES = 3`
+  - `DEFAULT_RETRY_DELAY = 1.0`
+- Updated `CerebrasProvider` and `OpenAICompatibleProvider` to use these constants
 
 ---
 
-### 4.3 Configuration File
+### 4.3 ~~Configuration File~~ DONE
 
-**Issue:** Settings scattered across `.env`, `src/config/__init__.py`, and hardcoded values.
+**Files created:**
+- `config.yaml` - Unified configuration file
+- `src/config/loader.py` - Configuration loader with dataclasses
 
-**Action:** Create unified `config.yaml`:
-
+**Configuration structure:**
 ```yaml
 providers:
-  nvidia:
-    enabled: true
-    model: "deepseek-ai/deepseek-v3.2"
-    timeout: 900
   cerebras:
     enabled: true
     model: "gpt-oss-120b"
     reasoning_effort: "high"
+  # ... other providers
 
 generation:
   concurrent_requests: 8
   max_retries: 5
+  json_parse_retries: 3
 
-subjects:
-  leetcode:
-    enabled: true
-  cs:
-    enabled: false
+database:
+  path: "llm2deck.db"
 ```
+
+**Updated:**
+- `src/setup.py` now reads from `config.yaml` via `load_config()`
+- Providers are enabled/disabled through config file instead of code comments
 
 ---
 
@@ -268,14 +283,14 @@ LLM2Deck/
 |--------|--------|-------|--------|
 | Total lines | ~4,167 | ~3,767 | -400 lines |
 | Provider code | ~1,200 | ~948 | -252 lines |
-| setup.py | 289 | 150 | -139 lines |
+| setup.py | 289 | 183 | -106 lines |
 | generator.py | 248 | 207 | -41 lines |
 | Files to touch when adding provider | 2-3 | 1 | Improved |
-| Test coverage | 0% | 0% | Pending |
+| Test coverage | 0% | 32 tests | Implemented |
 
 ### Progress Summary
 
 - **Priority 1 (Critical):** COMPLETED
 - **Priority 2 (High):** COMPLETED (except provider registry, deferred)
 - **Priority 3 (Medium):** COMPLETED
-- **Priority 4 (Low):** Pending
+- **Priority 4 (Low):** COMPLETED

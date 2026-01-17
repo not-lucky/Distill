@@ -3,6 +3,17 @@ from typing import Dict, Any, Optional
 
 
 class LLMProvider(ABC):
+    """Abstract base class for LLM providers.
+
+    Provides default retry configuration that subclasses should use
+    for consistent behavior across all providers.
+    """
+
+    # Default retry configuration
+    DEFAULT_MAX_RETRIES = 5
+    DEFAULT_JSON_PARSE_RETRIES = 3
+    DEFAULT_RETRY_DELAY = 1.0  # seconds
+
     @property
     @abstractmethod
     def name(self) -> str:

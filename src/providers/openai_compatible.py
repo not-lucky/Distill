@@ -30,7 +30,7 @@ class OpenAICompatibleProvider(LLMProvider):
         base_url: str,
         api_keys: Optional[Iterator[str]] = None,
         timeout: float = 120.0,
-        max_retries: int = 5,
+        max_retries: Optional[int] = None,
         temperature: float = 0.4,
         max_tokens: Optional[int] = None,
         strip_json_markers: bool = True,
@@ -43,7 +43,7 @@ class OpenAICompatibleProvider(LLMProvider):
             base_url: API base URL
             api_keys: Optional iterator of API keys (for rotation)
             timeout: Request timeout in seconds
-            max_retries: Maximum retry attempts for requests
+            max_retries: Maximum retry attempts for requests (default: DEFAULT_MAX_RETRIES)
             temperature: Sampling temperature
             max_tokens: Maximum tokens in response (None for API default)
             strip_json_markers: Whether to strip ```json markers from responses
@@ -52,7 +52,7 @@ class OpenAICompatibleProvider(LLMProvider):
         self.base_url = base_url
         self.api_key_iterator = api_keys
         self.timeout = timeout
-        self.max_retries = max_retries
+        self.max_retries = max_retries if max_retries is not None else self.DEFAULT_MAX_RETRIES
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.strip_json_markers = strip_json_markers
@@ -217,17 +217,17 @@ class OpenAICompatibleProvider(LLMProvider):
         ]
 
         # Retry JSON parsing separately from API calls
-        for attempt in range(3):
+        for attempt in range(self.DEFAULT_JSON_PARSE_RETRIES):
             response_content = await self._make_request(chat_messages, json_schema)
             if response_content:
                 try:
                     return json.loads(response_content)
                 except json.JSONDecodeError as error:
                     logger.warning(
-                        f"[{self.model_name}] Attempt {attempt + 1}/3: "
+                        f"[{self.model_name}] Attempt {attempt + 1}/{self.DEFAULT_JSON_PARSE_RETRIES}: "
                         f"JSON Decode Error: {error}. Retrying..."
                     )
                     continue
 
-        logger.error(f"[{self.model_name}] Failed to decode JSON after 3 attempts.")
+        logger.error(f"[{self.model_name}] Failed to decode JSON after {self.DEFAULT_JSON_PARSE_RETRIES} attempts.")
         return None

@@ -9,6 +9,7 @@ from gemini_webapi import GeminiClient
 
 from src.config import GEMINI_CREDENTIALS_FILE, ENABLE_GEMINI
 from src.config.keys import load_keys
+from src.config.loader import load_config, ProviderConfig
 from src.providers.base import LLMProvider
 from src.providers.cerebras import CerebrasProvider
 from src.providers.gemini import GeminiProvider
@@ -48,74 +49,104 @@ async def load_gemini_clients() -> List[GeminiClient]:
 
 
 async def initialize_providers() -> List[LLMProvider]:
-    """Initialize and return a list of configured LLM providers."""
+    """
+    Initialize and return a list of configured LLM providers.
+
+    Reads configuration from config.yaml to determine which providers
+    are enabled and their settings.
+    """
+    config = load_config()
     active_providers = []
 
     # Cerebras
-    try:
-        cerebras_keys = await load_keys("cerebras")
-        if cerebras_keys:
-            key_cycle = itertools.cycle(cerebras_keys)
+    cerebras_cfg = config.providers.get("cerebras")
+    if cerebras_cfg and cerebras_cfg.enabled:
+        try:
+            cerebras_keys = await load_keys("cerebras")
+            if cerebras_keys:
+                key_cycle = itertools.cycle(cerebras_keys)
+                active_providers.append(
+                    CerebrasProvider(
+                        api_keys=key_cycle,
+                        model=cerebras_cfg.model,
+                        reasoning_effort=cerebras_cfg.reasoning_effort or "high",
+                    )
+                )
+        except Exception as error:
+            logger.warning(f"Error loading Cerebras providers: {error}")
+
+    # OpenRouter
+    openrouter_cfg = config.providers.get("openrouter")
+    if openrouter_cfg and openrouter_cfg.enabled:
+        try:
+            openrouter_keys = await load_keys("openrouter")
+            if openrouter_keys:
+                key_cycle = itertools.cycle(openrouter_keys)
+                active_providers.append(
+                    OpenRouterProvider(api_keys=key_cycle, model=openrouter_cfg.model)
+                )
+        except Exception as error:
+            logger.warning(f"Error loading OpenRouter providers: {error}")
+
+    # NVIDIA
+    nvidia_cfg = config.providers.get("nvidia")
+    if nvidia_cfg and nvidia_cfg.enabled:
+        try:
+            nvidia_keys = await load_keys("nvidia")
+            if nvidia_keys:
+                key_cycle = itertools.cycle(nvidia_keys)
+                active_providers.append(
+                    NvidiaProvider(
+                        api_keys=key_cycle,
+                        model=nvidia_cfg.model,
+                        timeout=nvidia_cfg.timeout,
+                    )
+                )
+        except Exception as error:
+            logger.warning(f"Error loading NVIDIA providers: {error}")
+
+    # G4F
+    g4f_cfg = config.providers.get("g4f")
+    if g4f_cfg and g4f_cfg.enabled:
+        try:
             active_providers.append(
-                CerebrasProvider(api_keys=key_cycle, model="gpt-oss-120b")
+                G4FProvider(
+                    model=g4f_cfg.model,
+                    provider=g4f_cfg.provider_name or "LMArena",
+                )
             )
-    except Exception as error:
-        logger.warning(f"Error loading Cerebras providers: {error}")
+        except Exception as error:
+            logger.warning(f"Error initializing G4F provider: {error}")
 
-    # OpenRouter (commented out by default)
-    # try:
-    #     openrouter_keys = await load_keys("openrouter")
-    #     if openrouter_keys:
-    #         key_cycle = itertools.cycle(openrouter_keys)
-    #         active_providers.append(
-    #             OpenRouterProvider(api_keys=key_cycle, model="xiaomi/mimo-v2-flash:free")
-    #         )
-    # except Exception as error:
-    #     logger.warning(f"Error loading OpenRouter providers: {error}")
+    # Canopywave
+    canopywave_cfg = config.providers.get("canopywave")
+    if canopywave_cfg and canopywave_cfg.enabled:
+        try:
+            canopywave_keys = await load_keys("canopywave")
+            if canopywave_keys:
+                key_cycle = itertools.cycle(canopywave_keys)
+                active_providers.append(
+                    CanopywaveProvider(api_keys=key_cycle, model=canopywave_cfg.model)
+                )
+        except Exception as error:
+            logger.warning(f"Error loading Canopywave providers: {error}")
 
-    # NVIDIA (commented out by default)
-    # try:
-    #     nvidia_keys = await load_keys("nvidia")
-    #     if nvidia_keys:
-    #         key_cycle = itertools.cycle(nvidia_keys)
-    #         active_providers.append(
-    #             NvidiaProvider(api_keys=key_cycle, model="moonshotai/kimi-k2-thinking")
-    #         )
-    # except Exception as error:
-    #     logger.warning(f"Error loading NVIDIA providers: {error}")
-
-    # G4F (commented out by default)
-    # try:
-    #     active_providers.append(
-    #         G4FProvider(model="claude-opus-4-5-20251101-thinking-32k", provider="LMArena")
-    #     )
-    # except Exception as error:
-    #     logger.warning(f"Error initializing G4F provider: {error}")
-
-    # Canopywave (commented out by default)
-    # try:
-    #     canopywave_keys = await load_keys("canopywave")
-    #     if canopywave_keys:
-    #         key_cycle = itertools.cycle(canopywave_keys)
-    #         active_providers.append(
-    #             CanopywaveProvider(api_keys=key_cycle, model="zai/glm-4.7")
-    #         )
-    # except Exception as error:
-    #     logger.warning(f"Error loading Canopywave providers: {error}")
-
-    # Baseten (commented out by default)
-    # try:
-    #     baseten_keys = await load_keys("baseten")
-    #     if baseten_keys:
-    #         key_cycle = itertools.cycle(baseten_keys)
-    #         active_providers.append(
-    #             BasetenProvider(api_keys=key_cycle, model="zai-org/GLM-4.7")
-    #         )
-    # except Exception as error:
-    #     logger.warning(f"Error loading Baseten providers: {error}")
+    # Baseten
+    baseten_cfg = config.providers.get("baseten")
+    if baseten_cfg and baseten_cfg.enabled:
+        try:
+            baseten_keys = await load_keys("baseten")
+            if baseten_keys:
+                key_cycle = itertools.cycle(baseten_keys)
+                active_providers.append(
+                    BasetenProvider(api_keys=key_cycle, model=baseten_cfg.model)
+                )
+        except Exception as error:
+            logger.warning(f"Error loading Baseten providers: {error}")
 
     # Gemini Web API (reverse-engineered)
-    if ENABLE_GEMINI:
+    gemini_cfg = config.providers.get("gemini_webapi")
+    if (gemini_cfg and gemini_cfg.enabled) or ENABLE_GEMINI:
         try:
             gemini_clients = await load_gemini_clients()
             for client in gemini_clients:
@@ -123,26 +154,28 @@ async def initialize_providers() -> List[LLMProvider]:
         except Exception as error:
             logger.warning(f"Could not load Gemini clients: {error}")
 
-    # Google GenAI (Official API, commented out by default)
-    # try:
-    #     google_genai_keys = await load_keys("google_genai")
-    #     if google_genai_keys:
-    #         key_cycle = itertools.cycle(google_genai_keys)
-    #         active_providers.append(
-    #             GoogleGenAIProvider(
-    #                 api_keys=key_cycle,
-    #                 model="gemini-3-flash-preview",
-    #                 thinking_level="high",
-    #             )
-    #         )
-    # except Exception as error:
-    #     logger.warning(f"Error loading Google GenAI providers: {error}")
+    # Google GenAI (Official API)
+    google_genai_cfg = config.providers.get("google_genai")
+    if google_genai_cfg and google_genai_cfg.enabled:
+        try:
+            google_genai_keys = await load_keys("google_genai")
+            if google_genai_keys:
+                key_cycle = itertools.cycle(google_genai_keys)
+                active_providers.append(
+                    GoogleGenAIProvider(
+                        api_keys=key_cycle,
+                        model=google_genai_cfg.model,
+                        thinking_level=google_genai_cfg.thinking_level or "high",
+                    )
+                )
+        except Exception as error:
+            logger.warning(f"Error loading Google GenAI providers: {error}")
 
     # Google Antigravity (local proxy, no auth needed)
-    active_providers.append(GoogleAntigravityProvider(model="gemini-3-pro-preview"))
-    active_providers.append(
-        GoogleAntigravityProvider(model="gemini-claude-sonnet-4-5-thinking")
-    )
+    antigravity_cfg = config.providers.get("google_antigravity")
+    if antigravity_cfg and antigravity_cfg.enabled:
+        for model in antigravity_cfg.models:
+            active_providers.append(GoogleAntigravityProvider(model=model))
 
     if not active_providers:
         logger.error("No providers could be initialized.")

@@ -1,0 +1,65 @@
+# LLM2Deck Configuration
+# Uncomment providers to enable them
+
+# Provider Configuration
+providers:
+  cerebras:
+    enabled: true
+    model: "gpt-oss-120b"
+    reasoning_effort: "high"
+
+  openrouter:
+    enabled: false
+    model: "xiaomi/mimo-v2-flash:free"
+
+  nvidia:
+    enabled: false
+    model: "moonshotai/kimi-k2-thinking"
+    timeout: 900
+
+  g4f:
+    enabled: false
+    model: "claude-opus-4-5-20251101-thinking-32k"
+    provider_name: "LMArena"
+
+  canopywave:
+    enabled: false
+    model: "zai/glm-4.7"
+
+  baseten:
+    enabled: false
+    model: "zai-org/GLM-4.7"
+
+  gemini_webapi:
+    enabled: false
+    # Uses credentials from gemini_creds.json
+
+  google_genai:
+    enabled: false
+    model: "gemini-3-flash-preview"
+    thinking_level: "high"
+
+  google_antigravity:
+    enabled: true
+    models:
+      - "gemini-3-pro-preview"
+      - "gemini-claude-sonnet-4-5-thinking"
+
+# Generation Settings
+generation:
+  concurrent_requests: 8
+  max_retries: 5
+  json_parse_retries: 3
+
+# Database Settings
+database:
+  path: "llm2deck.db"
+
+# Subject Settings
+subjects:
+  leetcode:
+    enabled: true
+  cs:
+    enabled: true
+  physics:
+    enabled: true
