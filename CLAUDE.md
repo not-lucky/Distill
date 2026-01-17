@@ -12,28 +12,36 @@ LLM2Deck generates Anki flashcards using multiple LLMs in parallel. It supports 
 # Setup
 uv sync
 
-# Generate cards
-uv run main.py                              # LeetCode standard (default)
-uv run main.py <subject> [mcq] [--label=X]  # subject: leetcode, cs, physics
+# Generate cards (new unified CLI)
+uv run main.py generate                           # LeetCode standard (default)
+uv run main.py generate <subject> [card_type]     # subject: leetcode, cs, physics; card_type: standard, mcq
+uv run main.py generate cs mcq --label "test"     # with optional label
+
+# Backward compatible syntax
+uv run main.py <subject> [mcq] [--label=X]        # old style still works
 
 # Convert to Anki package
-uv run convert_to_apkg.py <file>.json       # auto-detects mode from filename
-uv run convert_to_apkg.py <file>.json --mode cs_mcq
+uv run main.py convert <file>.json                # auto-detects mode from filename
+uv run main.py convert <file>.json --mode cs_mcq  # explicit mode
 
-# Utilities
-uv run merge_anki_json.py <subject>         # merge archived JSONs
-uv run json_to_md.py                        # export to Markdown
+# Merge archived JSON files
+uv run main.py merge <subject>                    # subject: cs, leetcode, physics
+
+# Export to Markdown
+uv run main.py export-md                          # default directories
+uv run main.py export-md --source ./dir --target ./out
 ```
 
 ## Architecture
 
 ### Generation Flow
 
-1. `main.py` initializes providers via `src/setup.py` and creates a database Run
-2. For each question, `CardGenerator` (`src/generator.py`) spawns parallel requests to all providers
-3. Each provider returns initial cards, saved as `ProviderResult` entries
-4. First provider combines all results into final cards
-5. Final cards saved to JSON and database (`Problem`, `Card` entries)
+1. `main.py` delegates to `src/cli.py` which creates an `Orchestrator` (`src/orchestrator.py`)
+2. `Orchestrator` initializes providers via `src/setup.py` and creates a database Run
+3. For each question, `CardGenerator` (`src/generator.py`) spawns parallel requests to all providers
+4. Each provider returns initial cards, saved as `ProviderResult` entries
+5. First provider combines all results into final cards
+6. Final cards saved to JSON and database (`Problem`, `Card` entries)
 
 ### Provider System
 
@@ -63,9 +71,23 @@ Then add initialization in `src/setup.py` and key config in `src/config/keys.py`
 ### Subject Configuration
 
 `SubjectRegistry` in `src/config/subjects.py` maps subjects to:
-- Prompt templates (from `src/data/prompts/`)
+- Prompt templates (initial and combine prompts)
 - Pydantic models (card structure validation)
 - Questions (from `src/data/questions.json`)
+- Deck prefixes (for Anki deck naming)
+
+The `SubjectConfig` dataclass contains all configuration for a subject/mode:
+```python
+@dataclass
+class SubjectConfig:
+    name: str                    # "leetcode", "cs", "physics"
+    target_questions: Dict       # categorized questions
+    initial_prompt: Optional[str]
+    combine_prompt: Optional[str]
+    target_model: Type[BaseModel]
+    deck_prefix: str             # "LeetCode", "CS", "Physics"
+    deck_prefix_mcq: str         # MCQ variant prefix
+```
 
 ### Question Organization
 
@@ -103,7 +125,9 @@ Query utilities in `src/queries.py`.
 
 | Purpose | Files |
 |---------|-------|
-| Entry points | `main.py`, `convert_to_apkg.py` |
+| Entry point | `main.py` |
+| CLI | `src/cli.py` |
+| Orchestration | `src/orchestrator.py` |
 | Provider init | `src/setup.py`, `src/config/keys.py` |
 | Generation | `src/generator.py`, `src/prompts.py` |
 | Config | `src/config/subjects.py`, `src/data/questions.json` |
@@ -115,3 +139,4 @@ Query utilities in `src/queries.py`.
 - API keys stored in JSON files at project root (see README.md for format per provider)
 - `CONCURRENT_REQUESTS` env var controls parallel question processing (default: 8)
 - Mode naming: `<subject>` for standard, `<subject>_mcq` for MCQ (affects prompts and filenames)
+- Experimental test scripts are in `tests/experiments/`

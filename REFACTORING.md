@@ -83,77 +83,47 @@ except:
 
 ---
 
-## Priority 3: Medium (Improve Maintainability)
+## Priority 3: Medium (Improve Maintainability) - COMPLETED
 
-### 3.1 Unify Subject Configuration
+### 3.1 ~~Unify Subject Configuration~~ DONE
 
-**Files affected:**
-- `src/config/subjects.py`
-- `src/anki/generator.py` (hardcoded prefixes)
-- `src/generator.py` (mode-based prompt selection)
+**Files changed:**
+- `src/config/subjects.py` - Added `name`, `combine_prompt`, `deck_prefix`, `deck_prefix_mcq` fields to `SubjectConfig`
+- `src/generator.py` - Now accepts `combine_prompt` parameter instead of mode-based selection
+- `src/anki/generator.py` - Now accepts `deck_prefix` parameter instead of mode-based switch
 
-**Issue:** Subject-specific logic is scattered:
-- `SubjectRegistry` defines prompts and models
-- `DeckGenerator._get_prefix()` has hardcoded switch for deck names
-- `CardGenerator` has hardcoded mode-to-prompt mapping
-
-**Action:** Centralize all subject config:
-
-```python
-# src/config/subjects.py
-@dataclass
-class SubjectConfig:
-    name: str
-    deck_prefix: str
-    initial_prompt: str
-    combine_prompt: str
-    model_class: Type[BaseModel]
-    questions: Dict[str, List[str]]
-
-SUBJECTS = {
-    "leetcode": SubjectConfig(
-        name="leetcode",
-        deck_prefix="LeetCode",
-        initial_prompt=INITIAL_LEETCODE_PROMPT,
-        combine_prompt=COMBINE_LEETCODE_PROMPT,
-        model_class=LeetCodeProblem,
-        questions=load_questions("leetcode")
-    ),
-    # ...
-}
-```
-
-**Benefits:**
-- Adding a subject requires only updating this one file
-- No more hardcoded switch statements
+**Result:** All subject-specific configuration is now centralized in `SubjectConfig`. Adding a new subject requires updating only `src/config/subjects.py`.
 
 ---
 
-### 3.2 Refactor `main.py` Entry Point
+### 3.2 ~~Refactor `main.py` Entry Point~~ DONE
 
-**File:** `main.py` (157 lines)
+**Files created:**
+- `src/orchestrator.py` - Class-based `Orchestrator` for the main execution flow
+- `src/cli.py` - Unified CLI with argparse subcommands
 
-**Issue:** Main file mixes CLI parsing, orchestration, and async execution.
+**Files changed:**
+- `main.py` - Reduced to minimal entry point (8 lines)
 
-**Action:**
-1. Extract CLI argument parsing to `src/cli.py`
-2. Create `src/orchestrator.py` for the main execution flow
-3. Keep `main.py` minimal (just entry point)
+**Result:** Clean separation of concerns with CLI parsing, orchestration, and execution in separate modules.
 
 ---
 
-### 3.3 Move Utility Scripts
+### 3.3 ~~Move Utility Scripts~~ DONE
 
-**Files:**
-- `json_to_md.py` (99 lines)
-- `merge_anki_json.py` (87 lines)
-- `g4f_test.py` (22 lines) - should this be deleted?
-- `verify_google_genai.py` (34 lines) - should this be deleted?
+**Integrated into CLI:**
+- `json_to_md.py` -> `llm2deck export-md`
+- `merge_anki_json.py` -> `llm2deck merge`
+- `convert_to_apkg.py` -> `llm2deck convert`
 
-**Action:**
-- Move to `src/cli/` or `scripts/` directory
-- Consider making them subcommands of a unified CLI
-- Delete test/verification scripts if no longer needed
+**Moved test scripts:**
+- `g4f_test.py` -> `tests/experiments/g4f_test.py`
+- `verify_google_genai.py` -> `tests/experiments/verify_google_genai.py`
+
+**Added:**
+- `[project.scripts]` entry point in `pyproject.toml` for `llm2deck` command
+
+**Result:** Single unified CLI with subcommands. Old-style syntax (`main.py leetcode mcq`) still works via backward compatibility.
 
 ---
 
@@ -307,5 +277,5 @@ LLM2Deck/
 
 - **Priority 1 (Critical):** COMPLETED
 - **Priority 2 (High):** COMPLETED (except provider registry, deferred)
-- **Priority 3 (Medium):** Pending
+- **Priority 3 (Medium):** COMPLETED
 - **Priority 4 (Low):** Pending

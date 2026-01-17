@@ -12,16 +12,16 @@ from src.anki.renderer import render_markdown
 logger = logging.getLogger(__name__)
 
 class DeckGenerator:
-    def __init__(self, json_file_path: str, mode: str = "leetcode"):
+    def __init__(self, json_file_path: str, deck_prefix: str = "LeetCode"):
         """
         Initialize the Anki deck generator.
-        
+
         Args:
             json_file_path: Path to the JSON file containing card data
-            mode: Generation mode ('leetcode' or 'cs' or 'physics')
+            deck_prefix: Deck name prefix (e.g., "LeetCode", "CS_MCQ")
         """
         self.json_file_path = json_file_path
-        self.generation_mode = mode
+        self.deck_prefix = deck_prefix
         self.deck_collection: Dict[str, genanki.Deck] = {}
         self.model_factory = AnkiModelFactory()
         self.basic_card_model = self.model_factory.basic_model
@@ -50,16 +50,8 @@ class DeckGenerator:
         return self.deck_collection[deck_path]
     
     def _get_prefix(self) -> str:
-        """Get the deck prefix based on mode."""
-        subject_name = self.generation_mode.replace('_mcq', '')
-        is_mcq_mode = '_mcq' in self.generation_mode or self.generation_mode == 'mcq'
-        
-        if subject_name == "cs":
-            return "CS_MCQ" if is_mcq_mode else "CS"
-        elif subject_name == "physics":
-            return "Physics_MCQ" if is_mcq_mode else "Physics"
-        else:
-            return "LeetCode_MCQ" if is_mcq_mode else "LeetCode"
+        """Get the deck prefix."""
+        return self.deck_prefix
     
     def _build_deck_path(
         self, 
@@ -122,8 +114,8 @@ class DeckGenerator:
         card_type_value = card_data.get('card_type', 'General')
         card_tags.append(f"type::{card_type_value}")
         
-        # Check if MCQ
-        is_mcq_mode = 'mcq' in self.generation_mode
+        # Check if MCQ mode (based on deck prefix containing MCQ)
+        is_mcq_mode = 'MCQ' in self.deck_prefix
         
         if 'options' in card_data and is_mcq_mode:
             self._add_mcq_card(target_deck, card_data, problem_title, topic_name, difficulty_level, card_tags)

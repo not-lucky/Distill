@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Type, Optional, Any, Dict, Union
+from typing import List, Type, Optional, Dict
 from pydantic import BaseModel
 
 from src.models import (
@@ -10,12 +10,12 @@ from src.models import (
 )
 from src.prompts import (
     INITIAL_CS_PROMPT_TEMPLATE,
-    PHYSICS_PROMPT_TEMPLATE, 
+    PHYSICS_PROMPT_TEMPLATE,
     MCQ_PROMPT_TEMPLATE,
     PHYSICS_MCQ_PROMPT_TEMPLATE,
-    INITIAL_PROMPT_TEMPLATE,
-    INITIAL_LEETCODE_PROMPT_TEMPLATE,
-    COMBINE_LEETCODE_PROMPT_TEMPLATE
+    COMBINE_LEETCODE_PROMPT_TEMPLATE,
+    COMBINE_CS_PROMPT_TEMPLATE,
+    MCQ_COMBINE_PROMPT_TEMPLATE,
 )
 from src.questions import (
     QUESTIONS, 
@@ -23,24 +23,26 @@ from src.questions import (
     PHYSICS_QUESTIONS
 )
 
-# Type aliases
+# Type alias
 CategorizedQuestions = Dict[str, List[str]]
-FlatQuestions = List[str]
 
 @dataclass
 class SubjectConfig:
     """Configuration for a specific subject/mode."""
-    target_questions: Union[CategorizedQuestions, FlatQuestions]
-    prompt_template: Optional[str]
+    name: str  # "leetcode", "cs", "physics"
+    target_questions: CategorizedQuestions
+    initial_prompt: Optional[str]  # Prompt template for initial generation
+    combine_prompt: Optional[str]  # Prompt template for combining cards
     target_model: Type[BaseModel]
-    is_categorized: bool = False  # True if questions are in category dict format
+    deck_prefix: str  # Anki deck prefix, e.g., "LeetCode", "CS"
+    deck_prefix_mcq: str  # MCQ variant prefix, e.g., "LeetCode_MCQ"
     
 class SubjectRegistry:
     @staticmethod
     def get_config(subject_name: str, is_multiple_choice: bool = False) -> SubjectConfig:
         """
         Get configuration for a given subject and card type.
-        
+
         Args:
             subject_name: 'leetcode', 'cs', or 'physics'
             is_multiple_choice: Whether to generate MCQ cards
@@ -49,36 +51,45 @@ class SubjectRegistry:
         if subject_name not in ["cs", "physics", "leetcode"]:
             subject_name = "leetcode"
 
-        # 1. Select Questions (all subjects use categorized format now)
-        if subject_name == "cs":
-            question_list = CS_QUESTIONS
-        elif subject_name == "physics":
-            question_list = PHYSICS_QUESTIONS
-        else:
-            question_list = QUESTIONS
-        is_categorized_format = isinstance(question_list, dict)
+        # Question lists (all subjects use categorized format)
+        questions_map = {
+            "cs": CS_QUESTIONS,
+            "physics": PHYSICS_QUESTIONS,
+            "leetcode": QUESTIONS,
+        }
+        question_list = questions_map[subject_name]
 
-        # 2. Select Model & Prompt
+        # Deck prefixes
+        deck_prefixes = {
+            "cs": ("CS", "CS_MCQ"),
+            "physics": ("Physics", "Physics_MCQ"),
+            "leetcode": ("LeetCode", "LeetCode_MCQ"),
+        }
+        prefix, prefix_mcq = deck_prefixes[subject_name]
+
+        # Select Model & Prompts based on mode
         if is_multiple_choice:
             target_model_class = MCQProblem
             if subject_name == "physics":
-                prompt_template = PHYSICS_MCQ_PROMPT_TEMPLATE
+                initial_prompt = PHYSICS_MCQ_PROMPT_TEMPLATE
             else:
-                prompt_template = MCQ_PROMPT_TEMPLATE
+                initial_prompt = MCQ_PROMPT_TEMPLATE
+            combine_prompt = MCQ_COMBINE_PROMPT_TEMPLATE
         else:
-            if subject_name == "cs":
-                target_model_class = CSProblem
-                prompt_template = INITIAL_CS_PROMPT_TEMPLATE
-            elif subject_name == "physics":
-                target_model_class = PhysicsProblem
-                prompt_template = PHYSICS_PROMPT_TEMPLATE
-            else: # leetcode
-                target_model_class = LeetCodeProblem
-                prompt_template = None # Usage of generic/initial prompt implied or handled by Logic
+            # Standard mode - subject-specific configuration
+            config_map = {
+                "cs": (CSProblem, INITIAL_CS_PROMPT_TEMPLATE, COMBINE_CS_PROMPT_TEMPLATE),
+                "physics": (PhysicsProblem, PHYSICS_PROMPT_TEMPLATE, None),
+                "leetcode": (LeetCodeProblem, None, COMBINE_LEETCODE_PROMPT_TEMPLATE),
+            }
+            target_model_class, initial_prompt, combine_prompt = config_map[subject_name]
 
         return SubjectConfig(
+            name=subject_name,
             target_questions=question_list,
-            prompt_template=prompt_template,
+            initial_prompt=initial_prompt,
+            combine_prompt=combine_prompt,
             target_model=target_model_class,
-            is_categorized=is_categorized_format
+            deck_prefix=prefix,
+            deck_prefix_mcq=prefix_mcq,
         )

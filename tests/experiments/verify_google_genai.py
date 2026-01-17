@@ -3,8 +3,8 @@ import os
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.append(str(Path(__file__).parent))
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
     from src.providers.google_genai import GoogleGenAIProvider
@@ -19,13 +19,13 @@ async def test_instantiation():
     print("Testing instantiation...")
     # Mock keys file check
     # We won't actually call the API, just check we can create the object
-    
+
     # Create the keys file temporarily if needed, or just pass a mock iterator
     mock_keys = iter(["dummy_key"])
     provider = GoogleGenAIProvider(api_keys=mock_keys)
     print(f"Provider instantiated: {provider}")
     print(f"Model: {provider.model}")
-    
+
     # Test client creation (should not fail until API call)
     client = provider._get_client()
     print(f"Client created: {client}")

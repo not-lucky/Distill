@@ -5,11 +5,6 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel
 from src.models import LeetCodeProblem
 from src.providers.base import LLMProvider
-from src.prompts import (
-    MCQ_COMBINE_PROMPT_TEMPLATE,
-    COMBINE_LEETCODE_PROMPT_TEMPLATE,
-    COMBINE_CS_PROMPT_TEMPLATE,
-)
 from src.database import (
     get_session,
     create_problem,
@@ -29,12 +24,12 @@ class CardGenerator:
         self,
         providers: List[LLMProvider],
         combiner: LLMProvider,
-        mode: str = "default",
+        combine_prompt: Optional[str] = None,
         run_id: str = None,
     ):
         self.llm_providers = providers
         self.card_combiner = combiner
-        self.generation_mode = mode
+        self.combine_prompt = combine_prompt
         self.run_id = run_id
 
     async def process_question(
@@ -136,17 +131,8 @@ class CardGenerator:
         for set_index, provider_result in enumerate(valid_provider_results):
             combined_inputs += f"Set {set_index + 1}:\n{provider_result}\n\n"
 
-        # Select appropriate combining prompt based on mode
-        if "mcq" in self.generation_mode:
-            combine_prompt = MCQ_COMBINE_PROMPT_TEMPLATE
-        elif "leetcode" in self.generation_mode:
-            combine_prompt = COMBINE_LEETCODE_PROMPT_TEMPLATE
-        elif "cs" in self.generation_mode:
-            combine_prompt = COMBINE_CS_PROMPT_TEMPLATE
-        else:
-            combine_prompt = None
         final_card_data = await self.card_combiner.combine_cards(
-            question, combined_inputs, json_schema, combine_prompt
+            question, combined_inputs, json_schema, self.combine_prompt
         )
 
         if final_card_data:

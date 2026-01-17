@@ -23,3 +23,6 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "zendriver>=0.14.0",
 ]
+
+[project.scripts]
+llm2deck = "src.cli:main"
