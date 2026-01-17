@@ -4,20 +4,20 @@
 ![Python](https://img.shields.io/badge/python-%3E%3D3.12-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-LLM2Deck is a powerful tool designed to generate high-quality Anki decks using Large Language Models (LLMs). It automates the creation of study materials for LeetCode problems, Computer Science concepts, and Physics topics, with support for both standard Q&A and Multiple Choice Questions (MCQs).
+LLM2Deck generates high-quality Anki flashcards using multiple LLMs in parallel. It supports LeetCode problems, Computer Science concepts, and Physics topics, with both standard Q&A and MCQ formats.
 
 ## Features
 
-- **Multi-Provider Support**: Integrates with 8 LLM providers: Cerebras, NVIDIA, OpenRouter, Gemini (Web API), Google GenAI, Canopywave, Baseten, and G4F (experimental/free)
-- **Multiple Modes**:
-  - **LeetCode Mode** (Default): Generates detailed cards for algorithmic problems (Code, Complexity, approaches)
-  - **CS Mode**: Generates deep-dive cards for Computer Science concepts
-  - **Physics Mode**: Generates extensive cards for Physics concepts (Definitions, Formulas, Concepts)
-- **MCQ Support**: Generates high-quality Multiple Choice Questions with shuffled options and detailed explanations
-- **Category-Based Organization**: LeetCode problems are organized by category with numbered prefixes for proper ordering in Anki (e.g., `LeetCode::001 Binary Search::001 Two Sum`)
-- **Rich Formatting**: Supports code syntax highlighting (Catppuccin theme) and Markdown rendering in Anki cards
-- **Modular Architecture**: Clean, extensible design with separate concerns for logic, styles, and data
-- **Automated Export**: Converts generated JSON data directly into importable Anki Package (`.apkg`) files
+- **Multi-Provider Architecture**: Run multiple LLM providers in parallel, then combine results for comprehensive coverage
+- **Supported Providers**: Cerebras, NVIDIA, OpenRouter, Gemini (Web API), Google GenAI, Canopywave, Baseten, Google Antigravity, and G4F (experimental)
+- **Three Subjects**:
+  - **LeetCode**: Algorithm problems with code, complexity analysis, and approaches
+  - **CS**: Deep-dive Computer Science concept cards
+  - **Physics**: Definitions, formulas, and concept explanations
+- **MCQ Support**: Multiple choice questions with shuffled options and explanations
+- **Category-Based Organization**: Numbered hierarchical decks (e.g., `LeetCode::001 Binary Search::001 Two Sum`)
+- **Rich Formatting**: Syntax highlighting (Catppuccin theme) and Markdown rendering
+- **Database Tracking**: SQLite database stores all runs, provider outputs, and generated cards
 
 ## Prerequisites
 
@@ -26,16 +26,11 @@ LLM2Deck is a powerful tool designed to generate high-quality Anki decks using L
 
 ## Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone <repository_url>
-   cd LLM2Deck
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   uv sync
-   ```
+```bash
+git clone <repository_url>
+cd LLM2Deck
+uv sync
+```
 
 ## Configuration
 
@@ -44,25 +39,24 @@ LLM2Deck is a powerful tool designed to generate high-quality Anki decks using L
 Create a `.env` file in the root directory:
 
 ```ini
-# Configuration
 CONCURRENT_REQUESTS=5
 
-# Custom Key File Paths (Optional)
+# Custom key file paths (optional)
 # CEREBRAS_KEYS_FILE_PATH=api_keys.json
-# OPENROUTER_KEYS_FILE_PATH=openrouter_keys.json
 # NVIDIA_KEYS_FILE_PATH=nvidia_keys.json
+# OPENROUTER_KEYS_FILE_PATH=openrouter_keys.json
 # GEMINI_CREDENTIALS_FILE_PATH=python3ds.json
 # GOOGLE_GENAI_KEYS_FILE_PATH=google_genai_keys.json
 # CANOPYWAVE_KEYS_FILE_PATH=canopywave_keys.json
 # BASETEN_KEYS_FILE_PATH=baseten_keys.json
 
-# Enable Gemini Web API Provider (disabled by default, requires browser cookies)
+# Enable Gemini Web API (requires browser cookies)
 # ENABLE_GEMINI=true
 ```
 
 ### API Keys
 
-The project uses JSON files to manage API keys:
+API keys are stored in JSON files at the project root:
 
 | Provider     | File                     | Format                                              |
 |--------------|--------------------------|-----------------------------------------------------|
@@ -73,109 +67,82 @@ The project uses JSON files to manage API keys:
 | Google GenAI | `google_genai_keys.json` | `["key1", ...]` or `[{"api_key": "..."}]`           |
 | Canopywave   | `canopywave_keys.json`   | `["key1", ...]` or `[{"api_key": "..."}]`           |
 | Baseten      | `baseten_keys.json`      | `["key1", ...]` or `[{"api_key": "..."}]`           |
-| G4F          | N/A                      | No keys required (experimental, free tier)          |
+| G4F          | N/A                      | No keys required (experimental)                     |
 
 **Notes:**
-- **Gemini (Web)**: Uses reverse-engineered browser cookies. Requires `ENABLE_GEMINI=true`.
-- **Google GenAI**: Official Google API with Gemini 3 support (recommended over Gemini Web).
-- **G4F**: Uses the [g4f](https://github.com/xtekky/gpt4free) library for free model access.
+- **Gemini (Web)**: Reverse-engineered browser cookies. Requires `ENABLE_GEMINI=true`.
+- **Google GenAI**: Official Google API (recommended over Gemini Web).
+- **Google Antigravity**: Local proxy, no authentication required.
+- **G4F**: Uses [gpt4free](https://github.com/xtekky/gpt4free) for free model access.
 
-### Questions Configuration
+### Questions
 
-Questions are defined in `src/data/questions.json`. 
-
-**LeetCode** uses a category-based structure for organized deck generation:
+Questions are defined in `src/data/questions.json` using a categorized structure:
 
 ```json
 {
     "leetcode": {
-        "Binary Search": [
-            "Binary Search",
-            "Search a 2D Matrix",
-            "Koko Eating Bananas"
-        ],
-        "Two Pointers": [
-            "Valid Palindrome",
-            "3Sum"
-        ]
+        "Binary Search": ["Binary Search", "Search a 2D Matrix"],
+        "Two Pointers": ["Valid Palindrome", "3Sum"]
     },
     "cs": ["Linked List, implementation..."],
     "physics": ["Zeeman effect (normal)", "Zeeman effect (anomalous)"]
 }
 ```
 
-This structure generates Anki decks with numbered hierarchies:
+This generates numbered hierarchical Anki decks:
 ```
 LeetCode
 ├── 001 Binary Search
 │   ├── 001 Binary Search
-│   ├── 002 Search a 2D Matrix
-│   └── 003 Koko Eating Bananas
-├── 002 Two Pointers
-│   ├── 001 Valid Palindrome
-│   └── 002 3Sum
+│   └── 002 Search a 2D Matrix
+└── 002 Two Pointers
+    ├── 001 Valid Palindrome
+    └── 002 3Sum
 ```
 
 ## Usage
 
-### 1. Generating Cards (JSON)
+### Generate Cards
 
-Use `main.py` to generate raw card data in JSON format.
-
-**Standard Mode:**
 ```bash
-# Default (LeetCode)
+# Default (LeetCode standard)
 uv run main.py
 
-# Explicit subject
+# Specific subject
 uv run main.py leetcode
 uv run main.py cs
 uv run main.py physics
-```
 
-**MCQ Mode:**
-```bash
-# Physics MCQs
+# MCQ mode
 uv run main.py physics mcq
-
-# CS MCQs
 uv run main.py cs mcq
 
-# LeetCode MCQs
-uv run main.py leetcode mcq
+# With label
+uv run main.py leetcode --label="binary-search-practice"
 ```
 
-Output is saved as timestamped JSON files (e.g., `leetcode_anki_deck_20251227T140625.json`).
+Output: timestamped JSON file (e.g., `leetcode_anki_deck_20251227T140625.json`)
 
-### 2. Creating Anki Packages (.apkg)
-
-Use `convert_to_apkg.py` to convert generated JSON into an importable Anki package.
-Mode is auto-detected from the filename if `--mode` is not specified.
+### Create Anki Package
 
 ```bash
 # Auto-detect mode from filename
 uv run convert_to_apkg.py leetcode_anki_deck_20251227T140625.json
 
-# Explicit mode override
+# Explicit mode
 uv run convert_to_apkg.py output.json --mode physics_mcq
 ```
 
 **Valid modes:** `leetcode`, `cs`, `physics`, `leetcode_mcq`, `cs_mcq`, `physics_mcq`, `mcq`
 
-### 3. Merging Archival Cards
-
-If you have multiple generation runs archived, merge them:
+### Utilities
 
 ```bash
+# Merge archived JSON files
 uv run merge_anki_json.py leetcode
-uv run merge_anki_json.py cs
-```
 
-### 4. Exporting to Markdown (Optional)
-
-Save Anki cards as readable Markdown files:
-
-```bash
+# Export to Markdown
 uv run json_to_md.py
 ```
 
@@ -183,37 +150,53 @@ uv run json_to_md.py
 
 ```
 LLM2Deck/
+├── main.py                    # Entry point for card generation
+├── convert_to_apkg.py         # JSON → Anki package CLI
+├── merge_anki_json.py         # Merge archived JSON files
+├── json_to_md.py              # JSON → Markdown export
 ├── src/
-│   ├── anki/                 # Anki generation logic
-│   │   ├── generator.py      # Deck generation with category support
-│   │   ├── models.py         # Genanki model definitions
-│   │   ├── renderer.py       # Markdown to HTML rendering
-│   │   └── styles.py         # CSS themes (Catppuccin)
-│   ├── config/               # Configuration & Registry
-│   │   ├── __init__.py       # Main config (paths, env vars)
-│   │   └── subjects.py       # Subject-specific settings
-│   ├── data/
-│   │   ├── prompts/          # Markdown prompt templates
-│   │   └── questions.json    # Target questions (categorized)
-│   ├── providers/            # LLM Provider integrations
-│   │   ├── base.py           # Abstract base class
-│   │   ├── cerebras.py       # Cerebras Cloud SDK
-│   │   ├── nvidia.py         # NVIDIA NIM API
-│   │   ├── openrouter.py     # OpenRouter API
-│   │   ├── gemini.py         # Gemini Web API (cookie-based)
-│   │   ├── google_genai.py   # Official Google GenAI API
-│   │   ├── canopywave.py     # Canopywave API
-│   │   ├── baseten.py        # Baseten API
-│   │   └── g4f_provider.py   # G4F library (experimental)
-│   ├── generator.py          # Card generation logic
-│   ├── questions.py          # Question loading utilities
-│   └── prompts.py            # Prompt templates
-├── convert_to_apkg.py        # CLI: JSON → Anki package
-├── merge_anki_json.py        # CLI: Merge archived JSON files
-├── json_to_md.py             # CLI: JSON → Markdown
-├── main.py                   # Entry point for card generation
-└── README.md
+│   ├── generator.py           # CardGenerator orchestration
+│   ├── setup.py               # Provider initialization
+│   ├── database.py            # SQLite schema and operations
+│   ├── models.py              # Pydantic models for cards
+│   ├── questions.py           # Question loading utilities
+│   ├── prompts.py             # Prompt template loading
+│   ├── queries.py             # Database query utilities
+│   ├── config/
+│   │   ├── __init__.py        # Paths and env vars
+│   │   ├── subjects.py        # SubjectRegistry configuration
+│   │   └── keys.py            # Unified API key loading
+│   ├── providers/
+│   │   ├── base.py            # LLMProvider abstract base
+│   │   ├── openai_compatible.py  # Shared base for OpenAI-compatible APIs
+│   │   ├── cerebras.py        # Cerebras (native SDK)
+│   │   ├── nvidia.py          # NVIDIA NIM
+│   │   ├── openrouter.py      # OpenRouter
+│   │   ├── google_genai.py    # Official Google GenAI
+│   │   ├── google_antigravity.py  # Google Antigravity proxy
+│   │   ├── gemini.py          # Gemini Web API (cookies)
+│   │   ├── canopywave.py      # Canopywave
+│   │   ├── baseten.py         # Baseten
+│   │   └── g4f_provider.py    # G4F (experimental)
+│   ├── anki/
+│   │   ├── generator.py       # DeckGenerator
+│   │   ├── models.py          # Anki note models
+│   │   ├── renderer.py        # Markdown → HTML
+│   │   └── styles.py          # Catppuccin CSS
+│   └── data/
+│       ├── prompts/           # Markdown prompt templates
+│       └── questions.json     # Target questions
+└── llm2deck.db                # SQLite database (generated)
 ```
+
+## Architecture
+
+The system uses a two-stage generation process:
+
+1. **Parallel Generation**: Multiple providers generate initial cards simultaneously
+2. **Combination**: First provider merges all results into a final, comprehensive deck
+
+Most providers extend `OpenAICompatibleProvider` for shared request handling, retry logic, and JSON parsing. See `CLAUDE.md` for detailed architecture documentation.
 
 ## License
 

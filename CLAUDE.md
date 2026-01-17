@@ -4,184 +4,114 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LLM2Deck is a tool that generates high-quality Anki flashcards using Large Language Models. It supports three subjects (LeetCode, Computer Science, Physics) with both standard Q&A and MCQ formats. The system uses multiple LLM providers in parallel to generate diverse card perspectives, then combines them into a final deck.
+LLM2Deck generates Anki flashcards using multiple LLMs in parallel. It supports three subjects (LeetCode, CS, Physics) with standard Q&A and MCQ formats. The system uses a two-stage process: parallel generation across providers, then combination into a final deck.
 
-## Common Commands
+## Commands
 
-### Development Setup
 ```bash
-# Install dependencies using uv (recommended)
+# Setup
 uv sync
 
-# Activate virtual environment
-source .venv/bin/activate
-```
+# Generate cards
+uv run main.py                              # LeetCode standard (default)
+uv run main.py <subject> [mcq] [--label=X]  # subject: leetcode, cs, physics
 
-### Running Card Generation
-```bash
-# Generate cards (default: LeetCode standard mode)
-uv run main.py
+# Convert to Anki package
+uv run convert_to_apkg.py <file>.json       # auto-detects mode from filename
+uv run convert_to_apkg.py <file>.json --mode cs_mcq
 
-# Generate with specific subject and type
-uv run main.py <subject> [mcq] [--label=<name>]
-# Examples:
-uv run main.py leetcode          # LeetCode standard cards
-uv run main.py cs mcq            # CS multiple choice questions
-uv run main.py physics           # Physics standard cards
-uv run main.py leetcode --label="binary-search-practice"
-```
-
-### Converting to Anki Packages
-```bash
-# Auto-detect mode from filename
-uv run convert_to_apkg.py leetcode_anki_deck_20260101T131901.json
-
-# Explicit mode specification
-uv run convert_to_apkg.py output.json --mode cs_mcq
-```
-
-### Utility Commands
-```bash
-# Merge archived JSON files for a subject
-uv run merge_anki_json.py leetcode
-
-# Export cards to Markdown format
-uv run json_to_md.py
+# Utilities
+uv run merge_anki_json.py <subject>         # merge archived JSONs
+uv run json_to_md.py                        # export to Markdown
 ```
 
 ## Architecture
 
-### Core Generation Flow
+### Generation Flow
 
-The system follows a two-stage generation process:
-
-1. **Parallel Generation**: Multiple LLM providers generate initial card sets simultaneously for the same question
-2. **Combination**: A combiner provider merges all results into a final, comprehensive deck
-
-This architecture ensures diverse perspectives and comprehensive coverage by leveraging multiple models.
+1. `main.py` initializes providers via `src/setup.py` and creates a database Run
+2. For each question, `CardGenerator` (`src/generator.py`) spawns parallel requests to all providers
+3. Each provider returns initial cards, saved as `ProviderResult` entries
+4. First provider combines all results into final cards
+5. Final cards saved to JSON and database (`Problem`, `Card` entries)
 
 ### Provider System
 
-All LLM providers inherit from `LLMProvider` (src/providers/base.py) and implement two key methods:
+**Hierarchy:**
+- `LLMProvider` (`src/providers/base.py`) - abstract base defining `generate_initial_cards()` and `combine_cards()`
+- `OpenAICompatibleProvider` (`src/providers/openai_compatible.py`) - shared implementation for OpenAI-compatible APIs
+- Concrete providers (nvidia, openrouter, canopywave, baseten) extend `OpenAICompatibleProvider`
 
-- `generate_initial_cards()`: Create initial card sets from a question
-- `combine_cards()`: Merge multiple card sets into a final result
+**Adding a new OpenAI-compatible provider:**
+```python
+# src/providers/my_provider.py
+class MyProvider(OpenAICompatibleProvider):
+    def __init__(self, api_keys: Iterator[str], model: str):
+        super().__init__(
+            model=model,
+            base_url="https://api.example.com/v1",
+            api_keys=api_keys,
+        )
 
-**Provider initialization** (`src/setup.py`):
-- Loads API keys from JSON files in the project root
-- Creates provider instances with cyclic key rotation
-- Returns a list of active providers (first provider is used as combiner)
+    @property
+    def name(self) -> str:
+        return "my_provider"
+```
 
-**Adding a new provider**:
-1. Create a new file in `src/providers/` implementing `LLMProvider`
-2. Add key loading logic to `src/setup.py`
-3. Add provider instantiation in `initialize_providers()`
-4. Update `.env` and key file documentation
-
-### Database Integration
-
-The system uses SQLite (llm2deck.db) to track all generation runs, problems, provider results, and individual cards.
-
-**Key tables**:
-- `runs`: Tracks each execution with mode, subject, status, and statistics
-- `problems`: Individual questions processed within a run
-- `provider_results`: Raw output from each LLM provider before combination
-- `cards`: Final individual cards extracted from combined results
-
-**Database workflow**:
-1. `main.py` creates a Run entry at startup
-2. For each question, a Problem entry is created
-3. Each provider's output is saved as a ProviderResult
-4. Final combined cards are saved to both Problem.final_result and individual Card entries
-5. Run is updated with completion statistics
-
-Use `src/queries.py` for filtering and retrieving data. The database enables analysis of provider performance, historical comparisons, and debugging failed generations.
+Then add initialization in `src/setup.py` and key config in `src/config/keys.py`.
 
 ### Subject Configuration
 
-Subject-specific settings are centralized in `src/config/subjects.py` using `SubjectRegistry`:
-
-```python
-SubjectRegistry.get_config(subject_name, is_mcq=False)
-```
-
-Returns a `SubjectConfig` with:
-- `prompt_template`: Subject-specific generation prompt
-- `target_model`: Pydantic model defining card structure
-- `target_questions`: Questions to process (from src/data/questions.json)
+`SubjectRegistry` in `src/config/subjects.py` maps subjects to:
+- Prompt templates (from `src/data/prompts/`)
+- Pydantic models (card structure validation)
+- Questions (from `src/data/questions.json`)
 
 ### Question Organization
 
-Questions in `src/data/questions.json` use a **categorized dictionary format**:
-
+Questions in `src/data/questions.json` use a categorized format:
 ```json
 {
   "leetcode": {
     "Binary Search": ["Binary Search", "Search a 2D Matrix"],
     "Two Pointers": ["Valid Palindrome", "3Sum"]
-  },
-  "cs": {
-    "Data Structures": ["Linked List, implementation..."],
-    "Algorithms": ["Merge Sort"]
   }
 }
 ```
 
-This structure enables **numbered hierarchical decks** in Anki:
-```
-LeetCode::001 Binary Search::001 Binary Search
-LeetCode::001 Binary Search::002 Search a 2D Matrix
-LeetCode::002 Two Pointers::001 Valid Palindrome
-```
+This produces numbered hierarchical Anki decks: `LeetCode::001 Binary Search::001 Binary Search`
 
-The indexing is handled by `get_indexed_questions()` in `src/questions.py`, which returns tuples of `(category_index, category_name, problem_index, question)`.
+### Database
 
-### Anki Package Generation
+SQLite database `llm2deck.db` tracks:
+- `runs` - execution metadata and statistics
+- `problems` - individual questions processed
+- `provider_results` - raw LLM outputs before combination
+- `cards` - final individual cards
 
-The conversion from JSON to .apkg happens in `src/anki/`:
+Query utilities in `src/queries.py`.
 
-- **generator.py**: `DeckGenerator` reads JSON, creates genanki decks with proper hierarchy
-- **models.py**: Defines Anki note models (card templates) for each mode
-- **renderer.py**: Converts Markdown to HTML with syntax highlighting
-- **styles.py**: CSS styling (Catppuccin theme for code blocks)
+### Anki Generation
 
-Mode auto-detection in `convert_to_apkg.py` parses the filename prefix (e.g., `cs_mcq_anki_deck_*.json` → `cs_mcq` mode).
+`src/anki/` converts JSON to `.apkg`:
+- `generator.py` - `DeckGenerator` creates genanki decks with hierarchy
+- `models.py` - Anki note models (card templates)
+- `renderer.py` - Markdown to HTML with syntax highlighting
+- `styles.py` - Catppuccin theme CSS
 
-## Key Files and Patterns
+## Key Files
 
-### Entry Points
-- **main.py**: Primary entry point for card generation. Coordinates provider initialization, question processing, and database tracking.
-- **convert_to_apkg.py**: CLI for JSON → Anki package conversion with mode auto-detection.
-- **src/setup.py**: Provider initialization and API key management. Modify this to enable/disable specific providers.
+| Purpose | Files |
+|---------|-------|
+| Entry points | `main.py`, `convert_to_apkg.py` |
+| Provider init | `src/setup.py`, `src/config/keys.py` |
+| Generation | `src/generator.py`, `src/prompts.py` |
+| Config | `src/config/subjects.py`, `src/data/questions.json` |
+| Prompts | `src/data/prompts/*.md` |
 
-### Configuration
-- **.env**: Environment variables (CONCURRENT_REQUESTS, ENABLE_GEMINI, custom key file paths)
-- **src/config/__init__.py**: Path resolution and environment loading
-- **src/data/questions.json**: Source questions organized by category
+## Notes
 
-### Generation Logic
-- **src/generator.py**: `CardGenerator` orchestrates parallel generation and combining
-- **src/prompts.py**: Prompt template loading utilities
-- **src/data/prompts/**: Markdown files containing subject-specific prompts (initial*.md, combine*.md)
-
-### Utilities
-- **src/utils.py**: `save_final_deck()` for JSON export, filename sanitization
-- **src/queries.py**: Database query utilities for filtering runs, problems, and cards
-- **src/logging_config.py**: Logging setup with Rich console output
-
-## Important Notes
-
-### Provider Configuration
-Most providers in `src/setup.py` are commented out by default. The active configuration uses `GoogleAntigravityProvider`. To use other providers (Cerebras, NVIDIA, Google GenAI, etc.), uncomment the relevant sections and ensure API keys are configured.
-
-### API Key Formats
-Different providers use different JSON key formats. See README.md table for exact format specifications. Keys are stored in JSON files at the project root (not in version control).
-
-### Database Location
-The SQLite database `llm2deck.db` is created at the project root. All generation history is preserved here, enabling historical analysis via `src/queries.py`.
-
-### Concurrent Request Limit
-Set via `CONCURRENT_REQUESTS` in .env (default: 8). Controls how many questions are processed in parallel during generation.
-
-### Mode Naming Convention
-Mode identifiers follow the pattern: `<subject>` for standard cards, `<subject>_mcq` for multiple choice questions. This affects prompt selection, model selection, and filename generation.
+- Most providers in `src/setup.py` are commented out. Active: `CerebrasProvider`, `GoogleAntigravityProvider`
+- API keys stored in JSON files at project root (see README.md for format per provider)
+- `CONCURRENT_REQUESTS` env var controls parallel question processing (default: 8)
+- Mode naming: `<subject>` for standard, `<subject>_mcq` for MCQ (affects prompts and filenames)
