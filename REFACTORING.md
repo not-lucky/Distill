@@ -99,42 +99,32 @@ Updated CLI to import from modes module.
 
 ---
 
-## Priority 4: Low
+## Priority 4: Low ✅ COMPLETED
 
 Nice-to-have improvements for future iterations.
 
-### 10. Declarative Subject Configuration
+### 10. ⏸️ Declarative Subject Configuration (DEFERRED)
 **Location:** `src/config/subjects.py`
 
-Move subject definitions to YAML for easier editing.
+**Status:** Deferred - complexity outweighs benefit.
+- Subject configs reference Pydantic model classes (can't serialize to YAML)
+- Current code is readable and only ~95 lines
+- Would require significant restructuring with minimal gain
 
-```yaml
-# subjects.yaml
-leetcode:
-  deck_prefix: "LeetCode"
-  deck_prefix_mcq: "LeetCode MCQ"
-  prompts:
-    initial: "prompts/leetcode_initial.md"
-    combine: "prompts/leetcode_combine.md"
-```
-
-### 11. Prompt Path Configuration
+### 11. ✅ Prompt Path Configuration
 **Location:** `src/prompts.py`
 
-Hardcoded paths should be configurable or use resource discovery.
+Added configurable prompts directory via `LLM2DECK_PROMPTS_DIR` environment variable.
+Default path: `src/data/prompts`
 
-### 12. Provider Result Validation
-**Location:** Various
+### 12. ✅ Provider Result Validation
+**Location:** `src/types.py`
 
-Add Pydantic models for raw LLM responses before database insertion.
-
-```python
-class ProviderResponse(BaseModel):
-    cards: List[CardData]
-
-    @validator('cards')
-    def validate_cards(cls, v): ...
-```
+Added Pydantic models for validation:
+- `CardModel` - validates individual card structure
+- `ProviderResponse` - validates provider responses with:
+  - `validate_cards_not_empty` - ensures cards list is not empty
+  - `validate_cards_have_content` - ensures cards have front/back or question/explanation
 
 ---
 
@@ -144,3 +134,14 @@ class ProviderResponse(BaseModel):
 - P1 items block testability improvements
 - P2 items prevent code duplication
 - Consider tackling P1 items as a batch for maximum impact
+
+---
+
+## Summary
+
+| Priority | Status | Items |
+|----------|--------|-------|
+| P1: Critical | ✅ Complete | Logging, Generator refactor, Repository pattern |
+| P2: High | ✅ Complete | JSON utilities, Model constants, Type annotations |
+| P3: Medium | ✅ Complete | Exceptions, Task runner, CLI business logic |
+| P4: Low | ✅ Complete | Prompt paths, Provider validation (1 deferred) |
