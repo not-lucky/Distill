@@ -41,6 +41,14 @@ class JSONParseError(ProviderError):
         super().__init__(provider_name, "Failed to parse JSON response")
 
 
+class AllProvidersFailedError(LLM2DeckError):
+    """Raised when all providers fail for a question."""
+
+    def __init__(self, question: str):
+        self.question = question
+        super().__init__(f"All providers failed for question: {question}")
+
+
 class ConfigurationError(LLM2DeckError):
     """Raised for configuration issues."""
 
@@ -58,5 +66,11 @@ class SubjectError(ConfigurationError):
 
 class DatabaseError(LLM2DeckError):
     """Raised for database operation failures."""
+
+    pass
+
+
+class InitializationError(LLM2DeckError):
+    """Raised when orchestrator or component initialization fails."""
 
     pass

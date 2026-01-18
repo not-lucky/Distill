@@ -1,6 +1,5 @@
 """Orchestrator for LLM2Deck card generation workflow."""
 
-import asyncio
 import logging
 import uuid
 from typing import List, Dict, Optional, Tuple
@@ -12,6 +11,7 @@ from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.repositories import CardRepository
+from src.task_runner import ConcurrentTaskRunner
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions
 from src.database import init_database, create_run, update_run, get_session
@@ -121,37 +121,29 @@ class Orchestrator:
             self.subject_config.target_questions
         )
 
-        # Process questions with concurrency control
-        concurrency_semaphore = asyncio.Semaphore(CONCURRENT_REQUESTS)
-        all_generated_problems: List[Dict] = []
-
-        async def process_question_with_semaphore(
-            category_index: int,
-            category_name: str,
-            problem_index: int,
-            question_text: str,
-        ):
-            async with concurrency_semaphore:
-                generation_result = await self.card_generator.process_question(
-                    question_text,
-                    self.subject_config.initial_prompt,
-                    self.subject_config.target_model,
-                    category_index=category_index,
-                    category_name=category_name,
-                    problem_index=problem_index,
-                )
-                if generation_result:
-                    all_generated_problems.append(generation_result)
-
         logger.info(f"Starting generation for {len(questions_with_metadata)} questions...")
 
-        generation_tasks = [
-            process_question_with_semaphore(
-                category_index, category_name, problem_index, question_text
-            )
-            for category_index, category_name, problem_index, question_text in questions_with_metadata
+        # Create task functions for each question
+        def make_task(cat_idx: int, cat_name: str, prob_idx: int, question: str):
+            async def task():
+                return await self.card_generator.process_question(
+                    question,
+                    self.subject_config.initial_prompt,
+                    self.subject_config.target_model,
+                    category_index=cat_idx,
+                    category_name=cat_name,
+                    problem_index=prob_idx,
+                )
+            return task
+
+        tasks = [
+            make_task(cat_idx, cat_name, prob_idx, question)
+            for cat_idx, cat_name, prob_idx, question in questions_with_metadata
         ]
-        await asyncio.gather(*generation_tasks)
+
+        # Run with concurrency control
+        task_runner = ConcurrentTaskRunner(max_concurrent=CONCURRENT_REQUESTS)
+        all_generated_problems = await task_runner.run_all(tasks)
 
         # Update run status
         session = get_session()

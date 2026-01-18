@@ -65,43 +65,37 @@ Updated `CardGenerator.process_question()` return type.
 
 ---
 
-## Priority 3: Medium
+## Priority 3: Medium ✅ COMPLETED
 
 Maintainability improvements for long-term code health.
 
-### 7. Custom Exception Hierarchy
+### 7. ✅ Custom Exception Hierarchy
 **Location:** `src/exceptions.py`
 
-Add specific exceptions to replace `None` returns.
+Added new exceptions:
+- `AllProvidersFailedError` - when all providers fail for a question
+- `InitializationError` - when component initialization fails
 
-```python
-class LLM2DeckError(Exception): ...
-class GenerationError(LLM2DeckError): ...
-class CombineError(LLM2DeckError): ...
-class ProviderError(LLM2DeckError): ...
-```
+### 8. ✅ Extract Concurrency Logic
+**Location:** `src/task_runner.py` (new), `src/orchestrator.py`
 
-### 8. Extract Concurrency Logic
-**Location:** `src/orchestrator.py:119-148`
+Created `ConcurrentTaskRunner` class:
+- `run_all()` - runs tasks with semaphore, collects non-None results
+- `run_all_ordered()` - preserves order of results
 
-`process_question_with_semaphore` closure mixes concurrency with business logic.
+Updated orchestrator to use `ConcurrentTaskRunner`.
 
-```python
-# Proposed: src/task_runner.py
-class TaskRunner:
-    def __init__(self, max_concurrent: int): ...
-    async def run_all(self, tasks: List[Callable]): ...
-```
+### 9. ✅ Move Business Logic from CLI
+**Location:** `src/config/modes.py` (new), `src/cli.py`
 
-### 9. Move Business Logic from CLI
-**Location:** `src/cli.py`
+Created `src/config/modes.py` with:
+- `VALID_MODES` - frozenset of valid mode strings
+- `DECK_PREFIXES` - mapping of subject to prefix tuples
+- `detect_mode_from_filename()` - auto-detect mode from filename
+- `parse_mode()` - parse mode into (subject, is_mcq)
+- `get_deck_prefix()` - get Anki deck prefix for mode
 
-Mode detection from filenames belongs in domain layer, not CLI.
-
-```python
-# Move to src/utils.py or src/config/modes.py
-def detect_mode_from_filename(filename: str) -> str: ...
-```
+Updated CLI to import from modes module.
 
 ---
 
