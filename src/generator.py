@@ -12,6 +12,7 @@ from src.models import LeetCodeProblem
 from src.providers.base import LLMProvider
 from src.repositories import CardRepository
 from src.logging_utils import log_section, log_status
+from src.types import CardResult
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +173,7 @@ class CardGenerator:
         category_index: Optional[int] = None,
         category_name: Optional[str] = None,
         problem_index: Optional[int] = None,
-    ) -> Optional[Dict]:
+    ) -> Optional[CardResult]:
         """
         Process a single question and generate cards.
 
@@ -185,7 +186,7 @@ class CardGenerator:
             problem_index: 1-based index of the problem within its category.
 
         Returns:
-            Dict with card data including category metadata if provided.
+            CardResult with card data including category metadata if provided.
         """
         start_time = time.time()
         json_schema = model_class.model_json_schema()

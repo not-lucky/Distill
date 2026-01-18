@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from src.exceptions import ConfigurationError
+from src.config.models import DEFAULT_MODELS
 
 
 CONFIG_FILE = Path("config.yaml")
@@ -55,7 +56,11 @@ class AppConfig:
         """Return default configuration when no config file exists."""
         return cls(
             providers={
-                "cerebras": ProviderConfig(enabled=True, model="gpt-oss-120b", reasoning_effort="high"),
+                "cerebras": ProviderConfig(
+                    enabled=True,
+                    model=DEFAULT_MODELS["cerebras"],
+                    reasoning_effort="high",
+                ),
                 "google_antigravity": ProviderConfig(
                     enabled=True,
                     models=["gemini-3-pro-preview", "gemini-claude-sonnet-4-5-thinking"],

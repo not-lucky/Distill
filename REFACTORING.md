@@ -33,51 +33,35 @@ Created `CardRepository` class to decouple database operations from business log
 
 ---
 
-## Priority 2: High
+## Priority 2: High ✅ COMPLETED
 
 Code quality improvements that reduce duplication and improve maintainability.
 
-### 4. Extract JSON Utilities
-**Location:** `src/providers/openai_compatible.py:93-101` → `src/utils.py`
+### 4. ✅ Extract JSON Utilities
+**Location:** `src/utils.py`
 
-`_strip_json_block` is provider-agnostic and should be shared.
+Extracted `strip_json_block()` function from `openai_compatible.py` to shared `utils.py`.
 
-```python
-# src/utils.py
-def strip_json_block(content: str) -> str:
-    """Strip markdown JSON code block markers if present."""
-    ...
-```
+### 5. ✅ Centralize Model Constants
+**Location:** `src/config/models.py` (new)
 
-### 5. Centralize Model Constants
-**Location:** Various provider files
+Created centralized model constants file with:
+- `DEFAULT_MODELS` - default model for each provider
+- `MODELS_WITH_REASONING_EFFORT` - models supporting reasoning_effort param
+- `supports_reasoning_effort()` - helper function
 
-Hardcoded model names scattered across provider classes.
+Updated providers to use these constants.
 
-| Provider | Current Location | Model |
-|----------|------------------|-------|
-| Cerebras | `cerebras.py` | `gpt-oss-120b` |
-| G4F | `g4f_provider.py` | Various |
+### 6. ✅ Improve Type Annotations
+**Location:** `src/types.py` (new), `src/generator.py`
 
-**Solution:** Create `src/config/models.py` or add to `config.yaml`.
+Created `src/types.py` with TypedDict definitions:
+- `CardData` - structure for Anki cards
+- `MCQCardData` - structure for MCQ cards
+- `CardResult` - return type for `process_question()`
+- `ProviderResultData` - provider result structure
 
-### 6. Improve Type Annotations
-**Location:** `src/generator.py`, `src/orchestrator.py`
-
-Replace `Dict[str, Any]` with `TypedDict` for known structures.
-
-```python
-# Before
-def process_question(...) -> Optional[Dict]:
-
-# After
-class CardResult(TypedDict):
-    cards: List[CardData]
-    category_index: NotRequired[int]
-    category_name: NotRequired[str]
-
-def process_question(...) -> Optional[CardResult]:
-```
+Updated `CardGenerator.process_question()` return type.
 
 ---
 

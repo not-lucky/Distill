@@ -9,6 +9,7 @@ from openai import AsyncOpenAI, RateLimitError, APITimeoutError
 
 from src.providers.base import LLMProvider
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+from src.utils import strip_json_block
 import logging
 
 logger = logging.getLogger(__name__)
@@ -90,16 +91,6 @@ class OpenAICompatibleProvider(LLMProvider):
         """
         return {}
 
-    def _strip_json_block(self, content: str) -> str:
-        """Strip markdown JSON code block markers if present."""
-        if content.startswith("```json"):
-            content = content[7:]  # Remove ```json
-        elif content.startswith("```"):
-            content = content[3:]  # Remove ```
-        if content.endswith("```"):
-            content = content[:-3]
-        return content.strip()
-
     async def _make_request(
         self,
         chat_messages: List[Dict[str, Any]],
@@ -136,7 +127,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
                 if response_content:
                     if self.strip_json_markers and json_schema:
-                        response_content = self._strip_json_block(response_content)
+                        response_content = strip_json_block(response_content)
                     return response_content
 
                 logger.warning(
