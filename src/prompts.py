@@ -1,15 +1,34 @@
+import os
 from pathlib import Path
 
+# Configurable prompts directory via environment variable
+# Default: src/data/prompts relative to project root
+_DEFAULT_PROMPTS_DIR = Path(__file__).parent / "data" / "prompts"
+PROMPTS_DIR = Path(os.getenv("LLM2DECK_PROMPTS_DIR", str(_DEFAULT_PROMPTS_DIR)))
+
+
 def load_prompt(prompt_filename: str) -> str:
-    """Load prompt template from src/data/prompts"""
-    # Assuming this code is run from project root, or we use relative path from this file
-    current_file_path = Path(__file__)
-    project_root_path = current_file_path.parent.parent
-    prompt_file_path = project_root_path / "src" / "data" / "prompts" / prompt_filename
-    
+    """
+    Load prompt template from prompts directory.
+
+    Args:
+        prompt_filename: Name of the prompt file (e.g., "initial.md")
+
+    Returns:
+        Contents of the prompt file.
+
+    Raises:
+        FileNotFoundError: If prompt file doesn't exist.
+
+    Note:
+        The prompts directory can be configured via LLM2DECK_PROMPTS_DIR
+        environment variable.
+    """
+    prompt_file_path = PROMPTS_DIR / prompt_filename
+
     if not prompt_file_path.exists():
         raise FileNotFoundError(f"Prompt file not found: {prompt_file_path}")
-        
+
     with open(prompt_file_path, "r", encoding="utf-8") as prompt_file:
         return prompt_file.read()
 

@@ -6,6 +6,7 @@ from google import genai
 from google.genai import types
 from src.providers.base import LLMProvider
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+from src.config.models import DEFAULT_MODELS
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class GoogleGenAIProvider(LLMProvider):
     def __init__(
         self,
         api_keys: Iterator[str],
-        model: str = "gemini-3-flash-preview",
+        model: str = DEFAULT_MODELS["google_genai"],
         thinking_level: str = "high",
     ):
         """

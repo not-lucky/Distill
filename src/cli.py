@@ -11,12 +11,15 @@ from typing import Optional, List
 from dotenv import load_dotenv
 
 from src.config.subjects import SubjectRegistry
+from src.config.modes import (
+    VALID_MODES,
+    detect_mode_from_filename,
+    get_deck_prefix,
+)
 from src.logging_config import setup_logging
 import logging
 
 logger = logging.getLogger(__name__)
-
-VALID_MODES = ["cs", "physics", "leetcode", "cs_mcq", "physics_mcq", "leetcode_mcq", "mcq"]
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -68,7 +71,7 @@ def create_parser() -> argparse.ArgumentParser:
     convert_parser.add_argument(
         "--mode",
         default=None,
-        choices=VALID_MODES,
+        choices=list(VALID_MODES),
         help="Mode of generation (auto-detected from filename if not specified)",
     )
     convert_parser.add_argument(
@@ -111,41 +114,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     return parser
-
-
-def detect_mode_from_filename(filename: str) -> str:
-    """Auto-detect mode from JSON filename."""
-    stem = Path(filename).stem.lower()
-
-    # Try MCQ variants first (more specific)
-    for mode in ["cs_mcq", "physics_mcq", "leetcode_mcq"]:
-        if stem.startswith(mode):
-            return mode
-
-    # Then base modes
-    for mode in ["cs", "physics", "leetcode"]:
-        if stem.startswith(mode):
-            return mode
-
-    if "mcq" in stem:
-        return "mcq"
-
-    return "leetcode"
-
-
-def get_deck_prefix_from_mode(mode: str) -> str:
-    """Get deck prefix from mode string."""
-    subject = mode.replace("_mcq", "")
-    is_mcq = "_mcq" in mode or mode == "mcq"
-
-    prefixes = {
-        "cs": ("CS", "CS_MCQ"),
-        "physics": ("Physics", "Physics_MCQ"),
-        "leetcode": ("LeetCode", "LeetCode_MCQ"),
-    }
-
-    prefix, prefix_mcq = prefixes.get(subject, ("LeetCode", "LeetCode_MCQ"))
-    return prefix_mcq if is_mcq else prefix
 
 
 # ====== Command Handlers ======
@@ -193,7 +161,7 @@ def handle_convert(args: argparse.Namespace) -> int:
         logger.info(f"Auto-detected mode: {mode}")
 
     # Get deck prefix
-    deck_prefix = get_deck_prefix_from_mode(mode)
+    deck_prefix = get_deck_prefix(mode)
 
     # Determine output filename
     output_path = args.output if args.output else f"{input_path.stem}.apkg"

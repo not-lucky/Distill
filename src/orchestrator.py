@@ -1,13 +1,17 @@
 """Orchestrator for LLM2Deck card generation workflow."""
 
-import asyncio
+import logging
 import uuid
 from typing import List, Dict, Optional, Tuple
 
 from src.config import CONCURRENT_REQUESTS, DATABASE_PATH
+
+logger = logging.getLogger(__name__)
 from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
+from src.repositories import CardRepository
+from src.task_runner import ConcurrentTaskRunner
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions
 from src.database import init_database, create_run, update_run, get_session
@@ -58,7 +62,7 @@ class Orchestrator:
             True if initialization successful, False otherwise.
         """
         # Initialize database
-        print(f"Initializing database at {DATABASE_PATH}")
+        logger.info(f"Initializing database at {DATABASE_PATH}")
         init_database(DATABASE_PATH)
 
         # Create run entry
@@ -75,8 +79,7 @@ class Orchestrator:
         )
         session.close()
 
-        print(f"Run ID: {self.run_id}")
-        print("=" * 60)
+        logger.info(f"Run ID: {self.run_id}")
 
         # Initialize providers
         llm_providers = await initialize_providers()
@@ -90,12 +93,15 @@ class Orchestrator:
         combiner = llm_providers[0]
         llm_providers.remove(combiner)
 
-        # Initialize generator with combine_prompt from subject config
+        # Create repository for database operations
+        repository = CardRepository(run_id=self.run_id)
+
+        # Initialize generator with repository and combine_prompt from subject config
         self.card_generator = CardGenerator(
             providers=llm_providers,
             combiner=combiner,
+            repository=repository,
             combine_prompt=self.subject_config.combine_prompt,
-            run_id=self.run_id,
         )
 
         return True
@@ -115,37 +121,29 @@ class Orchestrator:
             self.subject_config.target_questions
         )
 
-        # Process questions with concurrency control
-        concurrency_semaphore = asyncio.Semaphore(CONCURRENT_REQUESTS)
-        all_generated_problems: List[Dict] = []
+        logger.info(f"Starting generation for {len(questions_with_metadata)} questions...")
 
-        async def process_question_with_semaphore(
-            category_index: int,
-            category_name: str,
-            problem_index: int,
-            question_text: str,
-        ):
-            async with concurrency_semaphore:
-                generation_result = await self.card_generator.process_question(
-                    question_text,
+        # Create task functions for each question
+        def make_task(cat_idx: int, cat_name: str, prob_idx: int, question: str):
+            async def task():
+                return await self.card_generator.process_question(
+                    question,
                     self.subject_config.initial_prompt,
                     self.subject_config.target_model,
-                    category_index=category_index,
-                    category_name=category_name,
-                    problem_index=problem_index,
+                    category_index=cat_idx,
+                    category_name=cat_name,
+                    problem_index=prob_idx,
                 )
-                if generation_result:
-                    all_generated_problems.append(generation_result)
+            return task
 
-        print(f"Starting generation for {len(questions_with_metadata)} questions...")
-
-        generation_tasks = [
-            process_question_with_semaphore(
-                category_index, category_name, problem_index, question_text
-            )
-            for category_index, category_name, problem_index, question_text in questions_with_metadata
+        tasks = [
+            make_task(cat_idx, cat_name, prob_idx, question)
+            for cat_idx, cat_name, prob_idx, question in questions_with_metadata
         ]
-        await asyncio.gather(*generation_tasks)
+
+        # Run with concurrency control
+        task_runner = ConcurrentTaskRunner(max_concurrent=CONCURRENT_REQUESTS)
+        all_generated_problems = await task_runner.run_all(tasks)
 
         # Update run status
         session = get_session()
@@ -172,17 +170,16 @@ class Orchestrator:
             Output filename if saved, None if no problems to save.
         """
         if not problems:
-            print("No cards generated.")
+            logger.warning("No cards generated.")
             return None
 
         output_filename = f"{self.generation_mode}_anki_deck"
         save_final_deck(problems, output_filename)
 
-        print("=" * 60)
-        print(f"Run completed successfully!")
-        print(f"Run ID: {self.run_id}")
-        print(f"Database: {DATABASE_PATH}")
-        print(f"Generated {len(problems)} problems")
-        print(f"Final deck: {output_filename}_<timestamp>.json")
+        logger.info(
+            f"Run completed successfully! Run ID: {self.run_id}, "
+            f"Database: {DATABASE_PATH}, Generated {len(problems)} problems, "
+            f"Final deck: {output_filename}_<timestamp>.json"
+        )
 
         return output_filename

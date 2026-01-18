@@ -6,6 +6,7 @@ Run with: pytest tests/test_integration.py -v -m integration
 
 import pytest
 import itertools
+from unittest.mock import MagicMock
 
 
 @pytest.mark.integration
@@ -23,8 +24,6 @@ async def test_full_generation_pipeline():
     from src.providers.cerebras import CerebrasProvider
     from src.generator import CardGenerator
     from src.config.subjects import SubjectRegistry
-    from src.database import init_database, get_session, create_problem, update_problem
-    from unittest.mock import patch, MagicMock
 
     # Load real keys
     keys = await load_keys("cerebras")
@@ -40,35 +39,31 @@ async def test_full_generation_pipeline():
     # Get config for leetcode
     subject_config = SubjectRegistry.get_config("leetcode", is_multiple_choice=False)
 
+    # Create mock repository for testing
+    mock_repository = MagicMock()
+    mock_repository.run_id = "integration-test-run"
+    mock_repository.create_initial_problem = MagicMock(return_value=1)
+    mock_repository.save_provider_result = MagicMock()
+    mock_repository.update_problem_failed = MagicMock()
+    mock_repository.save_final_result = MagicMock()
+
     # Create generator
     generator = CardGenerator(
         providers=[provider1, provider2],
         combiner=combiner,
+        repository=mock_repository,
         combine_prompt=subject_config.combine_prompt,
-        run_id="integration-test-run",
     )
 
-    # Mock database operations to avoid side effects
-    with patch("src.generator.get_session") as mock_session:
-        mock_session.return_value = MagicMock()
-
-        with patch("src.generator.create_problem") as mock_create_problem:
-            mock_problem = MagicMock()
-            mock_problem.id = "test-problem-id"
-            mock_create_problem.return_value = mock_problem
-
-            with patch("src.generator.create_provider_result"):
-                with patch("src.generator.update_problem"):
-                    with patch("src.generator.create_cards"):
-                        # Process single question
-                        result = await generator.process_question(
-                            question="Min Stack",
-                            prompt_template=subject_config.initial_prompt,
-                            model_class=subject_config.target_model,
-                            category_index=1,
-                            category_name="Stacks",
-                            problem_index=1,
-                        )
+    # Process single question
+    result = await generator.process_question(
+        question="Min Stack",
+        prompt_template=subject_config.initial_prompt,
+        model_class=subject_config.target_model,
+        category_index=1,
+        category_name="Stacks",
+        problem_index=1,
+    )
 
     # Assertions
     assert result is not None, "Result should not be None"
@@ -95,6 +90,10 @@ async def test_full_generation_pipeline():
     assert result.get("category_index") == 1
     assert result.get("category_name") == "Stacks"
     assert result.get("problem_index") == 1
+
+    # Verify repository was called
+    mock_repository.create_initial_problem.assert_called_once()
+    mock_repository.save_final_result.assert_called_once()
 
     print(f"\n✓ Integration test passed!")
     print(f"  Generated {len(result['cards'])} cards for 'Min Stack'")
@@ -150,4 +149,3 @@ async def test_provider_generation_only():
         # This is expected sometimes - raw generation doesn't guarantee valid JSON
         print(f"\n✓ Single provider generation passed (got response, JSON incomplete)")
         print(f"  Response length: {len(result)} chars")
-

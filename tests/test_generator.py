@@ -32,42 +32,42 @@ class TestCardGenerator:
         return combiner
 
     @pytest.fixture
-    def card_generator(self, mock_providers, mock_combiner):
+    def mock_repository(self):
+        """Create mock repository."""
+        repo = MagicMock()
+        repo.run_id = "test-run-id"
+        repo.create_initial_problem = MagicMock(return_value=1)
+        repo.save_provider_result = MagicMock()
+        repo.update_problem_failed = MagicMock()
+        repo.save_final_result = MagicMock()
+        return repo
+
+    @pytest.fixture
+    def card_generator(self, mock_providers, mock_combiner, mock_repository):
         """Create CardGenerator with mocked providers."""
         from src.generator import CardGenerator
         return CardGenerator(
             providers=mock_providers,
             combiner=mock_combiner,
+            repository=mock_repository,
             combine_prompt="Test combine prompt",
-            run_id="test-run-id"
         )
 
     @pytest.mark.asyncio
     async def test_process_question_calls_all_providers(
-        self, card_generator, mock_providers, temp_database
+        self, card_generator, mock_providers, mock_repository
     ):
         """Test that process_question calls all providers in parallel."""
-        with patch("src.generator.get_session") as mock_session:
-            mock_session.return_value = MagicMock()
+        from src.models import LeetCodeProblem
 
-            with patch("src.generator.create_problem") as mock_create:
-                mock_problem = MagicMock()
-                mock_problem.id = "test-problem-id"
-                mock_create.return_value = mock_problem
-
-                with patch("src.generator.create_provider_result"):
-                    with patch("src.generator.update_problem"):
-                        with patch("src.generator.create_cards"):
-                            from src.models import LeetCodeProblem
-
-                            result = await card_generator.process_question(
-                                question="Min Stack",
-                                prompt_template=None,
-                                model_class=LeetCodeProblem,
-                                category_index=1,
-                                category_name="Stacks",
-                                problem_index=1
-                            )
+        result = await card_generator.process_question(
+            question="Min Stack",
+            prompt_template=None,
+            model_class=LeetCodeProblem,
+            category_index=1,
+            category_name="Stacks",
+            problem_index=1
+        )
 
         # Both providers should have been called
         for provider in mock_providers:
@@ -76,7 +76,7 @@ class TestCardGenerator:
         assert result is not None
 
     @pytest.mark.asyncio
-    async def test_process_question_all_providers_fail(self, mock_combiner, temp_database):
+    async def test_process_question_all_providers_fail(self, mock_combiner, mock_repository):
         """Test behavior when all providers fail."""
         from src.generator import CardGenerator
 
@@ -94,55 +94,37 @@ class TestCardGenerator:
         generator = CardGenerator(
             providers=[failing_provider1, failing_provider2],
             combiner=mock_combiner,
-            run_id="test-run-id"
+            repository=mock_repository,
         )
 
-        with patch("src.generator.get_session") as mock_session:
-            mock_session.return_value = MagicMock()
+        from src.models import LeetCodeProblem
 
-            with patch("src.generator.create_problem") as mock_create:
-                mock_problem = MagicMock()
-                mock_problem.id = "test-problem-id"
-                mock_create.return_value = mock_problem
-
-                with patch("src.generator.update_problem"):
-                    from src.models import LeetCodeProblem
-
-                    result = await generator.process_question(
-                        question="Test",
-                        model_class=LeetCodeProblem
-                    )
+        result = await generator.process_question(
+            question="Test",
+            model_class=LeetCodeProblem
+        )
 
         # Should return None when all providers fail
         assert result is None
         # Combiner should not be called
         mock_combiner.combine_cards.assert_not_called()
+        # Repository should mark problem as failed
+        mock_repository.update_problem_failed.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_process_question_combination_succeeds(
-        self, card_generator, mock_combiner, sample_card_dict, temp_database
+        self, card_generator, mock_combiner, sample_card_dict, mock_repository
     ):
         """Test that combination produces expected output."""
-        with patch("src.generator.get_session") as mock_session:
-            mock_session.return_value = MagicMock()
+        from src.models import LeetCodeProblem
 
-            with patch("src.generator.create_problem") as mock_create:
-                mock_problem = MagicMock()
-                mock_problem.id = "test-problem-id"
-                mock_create.return_value = mock_problem
-
-                with patch("src.generator.create_provider_result"):
-                    with patch("src.generator.update_problem"):
-                        with patch("src.generator.create_cards"):
-                            from src.models import LeetCodeProblem
-
-                            result = await card_generator.process_question(
-                                question="Min Stack",
-                                model_class=LeetCodeProblem,
-                                category_index=1,
-                                category_name="Stacks",
-                                problem_index=1
-                            )
+        result = await card_generator.process_question(
+            question="Min Stack",
+            model_class=LeetCodeProblem,
+            category_index=1,
+            category_name="Stacks",
+            problem_index=1
+        )
 
         # Combiner should be called
         mock_combiner.combine_cards.assert_called_once()
@@ -156,32 +138,42 @@ class TestCardGenerator:
         assert result.get("category_name") == "Stacks"
         assert result.get("problem_index") == 1
 
+        # Repository should save final result
+        mock_repository.save_final_result.assert_called_once()
+
 
 class TestCardGeneratorInitialization:
     """Test CardGenerator initialization."""
 
-    def test_generator_stores_providers(self, mock_provider):
+    @pytest.fixture
+    def mock_repository(self):
+        """Create mock repository."""
+        repo = MagicMock()
+        repo.run_id = "test"
+        return repo
+
+    def test_generator_stores_providers(self, mock_provider, mock_repository):
         """Test that generator stores providers correctly."""
         from src.generator import CardGenerator
 
         generator = CardGenerator(
             providers=[mock_provider],
             combiner=mock_provider,
-            run_id="test"
+            repository=mock_repository,
         )
 
         assert len(generator.llm_providers) == 1
         assert generator.card_combiner == mock_provider
 
-    def test_generator_stores_combine_prompt(self, mock_provider):
+    def test_generator_stores_combine_prompt(self, mock_provider, mock_repository):
         """Test that generator stores combine prompt."""
         from src.generator import CardGenerator
 
         generator = CardGenerator(
             providers=[mock_provider],
             combiner=mock_provider,
+            repository=mock_repository,
             combine_prompt="Custom prompt",
-            run_id="test"
         )
 
         assert generator.combine_prompt == "Custom prompt"

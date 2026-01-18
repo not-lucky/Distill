@@ -8,6 +8,7 @@ from cerebras.cloud.sdk import Cerebras
 
 from src.providers.base import LLMProvider
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+from src.config.models import supports_reasoning_effort
 import logging
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ class CerebrasProvider(LLMProvider):
                 }
 
                 # Add reasoning effort for compatible models
-                if self.model_name == "gpt-oss-120b":
+                if supports_reasoning_effort(self.model_name):
                     params["reasoning_effort"] = self.reasoning_effort
 
                 # Cerebras SDK is sync, so run in thread
