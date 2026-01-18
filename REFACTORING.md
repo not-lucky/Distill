@@ -1,147 +1,174 @@
-# Refactoring Backlog
+# LLM2Deck Refactoring Priorities
 
-Prioritized list of refactoring opportunities for LLM2Deck.
-
----
-
-## Priority 1: Critical ✅ COMPLETED
-
-High-impact, foundational improvements that should be addressed first.
-
-### 1. ✅ Standardize Logging
-**Location:** `src/orchestrator.py`
-
-Replaced `print()` statements with `logger` calls to unify output handling.
-
-### 2. ✅ Refactor `CardGenerator.process_question`
-**Location:** `src/generator.py`
-
-Extracted helper methods from the 160-line function:
-- `_save_provider_results()` - saves valid results to DB
-- `_post_process_cards()` - strips spaces, adds metadata
-- `_generate_initial_cards()` - parallel provider calls
-- `_combine_results()` - combines provider outputs
-
-### 3. ✅ Implement Repository Pattern for Database
-**Location:** `src/repositories.py` (new), `src/generator.py`, `src/orchestrator.py`
-
-Created `CardRepository` class to decouple database operations from business logic:
-- `create_initial_problem()`
-- `save_provider_result()`
-- `update_problem_failed()`
-- `save_final_result()`
+Technical debt and code quality improvements, ordered by priority.
 
 ---
 
-## Priority 2: High ✅ COMPLETED
+## High Priority
 
-Code quality improvements that reduce duplication and improve maintainability.
+### 1. Provider Factory Pattern
+**Location:** `src/setup.py:51-183`
 
-### 4. ✅ Extract JSON Utilities
-**Location:** `src/utils.py`
+**Current State:**
+The `initialize_providers` function is a 130+ line monolith that repeats the same pattern for every provider:
+1. Check if enabled in config
+2. Load API keys
+3. Instantiate provider
+4. Handle errors
 
-Extracted `strip_json_block()` function from `openai_compatible.py` to shared `utils.py`.
+This violates the Open/Closed Principle - adding a new provider requires modifying this function.
 
-### 5. ✅ Centralize Model Constants
-**Location:** `src/config/models.py` (new)
+**Proposed Solution:**
+- Create a `ProviderRegistry` that maps provider names to their classes
+- Define a `ProviderFactory` that instantiates providers from config
+- Each provider registers itself with metadata (required keys, config path)
 
-Created centralized model constants file with:
-- `DEFAULT_MODELS` - default model for each provider
-- `MODELS_WITH_REASONING_EFFORT` - models supporting reasoning_effort param
-- `supports_reasoning_effort()` - helper function
+```python
+# Example structure
+PROVIDER_REGISTRY = {
+    "cerebras": (CerebrasProvider, "cerebras_keys.json"),
+    "openrouter": (OpenRouterProvider, "openrouter_keys.json"),
+}
 
-Updated providers to use these constants.
-
-### 6. ✅ Improve Type Annotations
-**Location:** `src/types.py` (new), `src/generator.py`
-
-Created `src/types.py` with TypedDict definitions:
-- `CardData` - structure for Anki cards
-- `MCQCardData` - structure for MCQ cards
-- `CardResult` - return type for `process_question()`
-- `ProviderResultData` - provider result structure
-
-Updated `CardGenerator.process_question()` return type.
-
----
-
-## Priority 3: Medium ✅ COMPLETED
-
-Maintainability improvements for long-term code health.
-
-### 7. ✅ Custom Exception Hierarchy
-**Location:** `src/exceptions.py`
-
-Added new exceptions:
-- `AllProvidersFailedError` - when all providers fail for a question
-- `InitializationError` - when component initialization fails
-
-### 8. ✅ Extract Concurrency Logic
-**Location:** `src/task_runner.py` (new), `src/orchestrator.py`
-
-Created `ConcurrentTaskRunner` class:
-- `run_all()` - runs tasks with semaphore, collects non-None results
-- `run_all_ordered()` - preserves order of results
-
-Updated orchestrator to use `ConcurrentTaskRunner`.
-
-### 9. ✅ Move Business Logic from CLI
-**Location:** `src/config/modes.py` (new), `src/cli.py`
-
-Created `src/config/modes.py` with:
-- `VALID_MODES` - frozenset of valid mode strings
-- `DECK_PREFIXES` - mapping of subject to prefix tuples
-- `detect_mode_from_filename()` - auto-detect mode from filename
-- `parse_mode()` - parse mode into (subject, is_mcq)
-- `get_deck_prefix()` - get Anki deck prefix for mode
-
-Updated CLI to import from modes module.
+def initialize_providers(config: dict) -> list[LLMProvider]:
+    providers = []
+    for name, enabled in config.get("providers", {}).items():
+        if not enabled:
+            continue
+        cls, key_file = PROVIDER_REGISTRY[name]
+        keys = load_keys(key_file)
+        providers.append(cls(api_keys=iter(keys)))
+    return providers
+```
 
 ---
 
-## Priority 4: Low ✅ COMPLETED
+### 2. Database Abstraction Leakage
+**Location:** `src/orchestrator.py:64-80, 149-158`
 
-Nice-to-have improvements for future iterations.
+**Current State:**
+`Orchestrator` directly manages database sessions and calls low-level DB functions (`init_database`, `create_run`, `update_run`). This mixes orchestration concerns with persistence.
 
-### 10. ⏸️ Declarative Subject Configuration (DEFERRED)
-**Location:** `src/config/subjects.py`
+**Proposed Solution:**
+- Extend the existing `CardRepository` (or create `RunRepository`) to handle run lifecycle
+- Orchestrator should only interact with repositories, never with raw sessions
+- Use dependency injection for the repository
 
-**Status:** Deferred - complexity outweighs benefit.
-- Subject configs reference Pydantic model classes (can't serialize to YAML)
-- Current code is readable and only ~95 lines
-- Would require significant restructuring with minimal gain
+---
 
-### 11. ✅ Prompt Path Configuration
+## Medium Priority
+
+### 3. Anki Generator Single Responsibility
+**Location:** `src/anki/generator.py:125-160`
+
+**Current State:**
+`DeckGenerator` handles:
+- File I/O (loading JSON)
+- Deck structure logic (naming, hierarchy)
+- HTML content rendering (inside `_add_mcq_card`)
+
+**Proposed Solution:**
+- Extract `CardRenderer` class for HTML generation
+- Move JSON loading to a separate utility or caller responsibility
+- Keep `DeckGenerator` focused solely on deck structure
+
+---
+
+### 4. Unified Provider Retry Logic
+**Location:** `src/providers/`
+
+**Current State:**
+- `OpenAICompatibleProvider` has its own retry loop in `_make_request`
+- `CerebrasProvider` uses native SDK but implements a separate retry mechanism
+- Base class `LLMProvider` defines retry constants but no shared implementation
+
+**Proposed Solution:**
+- Create a `RetryMixin` or move retry logic to abstract base class
+- Use `tenacity` library for consistent exponential backoff
+- All providers inherit the same retry behavior
+
+---
+
+### 5. Externalize Hardcoded Configuration
+**Location:** `src/config/models.py:9-18`
+
+**Current State:**
+Model names are hardcoded as Python constants:
+```python
+CEREBRAS_MODEL = "llama-3.3-70b"
+OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324"
+```
+
+**Proposed Solution:**
+- Move model defaults to `config.yaml`
+- Load models from config with fallback to defaults
+- Treat configuration as data, not code
+
+---
+
+### 6. Prompt Loading Consolidation
 **Location:** `src/prompts.py`
 
-Added configurable prompts directory via `LLM2DECK_PROMPTS_DIR` environment variable.
-Default path: `src/data/prompts`
+**Current State:**
+Prompt loading logic is spread across multiple functions. The directory is configurable via env var but defaulting logic is duplicated.
 
-### 12. ✅ Provider Result Validation
-**Location:** `src/types.py`
-
-Added Pydantic models for validation:
-- `CardModel` - validates individual card structure
-- `ProviderResponse` - validates provider responses with:
-  - `validate_cards_not_empty` - ensures cards list is not empty
-  - `validate_cards_have_content` - ensures cards have front/back or question/explanation
+**Proposed Solution:**
+- Create a `PromptLoader` class with caching
+- Single source of truth for prompt directory resolution
+- Lazy loading with validation
 
 ---
 
-## Notes
+## Low Priority
 
-- Items within each priority level are roughly ordered by impact
-- P1 items block testability improvements
-- P2 items prevent code duplication
-- Consider tackling P1 items as a batch for maximum impact
+### 7. CLI Legacy Argument Shim
+**Location:** `src/cli.py:292-303`
+
+**Current State:**
+The `main` function contains inline logic to convert old CLI syntax to new subcommand syntax for backward compatibility.
+
+**Proposed Solution:**
+- Extract to `normalize_legacy_args(argv: list[str]) -> list[str]`
+- Keep main() clean and focused on Typer app invocation
 
 ---
 
-## Summary
+### 8. Variable Naming Consistency
+**Locations:** Various
 
-| Priority | Status | Items |
-|----------|--------|-------|
-| P1: Critical | ✅ Complete | Logging, Generator refactor, Repository pattern |
-| P2: High | ✅ Complete | JSON utilities, Model constants, Type annotations |
-| P3: Medium | ✅ Complete | Exceptions, Task runner, CLI business logic |
-| P4: Low | ✅ Complete | Prompt paths, Provider validation (1 deferred) |
+**Current State:**
+Some generic variable names remain:
+- `q` instead of `question`
+- `res` instead of `response` or `result`
+
+**Proposed Solution:**
+- Rename during related refactoring work
+- Not worth a dedicated pass, but fix opportunistically
+
+---
+
+### 9. Test Coverage Gaps
+**Location:** `tests/`
+
+**Current State:**
+Some core modules lack comprehensive unit tests, particularly:
+- `src/orchestrator.py`
+- `src/generator.py`
+
+**Proposed Solution:**
+- Add unit tests with mocked providers
+- Focus on error handling paths
+- Address during related refactoring
+
+---
+
+## Completed
+
+Items moved here after completion:
+
+- [x] Repository pattern for database operations (`src/repository.py`)
+- [x] Centralized model constants (`src/config/models.py`)
+- [x] Extracted concurrency logic (`src/concurrency.py`)
+- [x] Custom exceptions hierarchy (`src/exceptions.py`)
+- [x] TypedDict annotations for complex types
+- [x] JSON utility extraction (`src/utils/json_utils.py`)
