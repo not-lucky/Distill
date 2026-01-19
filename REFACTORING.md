@@ -4,61 +4,9 @@ Technical debt and code quality improvements, ordered by priority.
 
 ---
 
-## High Priority
-
-### 1. Provider Factory Pattern
-**Location:** `src/setup.py:51-183`
-
-**Current State:**
-The `initialize_providers` function is a 130+ line monolith that repeats the same pattern for every provider:
-1. Check if enabled in config
-2. Load API keys
-3. Instantiate provider
-4. Handle errors
-
-This violates the Open/Closed Principle - adding a new provider requires modifying this function.
-
-**Proposed Solution:**
-- Create a `ProviderRegistry` that maps provider names to their classes
-- Define a `ProviderFactory` that instantiates providers from config
-- Each provider registers itself with metadata (required keys, config path)
-
-```python
-# Example structure
-PROVIDER_REGISTRY = {
-    "cerebras": (CerebrasProvider, "cerebras_keys.json"),
-    "openrouter": (OpenRouterProvider, "openrouter_keys.json"),
-}
-
-def initialize_providers(config: dict) -> list[LLMProvider]:
-    providers = []
-    for name, enabled in config.get("providers", {}).items():
-        if not enabled:
-            continue
-        cls, key_file = PROVIDER_REGISTRY[name]
-        keys = load_keys(key_file)
-        providers.append(cls(api_keys=iter(keys)))
-    return providers
-```
-
----
-
-### 2. Database Abstraction Leakage
-**Location:** `src/orchestrator.py:64-80, 149-158`
-
-**Current State:**
-`Orchestrator` directly manages database sessions and calls low-level DB functions (`init_database`, `create_run`, `update_run`). This mixes orchestration concerns with persistence.
-
-**Proposed Solution:**
-- Extend the existing `CardRepository` (or create `RunRepository`) to handle run lifecycle
-- Orchestrator should only interact with repositories, never with raw sessions
-- Use dependency injection for the repository
-
----
-
 ## Medium Priority
 
-### 3. Anki Generator Single Responsibility
+### 1. Anki Generator Single Responsibility
 **Location:** `src/anki/generator.py:125-160`
 
 **Current State:**
@@ -74,7 +22,7 @@ def initialize_providers(config: dict) -> list[LLMProvider]:
 
 ---
 
-### 4. Unified Provider Retry Logic
+### 2. Unified Provider Retry Logic
 **Location:** `src/providers/`
 
 **Current State:**
@@ -89,7 +37,7 @@ def initialize_providers(config: dict) -> list[LLMProvider]:
 
 ---
 
-### 5. Externalize Hardcoded Configuration
+### 3. Externalize Hardcoded Configuration
 **Location:** `src/config/models.py:9-18`
 
 **Current State:**
@@ -106,7 +54,7 @@ OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324"
 
 ---
 
-### 6. Prompt Loading Consolidation
+### 4. Prompt Loading Consolidation
 **Location:** `src/prompts.py`
 
 **Current State:**
@@ -121,7 +69,7 @@ Prompt loading logic is spread across multiple functions. The directory is confi
 
 ## Low Priority
 
-### 7. CLI Legacy Argument Shim
+### 5. CLI Legacy Argument Shim
 **Location:** `src/cli.py:292-303`
 
 **Current State:**
@@ -133,7 +81,7 @@ The `main` function contains inline logic to convert old CLI syntax to new subco
 
 ---
 
-### 8. Variable Naming Consistency
+### 6. Variable Naming Consistency
 **Locations:** Various
 
 **Current State:**
@@ -147,7 +95,7 @@ Some generic variable names remain:
 
 ---
 
-### 9. Test Coverage Gaps
+### 7. Test Coverage Gaps
 **Location:** `tests/`
 
 **Current State:**
@@ -166,7 +114,9 @@ Some core modules lack comprehensive unit tests, particularly:
 
 Items moved here after completion:
 
-- [x] Repository pattern for database operations (`src/repository.py`)
+- [x] Database abstraction in orchestrator (`src/repositories.py:RunRepository`, `src/orchestrator.py`)
+- [x] Provider factory pattern (`src/providers/registry.py`, `src/setup.py`)
+- [x] Repository pattern for database operations (`src/repositories.py`)
 - [x] Centralized model constants (`src/config/models.py`)
 - [x] Extracted concurrency logic (`src/concurrency.py`)
 - [x] Custom exceptions hierarchy (`src/exceptions.py`)
