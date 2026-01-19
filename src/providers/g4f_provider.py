@@ -5,7 +5,6 @@ from typing import Dict, Any, Optional, List
 from g4f.client import AsyncClient
 from src.providers.base import LLMProvider
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
-from src.config.models import DEFAULT_MODELS
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 class G4FProvider(LLMProvider):
     def __init__(
         self,
-        model: str = DEFAULT_MODELS["g4f"],
+        model: str = "",
         provider: Optional[str] = "LMArena",
     ):
         self.model_name = model

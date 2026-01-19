@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from src.exceptions import ConfigurationError
-from src.config.models import DEFAULT_MODELS
 
 
 CONFIG_FILE = Path("config.yaml")
@@ -58,7 +57,7 @@ class AppConfig:
             providers={
                 "cerebras": ProviderConfig(
                     enabled=True,
-                    model=DEFAULT_MODELS["cerebras"],
+                    model="gpt-oss-120b",
                     reasoning_effort="high",
                 ),
                 "google_antigravity": ProviderConfig(

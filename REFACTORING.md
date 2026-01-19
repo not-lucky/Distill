@@ -4,41 +4,9 @@ Technical debt and code quality improvements, ordered by priority.
 
 ---
 
-## Medium Priority
-
-### 1. Externalize Hardcoded Configuration
-**Location:** `src/config/models.py:9-18`
-
-**Current State:**
-Model names are hardcoded as Python constants:
-```python
-CEREBRAS_MODEL = "llama-3.3-70b"
-OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324"
-```
-
-**Proposed Solution:**
-- Move model defaults to `config.yaml`
-- Load models from config with fallback to defaults
-- Treat configuration as data, not code
-
----
-
-### 2. Prompt Loading Consolidation
-**Location:** `src/prompts.py`
-
-**Current State:**
-Prompt loading logic is spread across multiple functions. The directory is configurable via env var but defaulting logic is duplicated.
-
-**Proposed Solution:**
-- Create a `PromptLoader` class with caching
-- Single source of truth for prompt directory resolution
-- Lazy loading with validation
-
----
-
 ## Low Priority
 
-### 3. CLI Legacy Argument Shim
+### 1. CLI Legacy Argument Shim
 **Location:** `src/cli.py:292-303`
 
 **Current State:**
@@ -50,7 +18,7 @@ The `main` function contains inline logic to convert old CLI syntax to new subco
 
 ---
 
-### 4. Variable Naming Consistency
+### 2. Variable Naming Consistency
 **Locations:** Various
 
 **Current State:**
@@ -64,7 +32,7 @@ Some generic variable names remain:
 
 ---
 
-### 5. Test Coverage Gaps
+### 3. Test Coverage Gaps
 **Location:** `tests/`
 
 **Current State:**
@@ -83,6 +51,8 @@ Some core modules lack comprehensive unit tests, particularly:
 
 Items moved here after completion:
 
+- [x] Externalized hardcoded configuration - removed `DEFAULT_MODELS` dict (`src/config/models.py`, `src/config/loader.py`)
+- [x] Prompt loading consolidation - created `PromptLoader` class with lazy loading (`src/prompts.py`)
 - [x] Unified provider retry logic with tenacity (`src/providers/base.py`, `src/providers/openai_compatible.py`, `src/providers/cerebras.py`)
 - [x] Anki generator SRP - extracted `load_card_data()` (`src/anki/generator.py`)
 - [x] Database abstraction in orchestrator (`src/repositories.py:RunRepository`, `src/orchestrator.py`)
