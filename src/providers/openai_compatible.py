@@ -1,13 +1,22 @@
 """Base class for LLM providers using OpenAI-compatible APIs."""
 
 import json
-import asyncio
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Iterator
 
-from openai import AsyncOpenAI, RateLimitError, APITimeoutError
+from openai import AsyncOpenAI
+from openai import RateLimitError as OpenAIRateLimitError
+from openai import APITimeoutError as OpenAITimeoutError
+from tenacity import RetryError
 
-from src.providers.base import LLMProvider
+from src.providers.base import (
+    LLMProvider,
+    create_retry_decorator,
+    RetryableError,
+    RateLimitError,
+    TimeoutError,
+    EmptyResponseError,
+)
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
 from src.utils import strip_json_block
 import logging
@@ -106,7 +115,13 @@ class OpenAICompatibleProvider(LLMProvider):
         Returns:
             Response content string, or None if all retries failed
         """
-        for attempt in range(self.max_retries):
+        retry_decorator = create_retry_decorator(
+            max_retries=self.max_retries,
+            retry_logger=logger,
+        )
+
+        @retry_decorator
+        async def _do_request() -> str:
             try:
                 client = self._get_client()
 
@@ -125,37 +140,29 @@ class OpenAICompatibleProvider(LLMProvider):
                 completion = await client.chat.completions.create(**request_params)
                 response_content = completion.choices[0].message.content
 
-                if response_content:
-                    if self.strip_json_markers and json_schema:
-                        response_content = strip_json_block(response_content)
-                    return response_content
+                if not response_content:
+                    raise EmptyResponseError(
+                        f"[{self.model_name}] Received empty response"
+                    )
 
-                logger.warning(
-                    f"[{self.model_name}] Attempt {attempt + 1}/{self.max_retries}: "
-                    "Received None content. Retrying..."
-                )
+                if self.strip_json_markers and json_schema:
+                    response_content = strip_json_block(response_content)
 
-            except RateLimitError:
-                wait_time = 2 * (attempt + 1)
-                logger.warning(
-                    f"[{self.model_name}] Rate limit hit. "
-                    f"Backing off for {wait_time}s..."
-                )
-                await asyncio.sleep(wait_time)
-                continue
+                return response_content
 
-            except APITimeoutError:
-                logger.warning(f"[{self.model_name}] Request timed out.")
+            except OpenAIRateLimitError as e:
+                raise RateLimitError(f"[{self.model_name}] Rate limit hit") from e
+            except OpenAITimeoutError as e:
+                raise TimeoutError(f"[{self.model_name}] Request timed out") from e
 
-            except Exception as error:
-                logger.error(
-                    f"[{self.model_name}] Attempt {attempt + 1}/{self.max_retries} "
-                    f"Error: {error}"
-                )
-
-            await asyncio.sleep(1)
-
-        return None
+        try:
+            return await _do_request()
+        except RetryError:
+            logger.error(f"[{self.model_name}] All retry attempts failed")
+            return None
+        except Exception as e:
+            logger.error(f"[{self.model_name}] Unexpected error: {e}")
+            return None
 
     async def generate_initial_cards(
         self,

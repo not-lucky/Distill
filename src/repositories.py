@@ -2,10 +2,16 @@
 
 import json
 import logging
+import uuid
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from src.database import (
     get_session,
+    init_database,
+    create_run,
+    update_run,
     create_problem,
     update_problem,
     create_provider_result,
@@ -13,6 +19,130 @@ from src.database import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RunStats:
+    """Statistics for a completed run."""
+
+    total_problems: int
+    successful_problems: int
+    failed_problems: int
+
+
+class RunRepository:
+    """
+    Repository for run lifecycle operations.
+
+    Encapsulates database initialization and run management,
+    providing a clean interface for the orchestrator.
+    """
+
+    def __init__(self, db_path: Path):
+        """
+        Initialize the repository.
+
+        Args:
+            db_path: Path to the SQLite database file.
+        """
+        self.db_path = db_path
+        self._run_id: Optional[str] = None
+
+    @property
+    def run_id(self) -> Optional[str]:
+        """Get the current run ID."""
+        return self._run_id
+
+    def initialize_database(self) -> None:
+        """Initialize the database and create tables if needed."""
+        logger.info(f"Initializing database at {self.db_path}")
+        init_database(self.db_path)
+
+    def create_new_run(
+        self,
+        mode: str,
+        subject: str,
+        card_type: str,
+        user_label: Optional[str] = None,
+    ) -> str:
+        """
+        Create a new run entry in the database.
+
+        Args:
+            mode: Generation mode (e.g., "leetcode", "cs_mcq").
+            subject: Subject name (e.g., "leetcode", "cs").
+            card_type: Card type ("standard" or "mcq").
+            user_label: Optional user-provided label.
+
+        Returns:
+            The generated run ID.
+        """
+        self._run_id = str(uuid.uuid4())
+        session = get_session()
+        try:
+            create_run(
+                session=session,
+                id=self._run_id,
+                user_label=user_label,
+                mode=mode,
+                subject=subject,
+                card_type=card_type,
+                status="running",
+            )
+            logger.info(f"Created run: {self._run_id}")
+            return self._run_id
+        finally:
+            session.close()
+
+    def mark_run_failed(self) -> None:
+        """Mark the current run as failed."""
+        if not self._run_id:
+            raise RuntimeError("No active run to mark as failed")
+
+        session = get_session()
+        try:
+            update_run(session, self._run_id, status="failed")
+            logger.info(f"Marked run {self._run_id} as failed")
+        finally:
+            session.close()
+
+    def mark_run_completed(self, stats: RunStats) -> None:
+        """
+        Mark the current run as completed with statistics.
+
+        Args:
+            stats: Run statistics including problem counts.
+        """
+        if not self._run_id:
+            raise RuntimeError("No active run to mark as completed")
+
+        session = get_session()
+        try:
+            update_run(
+                session=session,
+                run_id=self._run_id,
+                status="completed",
+                total_problems=stats.total_problems,
+                successful_problems=stats.successful_problems,
+                failed_problems=stats.failed_problems,
+            )
+            logger.info(f"Marked run {self._run_id} as completed")
+        finally:
+            session.close()
+
+    def get_card_repository(self) -> "CardRepository":
+        """
+        Get a CardRepository for the current run.
+
+        Returns:
+            CardRepository instance bound to this run.
+
+        Raises:
+            RuntimeError: If no run has been created yet.
+        """
+        if not self._run_id:
+            raise RuntimeError("No active run. Call create_new_run() first.")
+        return CardRepository(run_id=self._run_id)
 
 
 class CardRepository:

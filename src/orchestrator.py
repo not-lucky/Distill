@@ -1,7 +1,6 @@
 """Orchestrator for LLM2Deck card generation workflow."""
 
 import logging
-import uuid
 from typing import List, Dict, Optional, Tuple
 
 from src.config import CONCURRENT_REQUESTS, DATABASE_PATH
@@ -10,11 +9,10 @@ logger = logging.getLogger(__name__)
 from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
-from src.repositories import CardRepository
+from src.repositories import RunRepository, RunStats
 from src.task_runner import ConcurrentTaskRunner
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions
-from src.database import init_database, create_run, update_run, get_session
 
 
 class Orchestrator:
@@ -37,8 +35,13 @@ class Orchestrator:
         self.subject_config = subject_config
         self.is_mcq = is_mcq
         self.run_label = run_label
-        self.run_id: Optional[str] = None
+        self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
+
+    @property
+    def run_id(self) -> Optional[str]:
+        """Get the current run ID."""
+        return self.run_repo.run_id
 
     @property
     def generation_mode(self) -> str:
@@ -61,40 +64,29 @@ class Orchestrator:
         Returns:
             True if initialization successful, False otherwise.
         """
-        # Initialize database
-        logger.info(f"Initializing database at {DATABASE_PATH}")
-        init_database(DATABASE_PATH)
-
-        # Create run entry
-        self.run_id = str(uuid.uuid4())
-        session = get_session()
-        create_run(
-            session=session,
-            id=self.run_id,
-            user_label=self.run_label,
+        # Initialize database and create run
+        self.run_repo.initialize_database()
+        self.run_repo.create_new_run(
             mode=self.generation_mode,
             subject=self.subject_config.name,
             card_type="mcq" if self.is_mcq else "standard",
-            status="running",
+            user_label=self.run_label,
         )
-        session.close()
 
         logger.info(f"Run ID: {self.run_id}")
 
         # Initialize providers
         llm_providers = await initialize_providers()
         if not llm_providers:
-            session = get_session()
-            update_run(session, self.run_id, status="failed")
-            session.close()
+            self.run_repo.mark_run_failed()
             return False
 
         # Combiner is first provider
         combiner = llm_providers[0]
         llm_providers.remove(combiner)
 
-        # Create repository for database operations
-        repository = CardRepository(run_id=self.run_id)
+        # Get repository for card operations
+        repository = self.run_repo.get_card_repository()
 
         # Initialize generator with repository and combine_prompt from subject config
         self.card_generator = CardGenerator(
@@ -146,16 +138,13 @@ class Orchestrator:
         all_generated_problems = await task_runner.run_all(tasks)
 
         # Update run status
-        session = get_session()
-        update_run(
-            session=session,
-            run_id=self.run_id,
-            status="completed",
-            total_problems=len(questions_with_metadata),
-            successful_problems=len(all_generated_problems),
-            failed_problems=len(questions_with_metadata) - len(all_generated_problems),
+        self.run_repo.mark_run_completed(
+            RunStats(
+                total_problems=len(questions_with_metadata),
+                successful_problems=len(all_generated_problems),
+                failed_problems=len(questions_with_metadata) - len(all_generated_problems),
+            )
         )
-        session.close()
 
         return all_generated_problems
 
