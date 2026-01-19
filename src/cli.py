@@ -147,7 +147,7 @@ async def handle_generate(args: argparse.Namespace) -> int:
 
 def handle_convert(args: argparse.Namespace) -> int:
     """Handle the convert subcommand."""
-    from src.anki.generator import DeckGenerator
+    from src.anki.generator import DeckGenerator, load_card_data
 
     input_path = Path(args.json_file)
     if not input_path.exists():
@@ -169,7 +169,8 @@ def handle_convert(args: argparse.Namespace) -> int:
     logger.info(f"Converting {input_path} to {output_path} (deck: {deck_prefix})")
 
     try:
-        generator = DeckGenerator(str(input_path), deck_prefix=deck_prefix)
+        card_data = load_card_data(str(input_path))
+        generator = DeckGenerator(card_data, deck_prefix=deck_prefix)
         generator.process()
         generator.save_package(output_path)
         print(f"Successfully created: {output_path}")

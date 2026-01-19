@@ -11,31 +11,44 @@ from src.anki.renderer import render_markdown
 
 logger = logging.getLogger(__name__)
 
+
+def load_card_data(json_file_path: str) -> List[Dict[str, Any]]:
+    """
+    Load card data from a JSON file.
+
+    Args:
+        json_file_path: Path to the JSON file containing card data.
+
+    Returns:
+        List of problem dictionaries with card data.
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist.
+        json.JSONDecodeError: If the file contains invalid JSON.
+    """
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as input_file:
+            return json.load(input_file)
+    except Exception as error:
+        logger.error(f"Failed to load data from {json_file_path}: {error}")
+        raise
+
+
 class DeckGenerator:
-    def __init__(self, json_file_path: str, deck_prefix: str = "LeetCode"):
+    def __init__(self, card_data: List[Dict[str, Any]], deck_prefix: str = "LeetCode"):
         """
         Initialize the Anki deck generator.
 
         Args:
-            json_file_path: Path to the JSON file containing card data
+            card_data: List of problem dictionaries containing card data
             deck_prefix: Deck name prefix (e.g., "LeetCode", "CS_MCQ")
         """
-        self.json_file_path = json_file_path
+        self.card_data = card_data
         self.deck_prefix = deck_prefix
         self.deck_collection: Dict[str, genanki.Deck] = {}
         self.model_factory = AnkiModelFactory()
         self.basic_card_model = self.model_factory.basic_model
         self.mcq_card_model = self.model_factory.mcq_model
-        self.card_data = self._load_data()
-    
-    def _load_data(self) -> List[Dict[str, Any]]:
-        """Load data from the JSON file."""
-        try:
-            with open(self.json_file_path, 'r', encoding='utf-8') as input_file:
-                return json.load(input_file)
-        except Exception as error:
-            logger.error(f"Failed to load data from {self.json_file_path}: {error}")
-            raise error
 
     def _generate_id(self, text_content: str) -> int:
         """Generate a unique ID based on text content."""

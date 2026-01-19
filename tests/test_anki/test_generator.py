@@ -5,68 +5,87 @@ import json
 from pathlib import Path
 
 
-class TestDeckGeneratorInitialization:
-    """Test DeckGenerator initialization."""
+class TestLoadCardData:
+    """Test load_card_data function."""
 
-    @pytest.fixture
-    def sample_json_file(self, tmp_path, sample_card_dict):
-        """Create a temporary JSON file for testing."""
+    def test_load_card_data_success(self, tmp_path, sample_card_dict):
+        """Test that load_card_data loads JSON correctly."""
+        from src.anki.generator import load_card_data
+
         json_file = tmp_path / "test_deck.json"
         with open(json_file, "w") as f:
             json.dump([sample_card_dict], f)
-        return str(json_file)
 
-    def test_deck_generator_initialization(self, sample_json_file):
+        data = load_card_data(str(json_file))
+
+        assert len(data) == 1
+        assert "cards" in data[0]
+
+    def test_load_card_data_file_not_found(self, tmp_path):
+        """Test that load_card_data raises on missing file."""
+        from src.anki.generator import load_card_data
+
+        with pytest.raises(FileNotFoundError):
+            load_card_data(str(tmp_path / "nonexistent.json"))
+
+    def test_load_card_data_invalid_json(self, tmp_path):
+        """Test that load_card_data raises on invalid JSON."""
+        from src.anki.generator import load_card_data
+
+        json_file = tmp_path / "invalid.json"
+        with open(json_file, "w") as f:
+            f.write("not valid json")
+
+        with pytest.raises(json.JSONDecodeError):
+            load_card_data(str(json_file))
+
+
+class TestDeckGeneratorInitialization:
+    """Test DeckGenerator initialization."""
+
+    def test_deck_generator_initialization(self, sample_card_dict):
         """Test that DeckGenerator initializes correctly."""
         from src.anki.generator import DeckGenerator
 
-        generator = DeckGenerator(sample_json_file, deck_prefix="TestDeck")
+        card_data = [sample_card_dict]
+        generator = DeckGenerator(card_data, deck_prefix="TestDeck")
 
-        assert generator.json_file_path == sample_json_file
+        assert generator.card_data == card_data
         assert generator.deck_prefix == "TestDeck"
 
-    def test_deck_generator_loads_data(self, sample_json_file):
-        """Test that DeckGenerator loads JSON data."""
+    def test_deck_generator_with_empty_data(self):
+        """Test that DeckGenerator handles empty data."""
         from src.anki.generator import DeckGenerator
 
-        generator = DeckGenerator(sample_json_file, deck_prefix="TestDeck")
+        generator = DeckGenerator([], deck_prefix="TestDeck")
 
-        assert len(generator.card_data) == 1
-        assert "cards" in generator.card_data[0]
+        assert len(generator.card_data) == 0
 
 
 class TestDeckGeneratorPrefix:
     """Test DeckGenerator prefix handling."""
 
-    @pytest.fixture
-    def empty_json_file(self, tmp_path):
-        """Create an empty JSON file."""
-        json_file = tmp_path / "empty.json"
-        with open(json_file, "w") as f:
-            json.dump([], f)
-        return str(json_file)
-
-    def test_get_prefix_returns_deck_prefix(self, empty_json_file):
+    def test_get_prefix_returns_deck_prefix(self):
         """Test that _get_prefix returns the configured deck_prefix."""
         from src.anki.generator import DeckGenerator
 
-        generator = DeckGenerator(empty_json_file, deck_prefix="LeetCode")
+        generator = DeckGenerator([], deck_prefix="LeetCode")
         assert generator._get_prefix() == "LeetCode"
 
-        generator2 = DeckGenerator(empty_json_file, deck_prefix="CS_MCQ")
+        generator2 = DeckGenerator([], deck_prefix="CS_MCQ")
         assert generator2._get_prefix() == "CS_MCQ"
 
-    def test_mcq_mode_detection(self, empty_json_file):
+    def test_mcq_mode_detection(self):
         """Test MCQ mode is detected from deck_prefix."""
         from src.anki.generator import DeckGenerator
 
         # Standard mode
-        gen_standard = DeckGenerator(empty_json_file, deck_prefix="LeetCode")
+        gen_standard = DeckGenerator([], deck_prefix="LeetCode")
         # MCQ detection happens in _add_card_to_deck based on 'MCQ' in prefix
         assert "MCQ" not in gen_standard.deck_prefix
 
         # MCQ mode
-        gen_mcq = DeckGenerator(empty_json_file, deck_prefix="LeetCode_MCQ")
+        gen_mcq = DeckGenerator([], deck_prefix="LeetCode_MCQ")
         assert "MCQ" in gen_mcq.deck_prefix
 
 
@@ -74,14 +93,10 @@ class TestDeckGeneratorPaths:
     """Test DeckGenerator path building."""
 
     @pytest.fixture
-    def generator(self, tmp_path):
+    def generator(self):
         """Create a generator with empty data."""
-        json_file = tmp_path / "test.json"
-        with open(json_file, "w") as f:
-            json.dump([], f)
-
         from src.anki.generator import DeckGenerator
-        return DeckGenerator(str(json_file), deck_prefix="LeetCode")
+        return DeckGenerator([], deck_prefix="LeetCode")
 
     def test_build_deck_path_with_category_metadata(self, generator):
         """Test deck path building with category metadata."""
@@ -107,14 +122,10 @@ class TestDeckGeneratorPaths:
 
         assert path == "LeetCode::Stacks::Min Stack"
 
-    def test_build_deck_path_mcq_prefix(self, tmp_path):
+    def test_build_deck_path_mcq_prefix(self):
         """Test deck path with MCQ prefix."""
-        json_file = tmp_path / "test.json"
-        with open(json_file, "w") as f:
-            json.dump([], f)
-
         from src.anki.generator import DeckGenerator
-        generator = DeckGenerator(str(json_file), deck_prefix="CS_MCQ")
+        generator = DeckGenerator([], deck_prefix="CS_MCQ")
 
         path = generator._build_deck_path(
             problem_title="Binary Search",

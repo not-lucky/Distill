@@ -6,23 +6,7 @@ Technical debt and code quality improvements, ordered by priority.
 
 ## Medium Priority
 
-### 1. Anki Generator Single Responsibility
-**Location:** `src/anki/generator.py:125-160`
-
-**Current State:**
-`DeckGenerator` handles:
-- File I/O (loading JSON)
-- Deck structure logic (naming, hierarchy)
-- HTML content rendering (inside `_add_mcq_card`)
-
-**Proposed Solution:**
-- Extract `CardRenderer` class for HTML generation
-- Move JSON loading to a separate utility or caller responsibility
-- Keep `DeckGenerator` focused solely on deck structure
-
----
-
-### 2. Unified Provider Retry Logic
+### 1. Unified Provider Retry Logic
 **Location:** `src/providers/`
 
 **Current State:**
@@ -37,7 +21,7 @@ Technical debt and code quality improvements, ordered by priority.
 
 ---
 
-### 3. Externalize Hardcoded Configuration
+### 2. Externalize Hardcoded Configuration
 **Location:** `src/config/models.py:9-18`
 
 **Current State:**
@@ -54,7 +38,7 @@ OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324"
 
 ---
 
-### 4. Prompt Loading Consolidation
+### 3. Prompt Loading Consolidation
 **Location:** `src/prompts.py`
 
 **Current State:**
@@ -69,7 +53,7 @@ Prompt loading logic is spread across multiple functions. The directory is confi
 
 ## Low Priority
 
-### 5. CLI Legacy Argument Shim
+### 4. CLI Legacy Argument Shim
 **Location:** `src/cli.py:292-303`
 
 **Current State:**
@@ -81,7 +65,7 @@ The `main` function contains inline logic to convert old CLI syntax to new subco
 
 ---
 
-### 6. Variable Naming Consistency
+### 5. Variable Naming Consistency
 **Locations:** Various
 
 **Current State:**
@@ -95,7 +79,7 @@ Some generic variable names remain:
 
 ---
 
-### 7. Test Coverage Gaps
+### 6. Test Coverage Gaps
 **Location:** `tests/`
 
 **Current State:**
@@ -114,6 +98,7 @@ Some core modules lack comprehensive unit tests, particularly:
 
 Items moved here after completion:
 
+- [x] Anki generator SRP - extracted `load_card_data()` (`src/anki/generator.py`)
 - [x] Database abstraction in orchestrator (`src/repositories.py:RunRepository`, `src/orchestrator.py`)
 - [x] Provider factory pattern (`src/providers/registry.py`, `src/setup.py`)
 - [x] Repository pattern for database operations (`src/repositories.py`)
