@@ -22,6 +22,34 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def normalize_legacy_args(argv: list[str]) -> list[str]:
+    """
+    Convert legacy CLI syntax to new subcommand syntax.
+
+    Old style: main.py <subject> [mcq] [--label=X]
+    New style: main.py generate <subject> [mcq] [--label X]
+
+    Args:
+        argv: Command line arguments (excluding program name)
+
+    Returns:
+        Normalized argument list compatible with new subcommand syntax.
+    """
+    SUBCOMMANDS = {"generate", "convert", "merge", "export-md", "-h", "--help"}
+
+    if not argv or argv[0] in SUBCOMMANDS:
+        return argv
+
+    # Old-style arguments detected - convert to new style
+    new_argv = ["generate"]
+    for arg in argv:
+        if arg.startswith("--label="):
+            new_argv.extend(["--label", arg.split("=", 1)[1]])
+        else:
+            new_argv.append(arg)
+    return new_argv
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with subcommands."""
     parser = argparse.ArgumentParser(
@@ -290,18 +318,7 @@ def main(argv: Optional[list] = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
-    # Backward compatibility: detect old-style arguments
-    # Old style: main.py <subject> [mcq] [--label=X]
-    # New style: main.py generate <subject> [mcq] [--label X]
-    if argv and argv[0] not in ["generate", "convert", "merge", "export-md", "-h", "--help"]:
-        # Old-style arguments detected - convert to new style
-        new_argv = ["generate"]
-        for arg in argv:
-            if arg.startswith("--label="):
-                new_argv.extend(["--label", arg.split("=", 1)[1]])
-            else:
-                new_argv.append(arg)
-        argv = new_argv
+    argv = normalize_legacy_args(argv)
 
     parser = create_parser()
     args = parser.parse_args(argv)
