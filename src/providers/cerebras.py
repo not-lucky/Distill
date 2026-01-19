@@ -5,8 +5,14 @@ import asyncio
 from typing import Any, Dict, Iterator, List, Optional
 
 from cerebras.cloud.sdk import Cerebras
+from tenacity import RetryError
 
-from src.providers.base import LLMProvider
+from src.providers.base import (
+    LLMProvider,
+    create_retry_decorator,
+    RetryableError,
+    EmptyResponseError,
+)
 from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
 from src.config.models import supports_reasoning_effort
 import logging
@@ -50,53 +56,56 @@ class CerebrasProvider(LLMProvider):
         json_schema: Dict[str, Any],
     ) -> Optional[str]:
         """Make a request with retry logic."""
-        for attempt in range(self.max_retries):
-            try:
-                client = self._get_client()
+        retry_decorator = create_retry_decorator(
+            max_retries=self.max_retries,
+            retry_logger=logger,
+        )
 
-                # Build request parameters
-                params = {
-                    "model": self.model_name,
-                    "messages": messages,
-                    "response_format": {
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": "card_schema",
-                            "strict": True,
-                            "schema": json_schema,
-                        },
+        @retry_decorator
+        async def _do_request() -> str:
+            client = self._get_client()
+
+            # Build request parameters
+            params = {
+                "model": self.model_name,
+                "messages": messages,
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "card_schema",
+                        "strict": True,
+                        "schema": json_schema,
                     },
-                    "temperature": 0.4,
-                }
+                },
+                "temperature": 0.4,
+            }
 
-                # Add reasoning effort for compatible models
-                if supports_reasoning_effort(self.model_name):
-                    params["reasoning_effort"] = self.reasoning_effort
+            # Add reasoning effort for compatible models
+            if supports_reasoning_effort(self.model_name):
+                params["reasoning_effort"] = self.reasoning_effort
 
-                # Cerebras SDK is sync, so run in thread
-                completion = await asyncio.to_thread(
-                    client.chat.completions.create,
-                    **params,
+            # Cerebras SDK is sync, so run in thread
+            completion = await asyncio.to_thread(
+                client.chat.completions.create,
+                **params,
+            )
+
+            content = completion.choices[0].message.content
+            if not content:
+                raise EmptyResponseError(
+                    f"[{self.model_name}] Received empty response"
                 )
 
-                content = completion.choices[0].message.content
-                if content:
-                    return content
+            return content
 
-                logger.warning(
-                    f"[{self.model_name}] Attempt {attempt + 1}/{self.max_retries}: "
-                    "Received None content. Retrying..."
-                )
-
-            except Exception as error:
-                logger.error(
-                    f"[{self.model_name}] Attempt {attempt + 1}/{self.max_retries} "
-                    f"Error: {error}"
-                )
-
-            await asyncio.sleep(1)
-
-        return None
+        try:
+            return await _do_request()
+        except RetryError:
+            logger.error(f"[{self.model_name}] All retry attempts failed")
+            return None
+        except Exception as e:
+            logger.error(f"[{self.model_name}] Unexpected error: {e}")
+            return None
 
     async def generate_initial_cards(
         self,

@@ -6,22 +6,7 @@ Technical debt and code quality improvements, ordered by priority.
 
 ## Medium Priority
 
-### 1. Unified Provider Retry Logic
-**Location:** `src/providers/`
-
-**Current State:**
-- `OpenAICompatibleProvider` has its own retry loop in `_make_request`
-- `CerebrasProvider` uses native SDK but implements a separate retry mechanism
-- Base class `LLMProvider` defines retry constants but no shared implementation
-
-**Proposed Solution:**
-- Create a `RetryMixin` or move retry logic to abstract base class
-- Use `tenacity` library for consistent exponential backoff
-- All providers inherit the same retry behavior
-
----
-
-### 2. Externalize Hardcoded Configuration
+### 1. Externalize Hardcoded Configuration
 **Location:** `src/config/models.py:9-18`
 
 **Current State:**
@@ -38,7 +23,7 @@ OPENROUTER_MODEL = "deepseek/deepseek-chat-v3-0324"
 
 ---
 
-### 3. Prompt Loading Consolidation
+### 2. Prompt Loading Consolidation
 **Location:** `src/prompts.py`
 
 **Current State:**
@@ -53,7 +38,7 @@ Prompt loading logic is spread across multiple functions. The directory is confi
 
 ## Low Priority
 
-### 4. CLI Legacy Argument Shim
+### 3. CLI Legacy Argument Shim
 **Location:** `src/cli.py:292-303`
 
 **Current State:**
@@ -65,7 +50,7 @@ The `main` function contains inline logic to convert old CLI syntax to new subco
 
 ---
 
-### 5. Variable Naming Consistency
+### 4. Variable Naming Consistency
 **Locations:** Various
 
 **Current State:**
@@ -79,7 +64,7 @@ Some generic variable names remain:
 
 ---
 
-### 6. Test Coverage Gaps
+### 5. Test Coverage Gaps
 **Location:** `tests/`
 
 **Current State:**
@@ -98,6 +83,7 @@ Some core modules lack comprehensive unit tests, particularly:
 
 Items moved here after completion:
 
+- [x] Unified provider retry logic with tenacity (`src/providers/base.py`, `src/providers/openai_compatible.py`, `src/providers/cerebras.py`)
 - [x] Anki generator SRP - extracted `load_card_data()` (`src/anki/generator.py`)
 - [x] Database abstraction in orchestrator (`src/repositories.py:RunRepository`, `src/orchestrator.py`)
 - [x] Provider factory pattern (`src/providers/registry.py`, `src/setup.py`)
