@@ -1,9 +1,9 @@
 """Prompt loading utilities for LLM2Deck."""
 
 import os
-from functools import cached_property
+from functools import cached_property, lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 
 class PromptLoader:
@@ -54,6 +54,60 @@ class PromptLoader:
         if not path.exists():
             raise FileNotFoundError(f"Prompt file not found: {path}")
         return path.read_text(encoding="utf-8")
+
+    def _try_load(self, path: Path) -> Optional[str]:
+        """Try to load a prompt file, returning None if it doesn't exist."""
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+        return None
+
+    def load_subject_prompts(
+        self, subject: str, prompts_dir: Optional[str] = None
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Load initial and combine prompts for a subject.
+
+        For custom subjects, prompts are loaded from a subdirectory:
+        - {prompts_dir}/initial.md (or {subject}/initial.md)
+        - {prompts_dir}/combine.md (or {subject}/combine.md)
+
+        Args:
+            subject: Subject name (e.g., "biology")
+            prompts_dir: Optional custom prompts directory path
+
+        Returns:
+            Tuple of (initial_prompt, combine_prompt), either can be None
+        """
+        if prompts_dir:
+            subject_dir = Path(prompts_dir)
+        else:
+            subject_dir = self._prompts_dir / subject
+
+        initial = self._try_load(subject_dir / "initial.md")
+        combine = self._try_load(subject_dir / "combine.md")
+        return initial, combine
+
+    def load_subject_mcq_prompts(
+        self, subject: str, prompts_dir: Optional[str] = None
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Load MCQ prompts for a subject.
+
+        Args:
+            subject: Subject name
+            prompts_dir: Optional custom prompts directory path
+
+        Returns:
+            Tuple of (initial_mcq_prompt, combine_mcq_prompt), either can be None
+        """
+        if prompts_dir:
+            subject_dir = Path(prompts_dir)
+        else:
+            subject_dir = self._prompts_dir / subject
+
+        initial = self._try_load(subject_dir / "mcq.md")
+        combine = self._try_load(subject_dir / "mcq_combine.md")
+        return initial, combine
 
     @cached_property
     def initial(self) -> str:

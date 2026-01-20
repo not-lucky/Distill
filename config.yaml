@@ -56,10 +56,28 @@ database:
   path: "llm2deck.db"
 
 # Subject Settings
+# Built-in subjects: leetcode, cs, physics
+# Custom subjects can be added with their own prompts and questions
 subjects:
+  # Built-in subjects
   leetcode:
     enabled: true
   cs:
     enabled: true
   physics:
     enabled: true
+
+  # Example custom subject (uncomment to use)
+  # example:
+  #   enabled: true
+  #   deck_prefix: "Example"                              # Anki deck name prefix
+  #   deck_prefix_mcq: "Example_MCQ"                      # Optional, defaults to {deck_prefix}_MCQ
+  #   prompts_dir: "src/data/prompts/example"             # Directory containing initial.md and combine.md
+  #   questions_file: "src/data/example_questions.json"   # Questions in categorized format
+
+  # Custom subject template:
+  # my_subject:
+  #   enabled: true
+  #   deck_prefix: "MySubject"
+  #   prompts_dir: "path/to/prompts"       # Must contain initial.md and combine.md
+  #   questions_file: "path/to/questions.json"
