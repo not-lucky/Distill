@@ -37,18 +37,24 @@ uv run main.py export-md --source ./dir --target ./out
 ### Generation Flow
 
 1. `main.py` delegates to `src/cli.py` which creates an `Orchestrator` (`src/orchestrator.py`)
-2. `Orchestrator` initializes providers via `src/setup.py` and creates a database Run
+2. `Orchestrator` initializes providers via `ProviderRegistry` and creates a database Run via `RunRepository`
 3. For each question, `CardGenerator` (`src/generator.py`) spawns parallel requests to all providers
 4. Each provider returns initial cards, saved as `ProviderResult` entries
 5. First provider combines all results into final cards
 6. Final cards saved to JSON and database (`Problem`, `Card` entries)
 
+**Key Components:**
+- `PromptLoader` (`src/prompts.py`) - lazy loading of prompt templates
+- `RunRepository` (`src/repositories.py`) - database abstraction for run management
+- Custom exceptions (`src/exceptions.py`) - `ProviderError`, `GenerationError`, `CombinationError`
+
 ### Provider System
 
 **Hierarchy:**
 - `LLMProvider` (`src/providers/base.py`) - abstract base defining `generate_initial_cards()` and `combine_cards()`
-- `OpenAICompatibleProvider` (`src/providers/openai_compatible.py`) - shared implementation for OpenAI-compatible APIs
+- `OpenAICompatibleProvider` (`src/providers/openai_compatible.py`) - shared implementation for OpenAI-compatible APIs with tenacity retry logic
 - Concrete providers (nvidia, openrouter, canopywave, baseten) extend `OpenAICompatibleProvider`
+- `ProviderRegistry` (`src/providers/registry.py`) - factory pattern for dynamic provider initialization
 
 **Adding a new OpenAI-compatible provider:**
 ```python
@@ -66,7 +72,7 @@ class MyProvider(OpenAICompatibleProvider):
         return "my_provider"
 ```
 
-Then add initialization in `src/setup.py` and key config in `src/config/keys.py`.
+Then register in `src/providers/registry.py` and add key config in `src/config/keys.py`.
 
 ### Subject Configuration
 
@@ -128,10 +134,14 @@ Query utilities in `src/queries.py`.
 | Entry point | `main.py` |
 | CLI | `src/cli.py` |
 | Orchestration | `src/orchestrator.py` |
-| Provider init | `src/setup.py`, `src/config/keys.py` |
-| Generation | `src/generator.py`, `src/prompts.py` |
-| Config | `src/config/subjects.py`, `src/data/questions.json` |
-| Prompts | `src/data/prompts/*.md` |
+| Provider factory | `src/providers/registry.py`, `src/setup.py` |
+| Provider base | `src/providers/base.py`, `src/providers/openai_compatible.py` |
+| Generation | `src/generator.py` |
+| Prompts | `src/prompts.py` (PromptLoader) |
+| Database | `src/database.py`, `src/repositories.py` |
+| Exceptions | `src/exceptions.py` |
+| Config | `src/config/subjects.py`, `src/config/models.py`, `src/config/loader.py`, `src/config/keys.py` |
+| Data | `src/data/questions.json`, `src/data/prompts/*.md` |
 
 ## Notes
 

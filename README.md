@@ -151,24 +151,31 @@ uv run json_to_md.py
 ```
 LLM2Deck/
 ├── main.py                    # Entry point for card generation
-├── convert_to_apkg.py         # JSON → Anki package CLI
-├── merge_anki_json.py         # Merge archived JSON files
-├── json_to_md.py              # JSON → Markdown export
 ├── src/
-│   ├── generator.py           # CardGenerator orchestration
+│   ├── cli.py                 # CLI argument parsing
+│   ├── orchestrator.py        # Main orchestration logic
+│   ├── generator.py           # CardGenerator for parallel generation
 │   ├── setup.py               # Provider initialization
 │   ├── database.py            # SQLite schema and operations
+│   ├── repositories.py        # Repository pattern for DB operations
 │   ├── models.py              # Pydantic models for cards
 │   ├── questions.py           # Question loading utilities
-│   ├── prompts.py             # Prompt template loading
+│   ├── prompts.py             # PromptLoader with lazy loading
 │   ├── queries.py             # Database query utilities
+│   ├── exceptions.py          # Custom exception hierarchy
+│   ├── task_runner.py         # Async task execution
+│   ├── types.py               # TypedDict and type definitions
 │   ├── config/
 │   │   ├── __init__.py        # Paths and env vars
 │   │   ├── subjects.py        # SubjectRegistry configuration
-│   │   └── keys.py            # Unified API key loading
+│   │   ├── keys.py            # Unified API key loading
+│   │   ├── loader.py          # Config file loading
+│   │   ├── models.py          # Model constants
+│   │   └── modes.py           # Mode configuration
 │   ├── providers/
 │   │   ├── base.py            # LLMProvider abstract base
-│   │   ├── openai_compatible.py  # Shared base for OpenAI-compatible APIs
+│   │   ├── registry.py        # ProviderRegistry factory
+│   │   ├── openai_compatible.py  # Shared base with tenacity retry
 │   │   ├── cerebras.py        # Cerebras (native SDK)
 │   │   ├── nvidia.py          # NVIDIA NIM
 │   │   ├── openrouter.py      # OpenRouter
@@ -196,7 +203,13 @@ The system uses a two-stage generation process:
 1. **Parallel Generation**: Multiple providers generate initial cards simultaneously
 2. **Combination**: First provider merges all results into a final, comprehensive deck
 
-Most providers extend `OpenAICompatibleProvider` for shared request handling, retry logic, and JSON parsing. See `CLAUDE.md` for detailed architecture documentation.
+**Key patterns:**
+- `ProviderRegistry` for dynamic provider initialization (factory pattern)
+- `RunRepository` for database abstraction (repository pattern)
+- Tenacity-based retry logic for resilient API calls
+- `PromptLoader` for lazy prompt template loading
+
+See `CLAUDE.md` for detailed architecture documentation.
 
 ## License
 
