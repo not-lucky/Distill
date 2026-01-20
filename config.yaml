@@ -51,6 +51,15 @@ generation:
   max_retries: 5
   json_parse_retries: 3
 
+  # Combiner Configuration
+  # Specify which provider/model combines cards from all generators.
+  # If not set, the first enabled provider is used as combiner.
+  combiner:
+    provider: cerebras        # Provider name from providers section
+    model: gpt-oss-120b       # Model to use for combining
+    also_generate: false       # If true, combiner also does initial generation
+                              # If false, combiner only combines (not used for generation)
+
 # Database Settings
 database:
   path: "llm2deck.db"

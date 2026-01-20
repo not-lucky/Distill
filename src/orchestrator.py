@@ -75,15 +75,21 @@ class Orchestrator:
 
         logger.info(f"Run ID: {self.run_id}")
 
-        # Initialize providers
-        llm_providers = await initialize_providers()
-        if not llm_providers:
+        # Initialize providers - returns (generators, combiner)
+        llm_providers, combiner = await initialize_providers()
+
+        # If no explicit combiner configured, use first provider as combiner
+        if combiner is None:
+            if not llm_providers:
+                self.run_repo.mark_run_failed()
+                return False
+            combiner = llm_providers[0]
+            llm_providers = llm_providers[1:]
+
+        # Need at least the combiner to function
+        if combiner is None:
             self.run_repo.mark_run_failed()
             return False
-
-        # Combiner is first provider
-        combiner = llm_providers[0]
-        llm_providers.remove(combiner)
 
         # Get repository for card operations
         repository = self.run_repo.get_card_repository()
