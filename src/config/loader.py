@@ -27,12 +27,22 @@ class ProviderConfig:
 
 
 @dataclass
+class CombinerConfig:
+    """Configuration for the combiner provider."""
+
+    provider: str = ""  # Provider name (e.g., "cerebras", "google_antigravity")
+    model: str = ""  # Model to use for combining
+    also_generate: bool = True  # If True, combiner also does initial generation
+
+
+@dataclass
 class GenerationConfig:
     """Configuration for card generation."""
 
     concurrent_requests: int = 8
     max_retries: int = 5
     json_parse_retries: int = 3
+    combiner: Optional[CombinerConfig] = None  # Explicit combiner configuration
 
 
 @dataclass
@@ -104,12 +114,25 @@ def _parse_provider_config(name: str, data: Dict[str, Any]) -> ProviderConfig:
     )
 
 
+def _parse_combiner_config(data: Dict[str, Any]) -> Optional[CombinerConfig]:
+    """Parse combiner configuration from YAML data."""
+    if not data:
+        return None
+    return CombinerConfig(
+        provider=data.get("provider", ""),
+        model=data.get("model", ""),
+        also_generate=data.get("also_generate", True),
+    )
+
+
 def _parse_generation_config(data: Dict[str, Any]) -> GenerationConfig:
     """Parse generation configuration from YAML data."""
+    combiner_data = data.get("combiner", {})
     return GenerationConfig(
         concurrent_requests=data.get("concurrent_requests", 8),
         max_retries=data.get("max_retries", 5),
         json_parse_retries=data.get("json_parse_retries", 3),
+        combiner=_parse_combiner_config(combiner_data),
     )
 
 
@@ -199,6 +222,46 @@ def get_enabled_providers(config: Optional[AppConfig] = None) -> Dict[str, Provi
         config = load_config()
 
     return {name: cfg for name, cfg in config.providers.items() if cfg.enabled}
+
+
+def get_combiner_config(config: Optional[AppConfig] = None) -> Optional[CombinerConfig]:
+    """
+    Get the combiner configuration.
+
+    Args:
+        config: Optional AppConfig. Will load from file if not provided.
+
+    Returns:
+        CombinerConfig if configured, None otherwise.
+
+    Raises:
+        ConfigurationError: If combiner references a disabled or non-existent provider.
+    """
+    if config is None:
+        config = load_config()
+
+    combiner = config.generation.combiner
+    if combiner is None or not combiner.provider:
+        return None
+
+    # Validate the combiner provider exists and is enabled
+    provider_cfg = config.providers.get(combiner.provider)
+    if provider_cfg is None:
+        raise ConfigurationError(
+            f"Combiner references unknown provider: '{combiner.provider}'"
+        )
+    if not provider_cfg.enabled:
+        raise ConfigurationError(
+            f"Combiner provider '{combiner.provider}' is not enabled"
+        )
+
+    # Validate model exists for multi-model providers
+    if provider_cfg.models and combiner.model not in provider_cfg.models:
+        raise ConfigurationError(
+            f"Combiner model '{combiner.model}' not found in provider '{combiner.provider}' models: {provider_cfg.models}"
+        )
+
+    return combiner
 
 
 def get_enabled_subjects(config: Optional[AppConfig] = None) -> Dict[str, SubjectSettings]:
