@@ -10,7 +10,7 @@ from typing import Optional, List
 
 from dotenv import load_dotenv
 
-from src.config.subjects import SubjectRegistry
+from src.config.subjects import SubjectRegistry, BUILTIN_SUBJECTS
 from src.config.modes import (
     VALID_MODES,
     detect_mode_from_filename,
@@ -52,6 +52,10 @@ def normalize_legacy_args(argv: list[str]) -> list[str]:
 
 def create_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with subcommands."""
+    # Get available subjects from registry
+    registry = SubjectRegistry()
+    available_subjects = registry.get_available_subjects()
+
     parser = argparse.ArgumentParser(
         prog="llm2deck",
         description="Generate Anki flashcards using multiple LLMs in parallel.",
@@ -68,8 +72,7 @@ def create_parser() -> argparse.ArgumentParser:
         "subject",
         nargs="?",
         default="leetcode",
-        choices=["leetcode", "cs", "physics"],
-        help="Subject to generate cards for (default: leetcode)",
+        help=f"Subject to generate cards for (available: {', '.join(available_subjects)}, default: leetcode)",
     )
     generate_parser.add_argument(
         "card_type",
@@ -118,8 +121,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     merge_parser.add_argument(
         "subject",
-        choices=["cs", "leetcode", "physics"],
-        help="Subject to merge files for",
+        help=f"Subject to merge files for (available: {', '.join(available_subjects)})",
     )
 
     # ====== export-md command ======
@@ -152,7 +154,17 @@ async def handle_generate(args: argparse.Namespace) -> int:
     from src.orchestrator import Orchestrator
 
     is_mcq = args.card_type == "mcq"
-    subject_config = SubjectRegistry.get_config(args.subject, is_mcq)
+
+    # Get subject configuration using registry
+    registry = SubjectRegistry()
+    if not registry.is_valid_subject(args.subject):
+        available = registry.get_available_subjects()
+        logger.error(
+            f"Unknown subject '{args.subject}'. Available subjects: {', '.join(available)}"
+        )
+        return 1
+
+    subject_config = registry.get_config(args.subject, is_mcq)
 
     print(f"Running: Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
     if args.label:

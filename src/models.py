@@ -44,3 +44,12 @@ class MCQProblem(BaseModel):
     topic: str = Field(..., description="Main topic (e.g., 'Data Structures', 'Algorithms')")
     difficulty: str = Field(..., description="Difficulty level (Easy, Medium, Hard)")
     cards: List[MCQCard]
+
+
+class GenericProblem(BaseModel):
+    """Generic problem model for user-defined custom subjects."""
+    model_config = {'extra': 'forbid'}
+    title: str = Field(..., description="Title of the topic/concept")
+    topic: str = Field(..., description="Main topic or category")
+    difficulty: str = Field(..., description="Difficulty level (e.g., Basic, Intermediate, Advanced)")
+    cards: List[AnkiCard]
