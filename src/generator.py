@@ -178,19 +178,23 @@ class CardGenerator:
         if not raw_combined:
             return None
 
-        # If formatter is configured, use it to produce valid JSON
-        if self.formatter:
+        # If formatter is configured and different from combiner, use it to produce valid JSON
+        if self.formatter and not self._is_same_provider(self.card_combiner, self.formatter):
             return await self.formatter.format_json(raw_combined, json_schema)
 
-        # Otherwise try to parse directly (legacy behavior)
+        # Otherwise try to parse directly (combiner must output valid JSON)
         try:
             return json.loads(raw_combined)
         except json.JSONDecodeError:
             logger.error(
                 f"Failed to parse combiner output as JSON for '{question}'. "
-                "Consider configuring a formatter provider."
+                "Consider configuring a different formatter provider."
             )
             return None
+
+    def _is_same_provider(self, provider1: LLMProvider, provider2: LLMProvider) -> bool:
+        """Check if two providers are the same (same name and model)."""
+        return provider1.name == provider2.name and provider1.model == provider2.model
 
     async def process_question(
         self,

@@ -43,20 +43,20 @@ providers:
     enabled: true
     models:
       - "gemini-3-pro-preview"
-      - "gemini-claude-sonnet-4-5-thinking"
+      - "gemini-claude-opus-4-5-thinking"
 
 # Generation Settings
 generation:
-  concurrent_requests: 8
-  max_retries: 5
-  json_parse_retries: 3
+  concurrent_requests: 15
+  max_retries: 7
+  json_parse_retries: 5
 
   # Combiner Configuration
   # Specify which provider/model combines cards from all generators.
   # If not set, the first enabled provider is used as combiner.
   combiner:
     provider: google_antigravity   # Provider name from providers section
-    model: gemini-claude-sonnet-4-5-thinking  # Model to use for combining
+    model: gemini-claude-opus-4-5-thinking  # Model to use for combining
     also_generate: true            # If true, combiner also does initial generation
                                    # If false, combiner only combines (not used for generation)
 
