@@ -36,9 +36,66 @@
         ]
     },
     "cs": {
-        "Binary Search": [
-            "Bisect Left",
-            "Bisect Right"
+        "Introduction": [
+            "String formatting in python",
+            "Object-Oriented Programming in Python",
+            "Python list operations and time complexity",
+            "Python dictionary operations and time complexity",
+            "Python string operations and time complexity",
+            "python collections module, deque, defaultdict, Counter and their time complexities",
+            "python bisect",
+            "python heapq",
+            "python itertools module",
+            "python functools"
+        ],
+        "Data Structures": [
+            "Stacks",
+            "implement stacks in python",
+            "convert decimal to n base",
+            "Infix, Prefix, and Postfix Expressions, convertors and evaluators",
+            "queues",
+            "queues implementation in python",
+            "deque implemention using common python data structures (dont use deque class directly)",
+            "Linked List, implementation of common operations (both iterative and recursive) and time complexity",
+            "Doubly Linked List, implementation of common operations (both iterative and recursive) and time complexity"
+        ],
+        "Recursion": [
+            "Tower of Hanoi",
+            "Dynamic programming"
+        ],
+        "Searching and Sorting": [
+            "Binary Search",
+            "Bubble sort",
+            "Selection sort",
+            "Insertion sort",
+            "Merge sort",
+            "quick sort",
+            "Counting sort",
+            "Heap sort",
+            "Bucket sort",
+            "Radix sort",
+            "Hashing",
+            "Map Abstract Data Structure implementation"
+        ],
+        "Trees and Tree Algorithms": [
+            "Tree Data Structures",
+            "Trees Representation",
+            "Tree Traversals",
+            "Priority Queues with Binary Heaps",
+            "Binary Search Trees and Operations",
+            "Balanced Binary Search Trees",
+            "AVL Tree and Performance",
+            "RedBlackTree"
+        ],
+        "Graphs and Graph Algorithms": [
+            "Graph Fundamentals",
+            "Graph Representation",
+            "Graph Traversals",
+            "Shortest Path Algorithms",
+            "Minimum Spanning Tree Algorithms",
+            "Word Ladder Problem",
+            "Knight's Tour Problem",
+            "Topological Sorting"
         ]
     },
     "physics": {
