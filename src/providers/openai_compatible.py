@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Iterator
 from openai import AsyncOpenAI
 from openai import RateLimitError as OpenAIRateLimitError
 from openai import APITimeoutError as OpenAITimeoutError
-from tenacity import RetryError
+from tenacity import RetryError, retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
 from src.providers.base import (
     LLMProvider,
@@ -260,18 +260,32 @@ class OpenAICompatibleProvider(LLMProvider):
             },
         ]
 
-        # Retry JSON parsing separately from API calls
-        for attempt in range(self.json_parse_retries):
-            response_content = await self._make_request(chat_messages, json_schema)
-            if response_content:
-                try:
-                    return json.loads(response_content)
-                except json.JSONDecodeError as error:
-                    logger.warning(
-                        f"[{self.model_name}] format_json attempt {attempt + 1}/{self.json_parse_retries}: "
-                        f"JSON Decode Error: {error}. Retrying..."
-                    )
-                    continue
+        model_name = self.model_name  # Capture for closure
 
-        logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
-        return None
+        def log_retry(retry_state):
+            logger.warning(
+                f"[{model_name}] format_json attempt {retry_state.attempt_number}/{self.json_parse_retries}: "
+                f"JSON Decode Error. Retrying..."
+            )
+
+        @retry(
+            stop=stop_after_attempt(self.json_parse_retries),
+            wait=wait_fixed(0.5),
+            retry=retry_if_exception_type((json.JSONDecodeError, RetryableError)),
+            before_sleep=log_retry,
+            reraise=True,
+        )
+        async def _parse_with_retry() -> Dict[str, Any]:
+            response_content = await self._make_request(chat_messages, json_schema)
+            if not response_content:
+                raise RetryableError("Empty response from format request")
+            return json.loads(response_content)
+
+        try:
+            return await _parse_with_retry()
+        except RetryError:
+            logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
+            return None
+        except json.JSONDecodeError:
+            logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
+            return None

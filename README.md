@@ -149,7 +149,7 @@ subjects:
   cs:
     enabled: true
   physics:
-    enabled: true
+    enabled: false
 ```
 
 ## Usage

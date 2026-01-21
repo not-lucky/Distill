@@ -129,7 +129,7 @@ subjects:
   cs:
     enabled: true
   physics:
-    enabled: true
+    enabled: false
 
   # Example custom subject (uncomment to use)
   # example:

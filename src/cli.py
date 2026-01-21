@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import sys
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -40,6 +41,11 @@ def normalize_legacy_args(argv: list[str]) -> list[str]:
         return argv
 
     # Old-style arguments detected - convert to new style
+    warnings.warn(
+        "Legacy CLI syntax is deprecated. Use 'llm2deck generate <subject> [card_type]' instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
     new_argv = ["generate"]
     for arg in argv:
         if arg.startswith("--label="):
@@ -187,11 +193,11 @@ async def handle_generate(args: argparse.Namespace) -> int:
     subject_config = registry.get_config(args.subject, is_mcq)
 
     if dry_run:
-        print(f"[DRY RUN] Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
+        logger.info(f"[DRY RUN] Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
     else:
-        print(f"Running: Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
+        logger.info(f"Running: Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
     if args.label:
-        print(f"Run Label: {args.label}")
+        logger.info(f"Run Label: {args.label}")
 
     orchestrator = Orchestrator(
         subject_config=subject_config,
@@ -251,7 +257,7 @@ def handle_convert(args: argparse.Namespace) -> int:
         generator = DeckGenerator(card_data, deck_prefix=deck_prefix)
         generator.process()
         generator.save_package(output_path)
-        print(f"Successfully created: {output_path}")
+        logger.info(f"Successfully created: {output_path}")
         return 0
     except Exception as error:
         logger.error(f"Failed to create Anki deck: {error}")
