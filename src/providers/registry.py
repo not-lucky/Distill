@@ -3,7 +3,7 @@
 import itertools
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Iterator, List, Optional, Type
+from typing import Awaitable, Callable, Dict, Iterator, List, Optional, Type
 
 from src.config.keys import load_keys
 from src.config.loader import DefaultsConfig, ProviderConfig
@@ -12,12 +12,17 @@ from src.providers.baseten import BasetenProvider
 from src.providers.canopywave import CanopywaveProvider
 from src.providers.cerebras import CerebrasProvider
 from src.providers.g4f_provider import G4FProvider
+from src.providers.gemini import GeminiProvider
+from src.providers.gemini_factory import create_gemini_providers
 from src.providers.google_antigravity import GoogleAntigravityProvider
 from src.providers.google_genai import GoogleGenAIProvider
 from src.providers.nvidia import NvidiaProvider
 from src.providers.openrouter import OpenRouterProvider
 
 logger = logging.getLogger(__name__)
+
+# Type alias for custom factory functions
+ProviderFactory = Callable[[ProviderConfig, DefaultsConfig], Awaitable[List[LLMProvider]]]
 
 
 # Default base URLs for OpenAI-compatible providers
@@ -40,6 +45,7 @@ class ProviderSpec:
     multi_model: bool = False  # True if provider creates multiple instances from models list
     no_keys: bool = False  # True if provider doesn't need any keys
     uses_base_url: bool = False  # True for OpenAI-compatible providers that accept base_url
+    factory: Optional[ProviderFactory] = None  # Custom factory for providers with special init
 
 
 # Registry mapping config names to provider specifications
@@ -87,6 +93,11 @@ PROVIDER_REGISTRY: Dict[str, ProviderSpec] = {
         multi_model=True,
         uses_base_url=True,
     ),
+    "gemini_webapi": ProviderSpec(
+        provider_class=GeminiProvider,
+        no_keys=True,
+        factory=create_gemini_providers,
+    ),
 }
 
 
@@ -108,6 +119,10 @@ async def create_provider_instances(
     Returns:
         List of provider instances (usually 1, but can be multiple for multi_model)
     """
+    # Use custom factory if provided (for providers with special init requirements)
+    if spec.factory is not None:
+        return await spec.factory(cfg, defaults)
+
     # Get effective values using defaults
     effective_timeout = cfg.get_effective_timeout(defaults)
     effective_temperature = cfg.get_effective_temperature(defaults)

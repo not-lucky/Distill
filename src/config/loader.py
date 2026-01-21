@@ -28,12 +28,26 @@ class DefaultsConfig:
 
 
 @dataclass
+class KeyPathsConfig:
+    """Configuration for API key file paths."""
+
+    cerebras: str = "api_keys.json"
+    openrouter: str = "openrouter_apikeys.json"
+    gemini: str = "python3ds.json"
+    nvidia: str = "nvidia_keys.json"
+    canopywave: str = "canopywave_keys.json"
+    baseten: str = "baseten_keys.json"
+    google_genai: str = "google_genai_keys.json"
+
+
+@dataclass
 class PathsConfig:
     """Configuration for file paths."""
 
     archival_dir: str = "anki_cards_archival"
     markdown_dir: str = "anki_cards_markdown"
     timestamp_format: str = "%Y%m%dT%H%M%S"
+    key_paths: KeyPathsConfig = field(default_factory=KeyPathsConfig)
 
 
 @dataclass
@@ -233,12 +247,27 @@ def _parse_defaults_config(data: Dict[str, Any]) -> DefaultsConfig:
     )
 
 
+def _parse_key_paths_config(data: Dict[str, Any]) -> KeyPathsConfig:
+    """Parse key paths configuration from YAML data."""
+    return KeyPathsConfig(
+        cerebras=data.get("cerebras", "api_keys.json"),
+        openrouter=data.get("openrouter", "openrouter_apikeys.json"),
+        gemini=data.get("gemini", "python3ds.json"),
+        nvidia=data.get("nvidia", "nvidia_keys.json"),
+        canopywave=data.get("canopywave", "canopywave_keys.json"),
+        baseten=data.get("baseten", "baseten_keys.json"),
+        google_genai=data.get("google_genai", "google_genai_keys.json"),
+    )
+
+
 def _parse_paths_config(data: Dict[str, Any]) -> PathsConfig:
     """Parse paths configuration from YAML data."""
+    key_paths_data = data.get("key_paths", {})
     return PathsConfig(
         archival_dir=data.get("archival_dir", "anki_cards_archival"),
         markdown_dir=data.get("markdown_dir", "anki_cards_markdown"),
         timestamp_format=data.get("timestamp_format", "%Y%m%dT%H%M%S"),
+        key_paths=_parse_key_paths_config(key_paths_data),
     )
 
 

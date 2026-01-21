@@ -1,4 +1,5 @@
 import os
+import warnings
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -29,6 +30,15 @@ GOOGLE_GENAI_KEYS_FILE = Path(
 # Configuration
 CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", 8))
 ENABLE_GEMINI = os.getenv("ENABLE_GEMINI", "False").lower() == "true"
+
+# Deprecation warning for ENABLE_GEMINI
+if ENABLE_GEMINI:
+    warnings.warn(
+        "ENABLE_GEMINI environment variable is deprecated. "
+        "Use 'gemini_webapi.enabled: true' in config.yaml instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
 # Re-export subject config
 from .subjects import SubjectRegistry, SubjectConfig

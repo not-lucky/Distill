@@ -73,10 +73,10 @@ providers:
 
 # Generation Settings
 generation:
-  concurrent_requests: 3
+  concurrent_requests: 7
   request_delay: 1  # Delay in seconds between starting each request (prevents rate limiting)
-  max_retries: 7
-  json_parse_retries: 7
+  max_retries: 10
+  json_parse_retries: 10
 
   # Combiner Configuration
   # Specify which provider/model combines cards from all generators.
@@ -106,6 +106,18 @@ paths:
   archival_dir: "anki_cards_archival"   # Directory for archived JSON files
   markdown_dir: "anki_cards_markdown"   # Directory for exported Markdown files
   timestamp_format: "%Y%m%dT%H%M%S"     # Timestamp format for output files
+
+  # API Key File Paths (optional)
+  # These can be overridden by environment variables (higher priority)
+  # Environment variables: CEREBRAS_KEYS_FILE_PATH, OPENROUTER_KEYS_FILE_PATH, etc.
+  # key_paths:
+  #   cerebras: "api_keys.json"
+  #   openrouter: "openrouter_apikeys.json"
+  #   gemini: "python3ds.json"
+  #   nvidia: "nvidia_keys.json"
+  #   canopywave: "canopywave_keys.json"
+  #   baseten: "baseten_keys.json"
+  #   google_genai: "google_genai_keys.json"
 
 # Subject Settings
 # Built-in subjects: leetcode, cs, physics

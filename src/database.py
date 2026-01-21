@@ -26,9 +26,112 @@ logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
-# Global engine and session maker
+# Global engine and session maker (deprecated - use DatabaseManager)
 _engine = None
 _SessionLocal = None
+
+
+class DatabaseManager:
+    """
+    Manages database connections and session lifecycle.
+
+    Supports both singleton access (for backward compatibility) and
+    dependency injection (for testing and multi-database scenarios).
+    """
+
+    _instance: Optional["DatabaseManager"] = None
+
+    def __init__(self, db_path: Optional[Path] = None):
+        """
+        Initialize the database manager.
+
+        Args:
+            db_path: Path to SQLite database. If None, must call initialize() later.
+        """
+        self._engine = None
+        self._session_factory = None
+        self._db_path: Optional[Path] = None
+
+        if db_path is not None:
+            self.initialize(db_path)
+
+    def initialize(self, db_path: Path) -> None:
+        """
+        Initialize database engine and create tables.
+
+        Args:
+            db_path: Path to the SQLite database file.
+        """
+        self._db_path = Path(db_path)
+        logger.info(f"Initializing database at {self._db_path}")
+
+        self._engine = create_engine(
+            f"sqlite:///{self._db_path}",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+            echo=False,
+        )
+
+        Base.metadata.create_all(bind=self._engine)
+
+        self._session_factory = sessionmaker(
+            autocommit=False, autoflush=False, bind=self._engine
+        )
+
+        logger.info("Database initialized successfully")
+
+    @property
+    def is_initialized(self) -> bool:
+        """Check if database is initialized."""
+        return self._session_factory is not None
+
+    @property
+    def db_path(self) -> Optional[Path]:
+        """Get the database path."""
+        return self._db_path
+
+    def get_session(self) -> Session:
+        """Get a new database session."""
+        if not self.is_initialized:
+            raise RuntimeError("Database not initialized. Call initialize() first.")
+        return self._session_factory()
+
+    @contextmanager
+    def session_scope(self):
+        """Provide a transactional scope around a series of operations."""
+        session = self.get_session()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    @classmethod
+    def get_default(cls) -> "DatabaseManager":
+        """Get or create the default singleton instance."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def set_default(cls, manager: "DatabaseManager") -> None:
+        """
+        Set the default singleton instance.
+
+        Useful for testing with in-memory databases or custom configurations.
+
+        Args:
+            manager: The DatabaseManager instance to use as default.
+        """
+        cls._instance = manager
+
+    @classmethod
+    def reset_default(cls) -> None:
+        """Reset the default singleton (useful for testing cleanup)."""
+        cls._instance = None
 
 
 class Run(Base):
@@ -154,48 +257,35 @@ class Card(Base):
 
 
 def init_database(db_path: Path) -> None:
-    """Initialize database engine and create tables"""
-    global _engine, _SessionLocal
+    """
+    Initialize database engine and create tables.
 
-    db_path = Path(db_path)
-    logger.info(f"Initializing database at {db_path}")
-
-    # Create engine
-    _engine = create_engine(
-        f"sqlite:///{db_path}",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        echo=False,  # Set to True for SQL debugging
-    )
-
-    # Create all tables
-    Base.metadata.create_all(bind=_engine)
-
-    # Create session factory
-    _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
-
-    logger.info("Database initialized successfully")
+    This is a backward-compatible wrapper around DatabaseManager.
+    For new code, prefer using DatabaseManager directly.
+    """
+    DatabaseManager.get_default().initialize(db_path)
 
 
 def get_session() -> Session:
-    """Get a new database session"""
-    if _SessionLocal is None:
-        raise RuntimeError("Database not initialized. Call init_database() first.")
-    return _SessionLocal()
+    """
+    Get a new database session.
+
+    This is a backward-compatible wrapper around DatabaseManager.
+    For new code, prefer using DatabaseManager directly.
+    """
+    return DatabaseManager.get_default().get_session()
 
 
 @contextmanager
 def session_scope():
-    """Provide a transactional scope around a series of operations"""
-    session = get_session()
-    try:
+    """
+    Provide a transactional scope around a series of operations.
+
+    This is a backward-compatible wrapper around DatabaseManager.
+    For new code, prefer using DatabaseManager.session_scope() directly.
+    """
+    with DatabaseManager.get_default().session_scope() as session:
         yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
 
 
 # CRUD Operations

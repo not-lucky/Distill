@@ -1,26 +1,38 @@
 {
     "leetcode": {
-        "Binary Search": [
-            "Binary Search",
-            "Search a 2D Matrix",
-            "Koko Eating Bananas",
-            "Find Minimum In Rotated Sorted Array",
-            "Search In Rotated Sorted Array",
-            "Time Based Key Value Store",
-            "Median of Two Sorted Arrays"
+        "Arrays and Hashing": [
+            "Contains Duplicate",
+            "Valid Anagram",
+            "Two Sum",
+            "Group Anagrams",
+            "Top K Frequent Elements",
+            "Encode and Decode Strings",
+            "Product of Array Except Self",
+            "Valid Sudoku",
+            "Longest Consecutive Sequence"
         ],
-        "Linked List": [
-            "Reverse Linked List",
-            "Merge Two Sorted Lists",
-            "Linked List Cycle",
-            "Reorder List",
-            "Remove Nth Node From End of List",
-            "Copy List With Random Pointer",
-            "Add Two Numbers",
-            "Find The Duplicate Number",
-            "LRU Cache",
-            "Merge K Sorted Lists",
-            "Reverse Nodes In K Group"
+        "Two Pointers": [
+            "Valid Palindrome",
+            "Two Sum II Input Array Is Sorted",
+            "3Sum",
+            "Container With Most Water",
+            "Trapping Rain Water"
+        ],
+        "Sliding Window": [
+            "Best Time to Buy And Sell Stock",
+            "Longest Substring Without Repeating Characters",
+            "Longest Repeating Character Replacement",
+            "Permutation In String",
+            "Minimum Window Substring",
+            "Sliding Window Maximum"
+        ],
+        "Stacks": [
+            "Valid Parentheses",
+            "Min Stack",
+            "Evaluate Reverse Polish Notation",
+            "Daily Temperatures",
+            "Car Fleet",
+            "Largest Rectangle In Histogram"
         ]
     },
     "cs": {

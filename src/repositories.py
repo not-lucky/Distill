@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from src.database import (
+    DatabaseManager,
     get_session,
     init_database,
     create_run,
@@ -38,15 +39,29 @@ class RunRepository:
     providing a clean interface for the orchestrator.
     """
 
-    def __init__(self, db_path: Path):
+    def __init__(
+        self,
+        db_path: Path,
+        db_manager: Optional[DatabaseManager] = None,
+    ):
         """
         Initialize the repository.
 
         Args:
             db_path: Path to the SQLite database file.
+            db_manager: Optional DatabaseManager instance for dependency injection.
+                       If None, uses the default singleton.
         """
         self.db_path = db_path
+        self._db_manager = db_manager
         self._run_id: Optional[str] = None
+
+    @property
+    def db_manager(self) -> DatabaseManager:
+        """Get the database manager, using default if not explicitly set."""
+        if self._db_manager is not None:
+            return self._db_manager
+        return DatabaseManager.get_default()
 
     @property
     def run_id(self) -> Optional[str]:
@@ -55,7 +70,7 @@ class RunRepository:
 
     def initialize_database(self) -> None:
         """Initialize the database and create tables if needed."""
-        init_database(self.db_path)
+        self.db_manager.initialize(self.db_path)
 
     def create_new_run(
         self,
@@ -77,8 +92,7 @@ class RunRepository:
             The generated run ID.
         """
         self._run_id = str(uuid.uuid4())
-        session = get_session()
-        try:
+        with self.db_manager.session_scope() as session:
             create_run(
                 session=session,
                 id=self._run_id,
@@ -88,21 +102,16 @@ class RunRepository:
                 card_type=card_type,
                 status="running",
             )
-            return self._run_id
-        finally:
-            session.close()
+        return self._run_id
 
     def mark_run_failed(self) -> None:
         """Mark the current run as failed."""
         if not self._run_id:
             raise RuntimeError("No active run to mark as failed")
 
-        session = get_session()
-        try:
+        with self.db_manager.session_scope() as session:
             update_run(session, self._run_id, status="failed")
-            logger.info(f"Marked run {self._run_id} as failed")
-        finally:
-            session.close()
+        logger.info(f"Marked run {self._run_id} as failed")
 
     def mark_run_completed(self, stats: RunStats) -> None:
         """
@@ -114,8 +123,7 @@ class RunRepository:
         if not self._run_id:
             raise RuntimeError("No active run to mark as completed")
 
-        session = get_session()
-        try:
+        with self.db_manager.session_scope() as session:
             update_run(
                 session=session,
                 run_id=self._run_id,
@@ -124,9 +132,7 @@ class RunRepository:
                 successful_problems=stats.successful_problems,
                 failed_problems=stats.failed_problems,
             )
-            logger.info(f"Marked run {self._run_id} as completed")
-        finally:
-            session.close()
+        logger.info(f"Marked run {self._run_id} as completed")
 
     def get_card_repository(self) -> "CardRepository":
         """
@@ -140,7 +146,7 @@ class RunRepository:
         """
         if not self._run_id:
             raise RuntimeError("No active run. Call create_new_run() first.")
-        return CardRepository(run_id=self._run_id)
+        return CardRepository(run_id=self._run_id, db_manager=self._db_manager)
 
 
 class CardRepository:
@@ -151,14 +157,28 @@ class CardRepository:
     providing a clean interface that decouples business logic from persistence.
     """
 
-    def __init__(self, run_id: str):
+    def __init__(
+        self,
+        run_id: str,
+        db_manager: Optional[DatabaseManager] = None,
+    ):
         """
         Initialize the repository.
 
         Args:
             run_id: The ID of the current run.
+            db_manager: Optional DatabaseManager instance for dependency injection.
+                       If None, uses the default singleton.
         """
         self.run_id = run_id
+        self._db_manager = db_manager
+
+    @property
+    def db_manager(self) -> DatabaseManager:
+        """Get the database manager, using default if not explicitly set."""
+        if self._db_manager is not None:
+            return self._db_manager
+        return DatabaseManager.get_default()
 
     def create_initial_problem(
         self,
@@ -179,8 +199,7 @@ class CardRepository:
         Returns:
             The ID of the created problem.
         """
-        session = get_session()
-        try:
+        with self.db_manager.session_scope() as session:
             problem = create_problem(
                 session=session,
                 run_id=self.run_id,
@@ -191,8 +210,6 @@ class CardRepository:
                 status="running",
             )
             return problem.id
-        finally:
-            session.close()
 
     def save_provider_result(
         self,
@@ -212,8 +229,7 @@ class CardRepository:
             raw_output: Raw JSON string output from the provider.
             card_count: Optional count of cards in the result.
         """
-        session = get_session()
-        try:
+        with self.db_manager.session_scope() as session:
             create_provider_result(
                 session=session,
                 problem_id=problem_id,
@@ -224,8 +240,6 @@ class CardRepository:
                 raw_output=raw_output,
                 card_count=card_count,
             )
-        finally:
-            session.close()
 
     def update_problem_failed(
         self,
@@ -239,16 +253,13 @@ class CardRepository:
             problem_id: ID of the problem to update.
             processing_time_seconds: Time spent processing before failure.
         """
-        session = get_session()
-        try:
+        with self.db_manager.session_scope() as session:
             update_problem(
                 session=session,
                 problem_id=problem_id,
                 status="failed",
                 processing_time_seconds=processing_time_seconds,
             )
-        finally:
-            session.close()
 
     def save_final_result(
         self,
@@ -264,8 +275,7 @@ class CardRepository:
             card_data: Final card data dictionary.
             processing_time_seconds: Total processing time.
         """
-        session = get_session()
-        try:
+        with self.db_manager.session_scope() as session:
             # Update problem with final result
             update_problem(
                 session=session,
@@ -284,8 +294,6 @@ class CardRepository:
                 cards_data=card_data.get("cards", []),
             )
 
-            logger.info(
-                f"Saved {len(card_data.get('cards', []))} cards to database for problem {problem_id}"
-            )
-        finally:
-            session.close()
+        logger.info(
+            f"Saved {len(card_data.get('cards', []))} cards to database for problem {problem_id}"
+        )
