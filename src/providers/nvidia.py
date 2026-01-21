@@ -12,26 +12,32 @@ class NvidiaProvider(OpenAICompatibleProvider):
         self,
         api_keys: Iterator[str],
         model: str,
+        base_url: str = "https://integrate.api.nvidia.com/v1",
         timeout: float = 900.0,
+        temperature: float = 0.4,
+        max_tokens: Optional[int] = 16384,
+        top_p: Optional[float] = 0.95,
+        extra_params: Optional[Dict[str, Any]] = None,
         max_retries: int = 5,
         json_parse_retries: int = 3,
     ):
+        # Merge default extra_body with config extra_params
+        default_extra = {"extra_body": {"chat_template_kwargs": {"thinking": True}}}
+        merged_extra = {**default_extra, **(extra_params or {})}
+
         super().__init__(
             model=model,
-            base_url="https://integrate.api.nvidia.com/v1",
+            base_url=base_url,
             api_keys=api_keys,
             timeout=timeout,
+            temperature=temperature,
             max_retries=max_retries,
             json_parse_retries=json_parse_retries,
-            max_tokens=16384,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            extra_params=merged_extra,
         )
 
     @property
     def name(self) -> str:
         return "llm2deck_nvidia"
-
-    def _get_extra_request_params(self) -> Dict[str, Any]:
-        return {
-            "top_p": 0.95,
-            "extra_body": {"chat_template_kwargs": {"thinking": True}},
-        }

@@ -1,7 +1,20 @@
 # LLM2Deck Configuration
 # Uncomment providers to enable them
 
+# Global Defaults
+# These values apply to all providers unless overridden per-provider
+defaults:
+  timeout: 120.0              # Request timeout in seconds
+  temperature: 0.4            # Sampling temperature
+  max_tokens: null            # Max tokens (null = API default)
+  max_retries: 5              # Max retry attempts for API requests
+  json_parse_retries: 5       # Max retries for JSON parsing
+  retry_delay: 1.0            # Base delay between retries
+  retry_min_wait: 1.0         # Minimum wait for exponential backoff
+  retry_max_wait: 10.0        # Maximum wait for exponential backoff
+
 # Provider Configuration
+# Each provider can override defaults with its own timeout, temperature, etc.
 providers:
   cerebras:
     enabled: true
@@ -11,11 +24,15 @@ providers:
   openrouter:
     enabled: false
     model: "xiaomi/mimo-v2-flash:free"
+    # base_url: "https://openrouter.ai/api/v1"  # Optional, has default
 
   nvidia:
     enabled: false
     model: "moonshotai/kimi-k2-thinking"
-    timeout: 900
+    timeout: 900                                 # Override default timeout
+    max_tokens: 16384
+    top_p: 0.95
+    # base_url: "https://integrate.api.nvidia.com/v1"  # Optional, has default
 
   g4f:
     enabled: false
@@ -25,10 +42,15 @@ providers:
   canopywave:
     enabled: false
     model: "zai/glm-4.7"
+    timeout: 900
+    max_tokens: 16384
+    # base_url: "https://api.xiaomimimo.com/v1"  # Optional, has default
 
   baseten:
     enabled: false
     model: "zai-org/GLM-4.7"
+    strip_json_markers: false
+    # base_url: "https://inference.baseten.co/v1"  # Optional, has default
 
   gemini_webapi:
     enabled: false
@@ -38,19 +60,23 @@ providers:
     enabled: false
     model: "gemini-3-flash-preview"
     thinking_level: "high"
+    temperature: 1.0                             # Gemini 3 recommends 1.0
 
   google_antigravity:
     enabled: true
     models:
       - "gemini-3-pro-preview"
       - "gemini-claude-opus-4-5-thinking"
+    timeout: 900
+    max_tokens: 16384
+    # base_url: "http://127.0.0.1:8317/v1"  # Optional, has default
 
 # Generation Settings
 generation:
-  concurrent_requests: 9
-  request_delay: 0.5  # Delay in seconds between starting each request (prevents rate limiting)
+  concurrent_requests: 3
+  request_delay: 1  # Delay in seconds between starting each request (prevents rate limiting)
   max_retries: 7
-  json_parse_retries: 5
+  json_parse_retries: 7
 
   # Combiner Configuration
   # Specify which provider/model combines cards from all generators.
@@ -74,6 +100,12 @@ generation:
 # Database Settings
 database:
   path: "llm2deck.db"
+
+# Paths Configuration
+paths:
+  archival_dir: "anki_cards_archival"   # Directory for archived JSON files
+  markdown_dir: "anki_cards_markdown"   # Directory for exported Markdown files
+  timestamp_format: "%Y%m%dT%H%M%S"     # Timestamp format for output files
 
 # Subject Settings
 # Built-in subjects: leetcode, cs, physics

@@ -14,16 +14,57 @@ CONFIG_FILE = Path("config.yaml")
 
 
 @dataclass
+class DefaultsConfig:
+    """Global default settings for all providers."""
+
+    timeout: float = 120.0
+    temperature: float = 0.4
+    max_tokens: Optional[int] = None
+    max_retries: int = 5
+    json_parse_retries: int = 5
+    retry_delay: float = 1.0
+    retry_min_wait: float = 1.0
+    retry_max_wait: float = 10.0
+
+
+@dataclass
+class PathsConfig:
+    """Configuration for file paths."""
+
+    archival_dir: str = "anki_cards_archival"
+    markdown_dir: str = "anki_cards_markdown"
+    timestamp_format: str = "%Y%m%dT%H%M%S"
+
+
+@dataclass
 class ProviderConfig:
     """Configuration for a single LLM provider."""
 
     enabled: bool = False
     model: str = ""
     models: List[str] = field(default_factory=list)  # For providers with multiple models
-    timeout: float = 120.0
+    base_url: Optional[str] = None  # Optional base URL override
+    timeout: Optional[float] = None  # None means use defaults
+    temperature: Optional[float] = None  # None means use defaults
+    max_tokens: Optional[int] = None
+    top_p: Optional[float] = None
+    strip_json_markers: Optional[bool] = None
+    extra_params: Optional[Dict[str, Any]] = None  # Provider-specific parameters
     reasoning_effort: Optional[str] = None
     thinking_level: Optional[str] = None
     provider_name: Optional[str] = None  # For G4F
+
+    def get_effective_timeout(self, defaults: "DefaultsConfig") -> float:
+        """Get timeout, falling back to defaults if not set."""
+        return self.timeout if self.timeout is not None else defaults.timeout
+
+    def get_effective_temperature(self, defaults: "DefaultsConfig") -> float:
+        """Get temperature, falling back to defaults if not set."""
+        return self.temperature if self.temperature is not None else defaults.temperature
+
+    def get_effective_max_tokens(self, defaults: "DefaultsConfig") -> Optional[int]:
+        """Get max_tokens, falling back to defaults if not set."""
+        return self.max_tokens if self.max_tokens is not None else defaults.max_tokens
 
 
 @dataclass
@@ -82,15 +123,18 @@ class SubjectSettings:
 class AppConfig:
     """Top-level application configuration."""
 
+    defaults: DefaultsConfig
     providers: Dict[str, ProviderConfig]
     generation: GenerationConfig
     database: DatabaseConfig
+    paths: PathsConfig
     subjects: Dict[str, SubjectSettings] = field(default_factory=dict)
 
     @classmethod
     def default(cls) -> "AppConfig":
         """Return default configuration when no config file exists."""
         return cls(
+            defaults=DefaultsConfig(),
             providers={
                 "cerebras": ProviderConfig(
                     enabled=True,
@@ -104,6 +148,7 @@ class AppConfig:
             },
             generation=GenerationConfig(),
             database=DatabaseConfig(),
+            paths=PathsConfig(),
             subjects={
                 "leetcode": SubjectSettings(enabled=True),
                 "cs": SubjectSettings(enabled=True),
@@ -118,7 +163,13 @@ def _parse_provider_config(name: str, data: Dict[str, Any]) -> ProviderConfig:
         enabled=data.get("enabled", False),
         model=data.get("model", ""),
         models=data.get("models", []),
-        timeout=data.get("timeout", 120.0),
+        base_url=data.get("base_url"),
+        timeout=data.get("timeout"),
+        temperature=data.get("temperature"),
+        max_tokens=data.get("max_tokens"),
+        top_p=data.get("top_p"),
+        strip_json_markers=data.get("strip_json_markers"),
+        extra_params=data.get("extra_params"),
         reasoning_effort=data.get("reasoning_effort"),
         thinking_level=data.get("thinking_level"),
         provider_name=data.get("provider_name"),
@@ -168,6 +219,29 @@ def _parse_database_config(data: Dict[str, Any]) -> DatabaseConfig:
     )
 
 
+def _parse_defaults_config(data: Dict[str, Any]) -> DefaultsConfig:
+    """Parse defaults configuration from YAML data."""
+    return DefaultsConfig(
+        timeout=data.get("timeout", 120.0),
+        temperature=data.get("temperature", 0.4),
+        max_tokens=data.get("max_tokens"),
+        max_retries=data.get("max_retries", 5),
+        json_parse_retries=data.get("json_parse_retries", 5),
+        retry_delay=data.get("retry_delay", 1.0),
+        retry_min_wait=data.get("retry_min_wait", 1.0),
+        retry_max_wait=data.get("retry_max_wait", 10.0),
+    )
+
+
+def _parse_paths_config(data: Dict[str, Any]) -> PathsConfig:
+    """Parse paths configuration from YAML data."""
+    return PathsConfig(
+        archival_dir=data.get("archival_dir", "anki_cards_archival"),
+        markdown_dir=data.get("markdown_dir", "anki_cards_markdown"),
+        timestamp_format=data.get("timestamp_format", "%Y%m%dT%H%M%S"),
+    )
+
+
 def _parse_subject_config(name: str, data: Dict[str, Any]) -> SubjectSettings:
     """Parse subject configuration from YAML data."""
     return SubjectSettings(
@@ -203,6 +277,10 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
     except yaml.YAMLError as e:
         raise ConfigurationError(f"Failed to parse {path}: {e}")
 
+    # Parse defaults config
+    defaults_data = data.get("defaults", {})
+    defaults = _parse_defaults_config(defaults_data)
+
     # Parse providers
     providers: Dict[str, ProviderConfig] = {}
     providers_data = data.get("providers", {})
@@ -218,17 +296,23 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
     database_data = data.get("database", {})
     database = _parse_database_config(database_data)
 
+    # Parse paths config
+    paths_data = data.get("paths", {})
+    paths = _parse_paths_config(paths_data)
+
     # Parse subjects config
-    subjects: Dict[str, SubjectConfig] = {}
+    subjects: Dict[str, SubjectSettings] = {}
     subjects_data = data.get("subjects", {})
     for subject_name, subject_data in subjects_data.items():
         if isinstance(subject_data, dict):
             subjects[subject_name] = _parse_subject_config(subject_name, subject_data)
 
     return AppConfig(
+        defaults=defaults,
         providers=providers,
         generation=generation,
         database=database,
+        paths=paths,
         subjects=subjects,
     )
 

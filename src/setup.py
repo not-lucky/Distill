@@ -13,6 +13,7 @@ from src.config.loader import (
     get_formatter_config,
     CombinerConfig,
     FormatterConfig,
+    DefaultsConfig,
 )
 from src.providers.base import LLMProvider
 from src.providers.gemini import GeminiProvider
@@ -66,9 +67,17 @@ async def initialize_providers() -> Tuple[List[LLMProvider], Optional[LLMProvide
     combiner_cfg = get_combiner_config(config)  # Validates combiner config
     formatter_cfg = get_formatter_config(config)  # Validates formatter config
 
-    # Get retry configuration from generation settings
-    max_retries = config.generation.max_retries
-    json_parse_retries = config.generation.json_parse_retries
+    # Create effective defaults by merging global defaults with generation settings
+    effective_defaults = DefaultsConfig(
+        timeout=config.defaults.timeout,
+        temperature=config.defaults.temperature,
+        max_tokens=config.defaults.max_tokens,
+        max_retries=config.generation.max_retries or config.defaults.max_retries,
+        json_parse_retries=config.generation.json_parse_retries or config.defaults.json_parse_retries,
+        retry_delay=config.defaults.retry_delay,
+        retry_min_wait=config.defaults.retry_min_wait,
+        retry_max_wait=config.defaults.retry_max_wait,
+    )
 
     active_providers: List[LLMProvider] = []
     combiner_provider: Optional[LLMProvider] = None
@@ -83,8 +92,7 @@ async def initialize_providers() -> Tuple[List[LLMProvider], Optional[LLMProvide
         try:
             instances = await create_provider_instances(
                 name, spec, cfg,
-                max_retries=max_retries,
-                json_parse_retries=json_parse_retries,
+                defaults=effective_defaults,
             )
 
             for instance in instances:

@@ -120,8 +120,22 @@ Create JSON files at project root:
 ```yaml
 generation:
   concurrent_requests: 8      # Parallel question processing
+  request_delay: 1            # Seconds between requests (rate limiting)
   max_retries: 5              # API retry attempts
   json_parse_retries: 3       # JSON parsing retries
+
+  # Combiner: which model merges outputs from all providers
+  combiner:
+    provider: google_antigravity
+    model: gemini-pro
+    also_generate: true       # Also use for initial generation
+
+  # Formatter: separate model for JSON output (optional)
+  # Use when combiner is smart but unreliable at JSON
+  formatter:
+    provider: cerebras
+    model: gpt-oss-120b
+    also_generate: false      # Only format, don't generate
 ```
 
 ### Subjects

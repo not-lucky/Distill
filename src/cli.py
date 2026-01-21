@@ -11,6 +11,7 @@ from typing import Optional, List
 from dotenv import load_dotenv
 
 from src.config.subjects import SubjectRegistry, BUILTIN_SUBJECTS
+from src.config.loader import load_config
 from src.config.modes import (
     VALID_MODES,
     detect_mode_from_filename,
@@ -148,14 +149,14 @@ def create_parser() -> argparse.ArgumentParser:
     export_parser.add_argument(
         "--source",
         type=str,
-        default="anki_cards_archival",
-        help="Source directory containing JSON files",
+        default=None,
+        help="Source directory containing JSON files (default: from config)",
     )
     export_parser.add_argument(
         "--target",
         type=str,
-        default="anki_cards_markdown",
-        help="Target directory for Markdown output",
+        default=None,
+        help="Target directory for Markdown output (default: from config)",
     )
     export_parser.add_argument(
         "--dry-run",
@@ -262,8 +263,9 @@ def handle_convert(args: argparse.Namespace) -> int:
 def handle_merge(args: argparse.Namespace) -> int:
     """Handle the merge subcommand."""
     dry_run = getattr(args, "dry_run", False)
+    config = load_config()
 
-    base_directory = Path("anki_cards_archival")
+    base_directory = Path(config.paths.archival_dir)
     source_directory = base_directory / args.subject
 
     if not source_directory.exists():
@@ -297,7 +299,7 @@ def handle_merge(args: argparse.Namespace) -> int:
         logger.error("No valid data found to merge.")
         return 1
 
-    timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+    timestamp = datetime.now().strftime(config.paths.timestamp_format)
     output_filename = f"{args.subject}_anki_deck_{timestamp}.json"
 
     if dry_run:
@@ -319,12 +321,14 @@ def handle_merge(args: argparse.Namespace) -> int:
 def handle_export_md(args: argparse.Namespace) -> int:
     """Handle the export-md subcommand."""
     dry_run = getattr(args, "dry_run", False)
+    config = load_config()
 
-    source_path = Path(args.source)
-    target_path = Path(args.target)
+    # Use CLI args if provided, otherwise fall back to config
+    source_path = Path(args.source if args.source else config.paths.archival_dir)
+    target_path = Path(args.target if args.target else config.paths.markdown_dir)
 
     if not source_path.exists():
-        logger.error(f"Source directory '{args.source}' does not exist.")
+        logger.error(f"Source directory '{source_path}' does not exist.")
         return 1
 
     json_files = list(source_path.rglob("*.json"))

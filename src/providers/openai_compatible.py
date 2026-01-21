@@ -45,6 +45,8 @@ class OpenAICompatibleProvider(LLMProvider):
         temperature: float = 0.4,
         max_tokens: Optional[int] = None,
         strip_json_markers: bool = True,
+        top_p: Optional[float] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize an OpenAI-compatible provider.
@@ -59,6 +61,8 @@ class OpenAICompatibleProvider(LLMProvider):
             temperature: Sampling temperature
             max_tokens: Maximum tokens in response (None for API default)
             strip_json_markers: Whether to strip ```json markers from responses
+            top_p: Nucleus sampling parameter (None for API default)
+            extra_params: Additional provider-specific parameters
         """
         self.model_name = model
         self.base_url = base_url
@@ -69,6 +73,8 @@ class OpenAICompatibleProvider(LLMProvider):
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.strip_json_markers = strip_json_markers
+        self.top_p = top_p
+        self.extra_params = extra_params or {}
 
     @property
     def model(self) -> str:
@@ -96,12 +102,19 @@ class OpenAICompatibleProvider(LLMProvider):
 
     def _get_extra_request_params(self) -> Dict[str, Any]:
         """
-        Override this method to add provider-specific request parameters.
+        Get provider-specific request parameters.
+
+        Uses top_p and extra_params from config. Subclasses can override
+        to add additional provider-specific logic.
 
         Returns:
             Dict of extra parameters to pass to chat.completions.create()
         """
-        return {}
+        params = {}
+        if self.top_p is not None:
+            params["top_p"] = self.top_p
+        params.update(self.extra_params)
+        return params
 
     async def _make_request(
         self,
