@@ -15,16 +15,19 @@ class ConcurrentTaskRunner:
 
     Provides a clean interface for running multiple async tasks
     with a configurable concurrency limit using semaphores.
+    Supports optional delays between starting each request to prevent rate limiting.
     """
 
-    def __init__(self, max_concurrent: int = 8):
+    def __init__(self, max_concurrent: int = 8, request_delay: float = 0.0):
         """
         Initialize the task runner.
 
         Args:
             max_concurrent: Maximum number of tasks to run concurrently.
+            request_delay: Delay in seconds between starting each request within a batch.
         """
         self.max_concurrent = max_concurrent
+        self.request_delay = request_delay
         self._semaphore: asyncio.Semaphore = None
 
     async def run_all(
@@ -32,7 +35,7 @@ class ConcurrentTaskRunner:
         tasks: List[Callable[[], Awaitable[T]]],
     ) -> List[T]:
         """
-        Run all tasks with concurrency control.
+        Run all tasks with concurrency control and staggered starts.
 
         Args:
             tasks: List of async callables (no-argument coroutine functions).
@@ -55,7 +58,14 @@ class ConcurrentTaskRunner:
                     logger.error(f"Task failed: {e}")
                     return None
 
-        wrapped_tasks = [run_with_semaphore(task) for task in tasks]
+        # Start tasks with optional delay between each
+        wrapped_tasks = []
+        for i, task in enumerate(tasks):
+            wrapped_tasks.append(run_with_semaphore(task))
+            # Add delay before starting next task (skip delay after last task)
+            if self.request_delay > 0 and i < len(tasks) - 1:
+                await asyncio.sleep(self.request_delay)
+
         await asyncio.gather(*wrapped_tasks)
 
         return results
@@ -65,7 +75,7 @@ class ConcurrentTaskRunner:
         tasks: List[Callable[[], Awaitable[T]]],
     ) -> List[T]:
         """
-        Run all tasks with concurrency control, preserving order.
+        Run all tasks with concurrency control and staggered starts, preserving order.
 
         Args:
             tasks: List of async callables.
@@ -84,5 +94,12 @@ class ConcurrentTaskRunner:
                     logger.error(f"Task failed: {e}")
                     return None
 
-        wrapped_tasks = [run_with_semaphore(task) for task in tasks]
+        # Start tasks with optional delay between each
+        wrapped_tasks = []
+        for i, task in enumerate(tasks):
+            wrapped_tasks.append(run_with_semaphore(task))
+            # Add delay before starting next task (skip delay after last task)
+            if self.request_delay > 0 and i < len(tasks) - 1:
+                await asyncio.sleep(self.request_delay)
+
         return await asyncio.gather(*wrapped_tasks)

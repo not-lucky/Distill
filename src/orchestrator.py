@@ -3,7 +3,8 @@
 import logging
 from typing import List, Dict, Optional, Tuple
 
-from src.config import CONCURRENT_REQUESTS, DATABASE_PATH
+from src.config import DATABASE_PATH
+from src.config.loader import load_config
 
 logger = logging.getLogger(__name__)
 from src.config.subjects import SubjectConfig
@@ -40,6 +41,11 @@ class Orchestrator:
         self.dry_run = dry_run
         self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
+
+        # Load generation config
+        config = load_config()
+        self.concurrent_requests = config.generation.concurrent_requests
+        self.request_delay = config.generation.request_delay
 
     @property
     def run_id(self) -> Optional[str]:
@@ -164,8 +170,11 @@ class Orchestrator:
             for cat_idx, cat_name, prob_idx, question in questions_with_metadata
         ]
 
-        # Run with concurrency control
-        task_runner = ConcurrentTaskRunner(max_concurrent=CONCURRENT_REQUESTS)
+        # Run with concurrency control and staggered request starts
+        task_runner = ConcurrentTaskRunner(
+            max_concurrent=self.concurrent_requests,
+            request_delay=self.request_delay,
+        )
         all_generated_problems = await task_runner.run_all(tasks)
 
         # Update run status

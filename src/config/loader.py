@@ -49,6 +49,7 @@ class GenerationConfig:
     """Configuration for card generation."""
 
     concurrent_requests: int = 8
+    request_delay: float = 0.0  # Delay in seconds between starting each request within a batch
     max_retries: int = 5
     json_parse_retries: int = 3
     combiner: Optional[CombinerConfig] = None  # Explicit combiner configuration
@@ -152,6 +153,7 @@ def _parse_generation_config(data: Dict[str, Any]) -> GenerationConfig:
     formatter_data = data.get("formatter", {})
     return GenerationConfig(
         concurrent_requests=data.get("concurrent_requests", 8),
+        request_delay=data.get("request_delay", 0.0),
         max_retries=data.get("max_retries", 5),
         json_parse_retries=data.get("json_parse_retries", 3),
         combiner=_parse_combiner_config(combiner_data),

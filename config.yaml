@@ -47,7 +47,8 @@ providers:
 
 # Generation Settings
 generation:
-  concurrent_requests: 15
+  concurrent_requests: 9
+  request_delay: 0.5  # Delay in seconds between starting each request (prevents rate limiting)
   max_retries: 7
   json_parse_retries: 5
 
