@@ -1,92 +1,81 @@
-# Refactoring Priorities
+# Refactoring Backlog
 
-## High Priority
+## Priority 1 - Architectural Issues
 
-### 1. Provider Code Duplication
-**Files:** `src/providers/openai_compatible.py`, `src/providers/cerebras.py`, `src/providers/base.py`
+### Provider Initialization Logic Split
+- **Files:** `src/setup.py:49-166`, `src/providers/registry.py`
+- **Problem:** Provider initialization logic is split between `registry.py` and `setup.py`. The `initialize_providers` function manually iterates through the registry and contains hardcoded special handling for `gemini_webapi`.
+- **Why it matters:** Adding a new provider requires modifying `setup.py` if it needs special handling, violating the Open/Closed Principle.
+- **Fix:** Refactor `ProviderRegistry` to fully encapsulate instantiation logic. Move Gemini-specific logic into its own factory/adapter.
 
-**Issue:** Significant logic duplication between `OpenAICompatibleProvider` and `CerebrasProvider`:
-- JSON parsing and retry loop (`DEFAULT_JSON_PARSE_RETRIES`) is duplicated
-- Exception handling for `json.JSONDecodeError` is repeated
-- Prompt message construction (system + user) is duplicated
+### Global Database State
+- **File:** `src/database.py:30-31, 156-178`
+- **Problem:** Module relies on global `_engine` and `_SessionLocal` initialized via `init_database()`.
+- **Why it matters:** Makes unit testing difficult (state persists between tests). Hard to manage multiple database connections.
+- **Fix:** Use dependency injection or a `DatabaseManager` singleton class. Pass session factory to repositories instead of global `get_session()`.
 
-**Recommendation:**
-- Extract "Request → Parse JSON → Retry" loop into base `LLMProvider` or a `JsonGeneratingProviderMixin`
-- Create helper method for building standard system/user message pairs
-
----
-
-### 2. Hardcoded Gemini Initialization
-**File:** `src/setup.py:64-73`
-
-**Issue:** `initialize_providers` contains a hardcoded block for `gemini_webapi`, breaking the open/closed principle. Adding new "special" providers requires modifying this central function.
-
-```python
-# Gemini Web API (reverse-engineered) - special case due to different auth
-gemini_cfg = config.providers.get("gemini_webapi")
-if (gemini_cfg and gemini_cfg.enabled) or ENABLE_GEMINI:
-    # ... specific loading logic ...
-```
-
-**Recommendation:**
-- Refactor `PROVIDER_REGISTRY` to support custom initialization factories
-- Allow `initializer_func` in provider spec instead of just `provider_class`
-- Move Gemini auth logic into its own module or factory function
+### Hardcoded Key Paths
+- **File:** `src/config/keys.py:54-79`
+- **Problem:** Paths to key files (`CEREBRAS_KEYS_FILE_PATH`, etc.) are hardcoded constants.
+- **Why it matters:** Users cannot configure key storage locations without modifying code.
+- **Fix:** Move key file paths into `config.yaml` or allow environment variable overrides.
 
 ---
 
-## Medium Priority
+## Priority 2 - Code Smells
 
-### 3. Brittle Question Loading
-**File:** `src/questions.py`
+### Complex Configuration Loading
+- **File:** `src/config/loader.py:160-253`
+- **Problem:** Many manual `_parse_*` functions extract values from dictionaries.
+- **Why it matters:** Boilerplate-heavy and error-prone.
+- **Fix:** Use Pydantic models for configuration loading with automatic type validation and defaults.
 
-**Issue:** `load_questions()` returns a tuple `(leetcode_questions, cs_questions, physics_questions)`:
-- Adding a new subject requires changing return signature and all callers
-- Hardcoded keys ("leetcode", "cs", "physics") in the function
+### Long CLI Handlers with Mixed Concerns
+- **File:** `src/cli.py:173-318`
+- **Problem:** Handler functions (`handle_generate`, `handle_convert`, `handle_merge`) mix argument parsing, logging, stdout printing, and business logic.
+- **Why it matters:** Hard to test and maintain.
+- **Fix:** Extract business logic into dedicated service classes (`MergeService`, `ExportService`). CLI handlers should only parse args and call services.
 
-**Recommendation:**
-- Return `Dict[str, Dict[str, List[str]]]` instead of tuple
-- System becomes data-driven: any top-level key in `questions.json` is treated as a subject
-
----
-
-### 4. Anki Deck Generator Complexity
-**File:** `src/anki/generator.py`
-
-**Issue:** `DeckGenerator` handles both data traversal and card formatting:
-- `_add_card_to_deck` uses conditionals to dispatch between `_add_mcq_card` and `_add_basic_card`
-- Card formatting (HTML generation) mixed with Genanki object creation
-
-**Recommendation:**
-- Implement Strategy pattern for card creation
-- Create `CardBuilder` interface with `StandardCardBuilder` and `MCQCardBuilder` implementations
-- `DeckGenerator` selects builder based on mode and delegates note creation
+### Anki Card Generation Duplication
+- **File:** `src/anki/generator.py:138-172, 192-212`
+- **Problem:** `_add_mcq_card` and `_add_basic_card` share similar logic for creating `genanki.Note` objects and handling tags.
+- **Why it matters:** Code duplication increases maintenance burden.
+- **Fix:** Abstract note creation into a helper method that takes the model and fields.
 
 ---
 
-## Low Priority
+## Priority 3 - Consistency & Cleanup
 
-### 5. Scattered Path Management
-**Files:** `src/questions.py`, `src/prompts.py`, `src/config/loader.py`
+### Logging vs Printing Inconsistency
+- **File:** `src/cli.py:192, 194, 196`
+- **Problem:** CLI uses `print()` for some status updates but `logger` for others.
+- **Why it matters:** `print` output cannot be captured or silenced by logging configuration.
+- **Fix:** Standardize on `logger` or the `rich` console from `src/logging_config.py` for all user output.
 
-**Issue:** Path resolution logic duplicated across files:
-- `src/questions.py` traverses parent directories to find `questions.json`
-- `src/prompts.py` resolves the prompts directory independently
+### Legacy Argument Normalization
+- **File:** `src/cli.py:26-51`
+- **Problem:** `normalize_legacy_args` exists to support old CLI syntax.
+- **Why it matters:** Adds complexity and maintains two ways of doing the same thing.
+- **Fix:** Deprecate old syntax with a warning, plan removal in future version.
 
-**Recommendation:**
-- Create `src/paths.py` module with centralized path constants:
-  - `PROJECT_ROOT`
-  - `DATA_DIR`
-  - `PROMPTS_DIR`
-  - `CONFIG_DIR`
+### JSON Parsing Retry Logic
+- **File:** `src/providers/openai_compatible.py:263-277`
+- **Problem:** The `format_json` method implements its own retry loop for JSON parsing.
+- **Why it matters:** Inconsistent with network request retries that use `tenacity`.
+- **Fix:** Use `tenacity` for JSON parsing retries for consistent backoff behavior.
 
 ---
 
-### 6. Legacy CLI Support
-**File:** `main.py`
+## Priority 4 - Tech Debt
 
-**Issue:** `normalize_legacy_args` maintains backward compatibility with old CLI syntax.
+### Reverse-Engineered Gemini API
+- **File:** `src/setup.py:131-160`
+- **Problem:** Uses `gemini_webapi` which relies on an unofficial API.
+- **Why it matters:** Unstable dependency, may break without notice.
+- **Fix:** Migrate to official API if available, or isolate into a strict `LLMProvider` adapter.
 
-**Recommendation:**
-- Consider deprecation warning for legacy syntax
-- Remove in future major version to simplify `main.py`
+### Error Swallowing in Task Runner
+- **File:** `src/task_runner.py:57-59`
+- **Problem:** Task runner catches `Exception`, logs it, and returns `None`.
+- **Why it matters:** Forces callers to handle `None` checks, may obscure systemic failures.
+- **Fix:** Return a Result object (Success/Failure) or collect exceptions and raise `BatchExecutionError`.
