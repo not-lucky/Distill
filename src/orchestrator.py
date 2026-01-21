@@ -3,14 +3,15 @@
 import logging
 from typing import List, Dict, Optional, Tuple
 
-from src.config import CONCURRENT_REQUESTS, DATABASE_PATH
+from src.config import DATABASE_PATH
+from src.config.loader import load_config
 
 logger = logging.getLogger(__name__)
 from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.repositories import RunRepository, RunStats
-from src.task_runner import ConcurrentTaskRunner
+from src.task_runner import ConcurrentTaskRunner, Success
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions
 
@@ -23,6 +24,7 @@ class Orchestrator:
         subject_config: SubjectConfig,
         is_mcq: bool = False,
         run_label: Optional[str] = None,
+        dry_run: bool = False,
     ):
         """
         Initialize the orchestrator.
@@ -31,12 +33,19 @@ class Orchestrator:
             subject_config: Configuration for the subject/mode
             is_mcq: Whether generating MCQ cards
             run_label: Optional user-provided label for the run
+            dry_run: If True, show what would be done without making changes
         """
         self.subject_config = subject_config
         self.is_mcq = is_mcq
         self.run_label = run_label
+        self.dry_run = dry_run
         self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
+
+        # Load generation config
+        config = load_config()
+        self.concurrent_requests = config.generation.concurrent_requests
+        self.request_delay = config.generation.request_delay
 
     @property
     def run_id(self) -> Optional[str]:
@@ -64,42 +73,54 @@ class Orchestrator:
         Returns:
             True if initialization successful, False otherwise.
         """
-        # Initialize database and create run
-        self.run_repo.initialize_database()
-        self.run_repo.create_new_run(
-            mode=self.generation_mode,
-            subject=self.subject_config.name,
-            card_type="mcq" if self.is_mcq else "standard",
-            user_label=self.run_label,
-        )
+        if self.dry_run:
+            logger.info("[DRY RUN] Would initialize database and create run")
+        else:
+            # Initialize database and create run
+            self.run_repo.initialize_database()
+            self.run_repo.create_new_run(
+                mode=self.generation_mode,
+                subject=self.subject_config.name,
+                card_type="mcq" if self.is_mcq else "standard",
+                user_label=self.run_label,
+            )
+            logger.info(f"Run ID: {self.run_id}")
 
-        logger.info(f"Run ID: {self.run_id}")
-
-        # Initialize providers - returns (generators, combiner)
-        llm_providers, combiner = await initialize_providers()
+        # Initialize providers - returns (generators, combiner, formatter)
+        llm_providers, combiner, formatter = await initialize_providers()
 
         # If no explicit combiner configured, use first provider as combiner
         if combiner is None:
             if not llm_providers:
-                self.run_repo.mark_run_failed()
+                if not self.dry_run:
+                    self.run_repo.mark_run_failed()
                 return False
             combiner = llm_providers[0]
             llm_providers = llm_providers[1:]
 
         # Need at least the combiner to function
         if combiner is None:
-            self.run_repo.mark_run_failed()
+            if not self.dry_run:
+                self.run_repo.mark_run_failed()
             return False
 
-        # Get repository for card operations
-        repository = self.run_repo.get_card_repository()
+        if self.dry_run:
+            logger.info(f"[DRY RUN] Combiner: {combiner.name} ({combiner.model})")
+            if formatter:
+                logger.info(f"[DRY RUN] Formatter: {formatter.name} ({formatter.model})")
+            logger.info(f"[DRY RUN] Generators: {[(p.name, p.model) for p in llm_providers]}")
+
+        # Get repository for card operations (None in dry run mode)
+        repository = None if self.dry_run else self.run_repo.get_card_repository()
 
         # Initialize generator with repository and combine_prompt from subject config
         self.card_generator = CardGenerator(
             providers=llm_providers,
             combiner=combiner,
+            formatter=formatter,
             repository=repository,
             combine_prompt=self.subject_config.combine_prompt,
+            dry_run=self.dry_run,
         )
 
         return True
@@ -118,6 +139,16 @@ class Orchestrator:
         questions_with_metadata: List[Tuple] = get_indexed_questions(
             self.subject_config.target_questions
         )
+
+        if self.dry_run:
+            logger.info(f"[DRY RUN] Would process {len(questions_with_metadata)} questions")
+            # Show first few questions as preview
+            preview_count = min(5, len(questions_with_metadata))
+            for cat_idx, cat_name, prob_idx, question in questions_with_metadata[:preview_count]:
+                logger.info(f"[DRY RUN]   - {cat_name}/{question}")
+            if len(questions_with_metadata) > preview_count:
+                logger.info(f"[DRY RUN]   ... and {len(questions_with_metadata) - preview_count} more")
+            return []
 
         logger.info(f"Starting generation for {len(questions_with_metadata)} questions...")
 
@@ -139,9 +170,17 @@ class Orchestrator:
             for cat_idx, cat_name, prob_idx, question in questions_with_metadata
         ]
 
-        # Run with concurrency control
-        task_runner = ConcurrentTaskRunner(max_concurrent=CONCURRENT_REQUESTS)
-        all_generated_problems = await task_runner.run_all(tasks)
+        # Run with concurrency control and staggered request starts
+        task_runner = ConcurrentTaskRunner(
+            max_concurrent=self.concurrent_requests,
+            request_delay=self.request_delay,
+        )
+        results = await task_runner.run_all(tasks)
+
+        # Extract successful results
+        all_generated_problems = [
+            result.value for result in results if isinstance(result, Success)
+        ]
 
         # Update run status
         self.run_repo.mark_run_completed(
@@ -164,11 +203,19 @@ class Orchestrator:
         Returns:
             Output filename if saved, None if no problems to save.
         """
+        output_filename = f"{self.generation_mode}_anki_deck"
+
+        if self.dry_run:
+            if problems:
+                logger.info(f"[DRY RUN] Would save {len(problems)} problems to {output_filename}_<timestamp>.json")
+            else:
+                logger.info(f"[DRY RUN] Would save results to {output_filename}_<timestamp>.json")
+            return output_filename
+
         if not problems:
             logger.warning("No cards generated.")
             return None
 
-        output_filename = f"{self.generation_mode}_anki_deck"
         save_final_deck(problems, output_filename)
 
         logger.info(

@@ -1,6 +1,7 @@
 You are an expert coding tutor.
 
 **Problem**: {question}
+**Language**: Python only. All code examples must be in Python.
 
 I have multiple sets of Anki cards generated for this problem. Your job is to merge them into one cohesive, high-quality deck.
 

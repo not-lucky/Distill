@@ -1,11 +1,11 @@
 """Configuration file loader for LLM2Deck."""
 
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
+from pydantic import BaseModel, Field
 
 from src.exceptions import ConfigurationError
 
@@ -13,21 +13,71 @@ from src.exceptions import ConfigurationError
 CONFIG_FILE = Path("config.yaml")
 
 
-@dataclass
-class ProviderConfig:
+class DefaultsConfig(BaseModel):
+    """Global default settings for all providers."""
+
+    timeout: float = 120.0
+    temperature: float = 0.4
+    max_tokens: Optional[int] = None
+    max_retries: int = 5
+    json_parse_retries: int = 5
+    retry_delay: float = 1.0
+    retry_min_wait: float = 1.0
+    retry_max_wait: float = 10.0
+
+
+class KeyPathsConfig(BaseModel):
+    """Configuration for API key file paths."""
+
+    cerebras: str = "api_keys.json"
+    openrouter: str = "openrouter_apikeys.json"
+    gemini: str = "python3ds.json"
+    nvidia: str = "nvidia_keys.json"
+    canopywave: str = "canopywave_keys.json"
+    baseten: str = "baseten_keys.json"
+    google_genai: str = "google_genai_keys.json"
+
+
+class PathsConfig(BaseModel):
+    """Configuration for file paths."""
+
+    archival_dir: str = "anki_cards_archival"
+    markdown_dir: str = "anki_cards_markdown"
+    timestamp_format: str = "%Y%m%dT%H%M%S"
+    key_paths: KeyPathsConfig = Field(default_factory=KeyPathsConfig)
+
+
+class ProviderConfig(BaseModel):
     """Configuration for a single LLM provider."""
 
     enabled: bool = False
     model: str = ""
-    models: List[str] = field(default_factory=list)  # For providers with multiple models
-    timeout: float = 120.0
+    models: List[str] = Field(default_factory=list)  # For providers with multiple models
+    base_url: Optional[str] = None  # Optional base URL override
+    timeout: Optional[float] = None  # None means use defaults
+    temperature: Optional[float] = None  # None means use defaults
+    max_tokens: Optional[int] = None
+    top_p: Optional[float] = None
+    strip_json_markers: Optional[bool] = None
+    extra_params: Optional[Dict[str, Any]] = None  # Provider-specific parameters
     reasoning_effort: Optional[str] = None
     thinking_level: Optional[str] = None
     provider_name: Optional[str] = None  # For G4F
 
+    def get_effective_timeout(self, defaults: "DefaultsConfig") -> float:
+        """Get timeout, falling back to defaults if not set."""
+        return self.timeout if self.timeout is not None else defaults.timeout
 
-@dataclass
-class CombinerConfig:
+    def get_effective_temperature(self, defaults: "DefaultsConfig") -> float:
+        """Get temperature, falling back to defaults if not set."""
+        return self.temperature if self.temperature is not None else defaults.temperature
+
+    def get_effective_max_tokens(self, defaults: "DefaultsConfig") -> Optional[int]:
+        """Get max_tokens, falling back to defaults if not set."""
+        return self.max_tokens if self.max_tokens is not None else defaults.max_tokens
+
+
+class CombinerConfig(BaseModel):
     """Configuration for the combiner provider."""
 
     provider: str = ""  # Provider name (e.g., "cerebras", "google_antigravity")
@@ -35,25 +85,32 @@ class CombinerConfig:
     also_generate: bool = True  # If True, combiner also does initial generation
 
 
-@dataclass
-class GenerationConfig:
+class FormatterConfig(BaseModel):
+    """Configuration for the JSON formatter provider."""
+
+    provider: str = ""  # Provider name (e.g., "cerebras", "openrouter")
+    model: str = ""  # Model to use for formatting
+    also_generate: bool = True  # If True, formatter also does initial generation
+
+
+class GenerationConfig(BaseModel):
     """Configuration for card generation."""
 
     concurrent_requests: int = 8
+    request_delay: float = 0.0  # Delay in seconds between starting each request within a batch
     max_retries: int = 5
     json_parse_retries: int = 3
     combiner: Optional[CombinerConfig] = None  # Explicit combiner configuration
+    formatter: Optional[FormatterConfig] = None  # JSON formatter configuration
 
 
-@dataclass
-class DatabaseConfig:
+class DatabaseConfig(BaseModel):
     """Configuration for database."""
 
     path: str = "llm2deck.db"
 
 
-@dataclass
-class SubjectSettings:
+class SubjectSettings(BaseModel):
     """Configuration settings for a subject (built-in or custom) from config.yaml."""
 
     enabled: bool = True
@@ -67,14 +124,15 @@ class SubjectSettings:
         return self.prompts_dir is not None or self.questions_file is not None
 
 
-@dataclass
-class AppConfig:
+class AppConfig(BaseModel):
     """Top-level application configuration."""
 
-    providers: Dict[str, ProviderConfig]
-    generation: GenerationConfig
-    database: DatabaseConfig
-    subjects: Dict[str, SubjectSettings] = field(default_factory=dict)
+    defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
+    providers: Dict[str, ProviderConfig] = Field(default_factory=dict)
+    generation: GenerationConfig = Field(default_factory=GenerationConfig)
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    paths: PathsConfig = Field(default_factory=PathsConfig)
+    subjects: Dict[str, SubjectSettings] = Field(default_factory=dict)
 
     @classmethod
     def default(cls) -> "AppConfig":
@@ -91,67 +149,12 @@ class AppConfig:
                     models=["gemini-3-pro-preview", "gemini-claude-sonnet-4-5-thinking"],
                 ),
             },
-            generation=GenerationConfig(),
-            database=DatabaseConfig(),
             subjects={
                 "leetcode": SubjectSettings(enabled=True),
                 "cs": SubjectSettings(enabled=True),
                 "physics": SubjectSettings(enabled=True),
             },
         )
-
-
-def _parse_provider_config(name: str, data: Dict[str, Any]) -> ProviderConfig:
-    """Parse provider configuration from YAML data."""
-    return ProviderConfig(
-        enabled=data.get("enabled", False),
-        model=data.get("model", ""),
-        models=data.get("models", []),
-        timeout=data.get("timeout", 120.0),
-        reasoning_effort=data.get("reasoning_effort"),
-        thinking_level=data.get("thinking_level"),
-        provider_name=data.get("provider_name"),
-    )
-
-
-def _parse_combiner_config(data: Dict[str, Any]) -> Optional[CombinerConfig]:
-    """Parse combiner configuration from YAML data."""
-    if not data:
-        return None
-    return CombinerConfig(
-        provider=data.get("provider", ""),
-        model=data.get("model", ""),
-        also_generate=data.get("also_generate", True),
-    )
-
-
-def _parse_generation_config(data: Dict[str, Any]) -> GenerationConfig:
-    """Parse generation configuration from YAML data."""
-    combiner_data = data.get("combiner", {})
-    return GenerationConfig(
-        concurrent_requests=data.get("concurrent_requests", 8),
-        max_retries=data.get("max_retries", 5),
-        json_parse_retries=data.get("json_parse_retries", 3),
-        combiner=_parse_combiner_config(combiner_data),
-    )
-
-
-def _parse_database_config(data: Dict[str, Any]) -> DatabaseConfig:
-    """Parse database configuration from YAML data."""
-    return DatabaseConfig(
-        path=data.get("path", "llm2deck.db"),
-    )
-
-
-def _parse_subject_config(name: str, data: Dict[str, Any]) -> SubjectSettings:
-    """Parse subject configuration from YAML data."""
-    return SubjectSettings(
-        enabled=data.get("enabled", True),
-        deck_prefix=data.get("deck_prefix"),
-        deck_prefix_mcq=data.get("deck_prefix_mcq"),
-        prompts_dir=data.get("prompts_dir"),
-        questions_file=data.get("questions_file"),
-    )
 
 
 def load_config(config_path: Optional[Path] = None) -> AppConfig:
@@ -178,34 +181,10 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
     except yaml.YAMLError as e:
         raise ConfigurationError(f"Failed to parse {path}: {e}")
 
-    # Parse providers
-    providers: Dict[str, ProviderConfig] = {}
-    providers_data = data.get("providers", {})
-    for provider_name, provider_data in providers_data.items():
-        if isinstance(provider_data, dict):
-            providers[provider_name] = _parse_provider_config(provider_name, provider_data)
-
-    # Parse generation config
-    generation_data = data.get("generation", {})
-    generation = _parse_generation_config(generation_data)
-
-    # Parse database config
-    database_data = data.get("database", {})
-    database = _parse_database_config(database_data)
-
-    # Parse subjects config
-    subjects: Dict[str, SubjectConfig] = {}
-    subjects_data = data.get("subjects", {})
-    for subject_name, subject_data in subjects_data.items():
-        if isinstance(subject_data, dict):
-            subjects[subject_name] = _parse_subject_config(subject_name, subject_data)
-
-    return AppConfig(
-        providers=providers,
-        generation=generation,
-        database=database,
-        subjects=subjects,
-    )
+    try:
+        return AppConfig.model_validate(data)
+    except Exception as e:
+        raise ConfigurationError(f"Configuration validation failed: {e}")
 
 
 def get_enabled_providers(config: Optional[AppConfig] = None) -> Dict[str, ProviderConfig]:
@@ -262,6 +241,46 @@ def get_combiner_config(config: Optional[AppConfig] = None) -> Optional[Combiner
         )
 
     return combiner
+
+
+def get_formatter_config(config: Optional[AppConfig] = None) -> Optional[FormatterConfig]:
+    """
+    Get the formatter configuration.
+
+    Args:
+        config: Optional AppConfig. Will load from file if not provided.
+
+    Returns:
+        FormatterConfig if configured, None otherwise.
+
+    Raises:
+        ConfigurationError: If formatter references a disabled or non-existent provider.
+    """
+    if config is None:
+        config = load_config()
+
+    formatter = config.generation.formatter
+    if formatter is None or not formatter.provider:
+        return None
+
+    # Validate the formatter provider exists and is enabled
+    provider_cfg = config.providers.get(formatter.provider)
+    if provider_cfg is None:
+        raise ConfigurationError(
+            f"Formatter references unknown provider: '{formatter.provider}'"
+        )
+    if not provider_cfg.enabled:
+        raise ConfigurationError(
+            f"Formatter provider '{formatter.provider}' is not enabled"
+        )
+
+    # Validate model exists for multi-model providers
+    if provider_cfg.models and formatter.model not in provider_cfg.models:
+        raise ConfigurationError(
+            f"Formatter model '{formatter.model}' not found in provider '{formatter.provider}' models: {provider_cfg.models}"
+        )
+
+    return formatter
 
 
 def get_enabled_subjects(config: Optional[AppConfig] = None) -> Dict[str, SubjectSettings]:

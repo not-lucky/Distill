@@ -33,11 +33,14 @@ class CerebrasProvider(LLMProvider):
         api_keys: Iterator[str],
         model: str,
         reasoning_effort: str = "high",
+        max_retries: int = 5,
+        json_parse_retries: int = 3,
     ):
         self.api_key_iterator = api_keys
         self.model_name = model
         self.reasoning_effort = reasoning_effort
-        self.max_retries = self.DEFAULT_MAX_RETRIES
+        self.max_retries = max_retries
+        self.json_parse_retries = json_parse_retries
 
     @property
     def name(self) -> str:
@@ -139,8 +142,11 @@ class CerebrasProvider(LLMProvider):
         combined_inputs: str,
         json_schema: Dict[str, Any],
         combine_prompt_template: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
-        """Combine multiple sets of cards into a single deck."""
+    ) -> Optional[str]:
+        """Combine multiple sets of cards into a single deck.
+
+        Returns raw response string (may not be valid JSON).
+        """
         template = combine_prompt_template or COMBINE_PROMPT_TEMPLATE
 
         messages = [
@@ -157,17 +163,47 @@ class CerebrasProvider(LLMProvider):
             },
         ]
 
-        for attempt in range(self.DEFAULT_JSON_PARSE_RETRIES):
+        return await self._make_request(messages, json_schema)
+
+    async def format_json(
+        self,
+        raw_content: str,
+        json_schema: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Format raw content into valid JSON matching the schema.
+
+        Cerebras supports structured JSON output natively, making it ideal for formatting.
+        """
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a JSON formatting assistant. Your task is to extract and format "
+                    "the content into valid JSON matching the provided schema. "
+                    "Output ONLY valid JSON, nothing else."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Format the following content into valid JSON matching this schema:\n\n"
+                    f"Schema:\n{json.dumps(json_schema, indent=2, ensure_ascii=False)}\n\n"
+                    f"Content to format:\n{raw_content}"
+                ),
+            },
+        ]
+
+        for attempt in range(self.json_parse_retries):
             content = await self._make_request(messages, json_schema)
             if content:
                 try:
                     return json.loads(content)
                 except json.JSONDecodeError as error:
                     logger.warning(
-                        f"[{self.model_name}] Attempt {attempt + 1}/{self.DEFAULT_JSON_PARSE_RETRIES}: "
+                        f"[{self.model_name}] format_json attempt {attempt + 1}/{self.json_parse_retries}: "
                         f"JSON Decode Error: {error}. Retrying..."
                     )
                     continue
 
-        logger.error(f"[{self.model_name}] Failed to decode JSON after {self.DEFAULT_JSON_PARSE_RETRIES} attempts.")
+        logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
         return None

@@ -73,7 +73,7 @@ class LLMProvider(ABC):
 
     # Default retry configuration
     DEFAULT_MAX_RETRIES = 5
-    DEFAULT_JSON_PARSE_RETRIES = 3
+    DEFAULT_JSON_PARSE_RETRIES = 5
     DEFAULT_RETRY_DELAY = 1.0  # seconds
 
     @property
@@ -105,6 +105,26 @@ class LLMProvider(ABC):
         combined_inputs: str,
         json_schema: Dict[str, Any],
         combine_prompt_template: Optional[str] = None,
+    ) -> Optional[str]:
+        """Combines multiple sets of cards into a single deck.
+
+        Returns raw response string (may not be valid JSON).
+        """
+        pass
+
+    @abstractmethod
+    async def format_json(
+        self,
+        raw_content: str,
+        json_schema: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
-        """Combines multiple sets of cards into a single deck."""
+        """Formats raw content into valid JSON matching the schema.
+
+        Args:
+            raw_content: Raw text content (potentially invalid JSON).
+            json_schema: JSON schema the output should match.
+
+        Returns:
+            Parsed JSON dict if successful, None otherwise.
+        """
         pass

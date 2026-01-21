@@ -2,19 +2,12 @@
 
 import json
 import logging
+import os
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from random import shuffle
 from typing import Callable, List, Optional
-
-from src.config import (
-    CEREBRAS_KEYS_FILE_PATH,
-    OPENROUTER_KEYS_FILE,
-    NVIDIA_KEYS_FILE,
-    CANOPYWAVE_KEYS_FILE,
-    BASETEN_KEYS_FILE,
-    GOOGLE_GENAI_KEYS_FILE,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -50,30 +43,101 @@ class KeyConfig:
     extractor: Callable[[list], List[str]]
 
 
+# Environment variable names for each provider (for backward compatibility)
+ENV_VAR_NAMES = {
+    "cerebras": "CEREBRAS_KEYS_FILE_PATH",
+    "openrouter": "OPENROUTER_KEYS_FILE_PATH",
+    "gemini": "GEMINI_CREDENTIALS_FILE_PATH",
+    "nvidia": "NVIDIA_KEYS_FILE_PATH",
+    "canopywave": "CANOPYWAVE_KEYS_FILE_PATH",
+    "baseten": "BASETEN_KEYS_FILE_PATH",
+    "google_genai": "GOOGLE_GENAI_KEYS_FILE_PATH",
+}
+
+
+@lru_cache(maxsize=1)
+def _get_key_paths_from_config():
+    """
+    Get key paths config from config.yaml, cached for performance.
+
+    Returns KeyPathsConfig or None if config cannot be loaded.
+    """
+    try:
+        from src.config.loader import load_config
+        config = load_config()
+        return config.paths.key_paths
+    except Exception:
+        return None
+
+
+def get_key_path(provider_name: str) -> Path:
+    """
+    Resolve key file path for a provider.
+
+    Resolution order (highest to lowest priority):
+    1. Environment variable (if set)
+    2. config.yaml paths.key_paths.<provider>
+    3. Default value
+
+    Args:
+        provider_name: Provider name (e.g., 'cerebras', 'nvidia', 'google_genai')
+
+    Returns:
+        Path to the key file.
+    """
+    # Default paths
+    defaults = {
+        "cerebras": "api_keys.json",
+        "openrouter": "openrouter_apikeys.json",
+        "gemini": "python3ds.json",
+        "nvidia": "nvidia_keys.json",
+        "canopywave": "canopywave_keys.json",
+        "baseten": "baseten_keys.json",
+        "google_genai": "google_genai_keys.json",
+    }
+
+    # 1. Check environment variable first (highest priority)
+    env_var = ENV_VAR_NAMES.get(provider_name)
+    if env_var:
+        env_value = os.getenv(env_var)
+        if env_value:
+            return Path(env_value)
+
+    # 2. Check config.yaml
+    key_paths = _get_key_paths_from_config()
+    if key_paths is not None:
+        config_path = getattr(key_paths, provider_name, None)
+        if config_path:
+            return Path(config_path)
+
+    # 3. Fall back to default
+    return Path(defaults.get(provider_name, f"{provider_name}_keys.json"))
+
+
 # Registry of key configurations for each provider
 KEY_CONFIGS: dict[str, KeyConfig] = {
     "cerebras": KeyConfig(
-        path=CEREBRAS_KEYS_FILE_PATH,
+        path=get_key_path("cerebras"),
         extractor=_extract_api_key,
     ),
     "openrouter": KeyConfig(
-        path=OPENROUTER_KEYS_FILE,
+        path=get_key_path("openrouter"),
         extractor=_extract_openrouter_key,
     ),
     "nvidia": KeyConfig(
-        path=NVIDIA_KEYS_FILE,
+        path=get_key_path("nvidia"),
         extractor=_extract_flexible,
     ),
     "canopywave": KeyConfig(
-        path=CANOPYWAVE_KEYS_FILE,
+        path=get_key_path("canopywave"),
         extractor=_extract_flexible,
     ),
     "baseten": KeyConfig(
-        path=BASETEN_KEYS_FILE,
+        path=get_key_path("baseten"),
         extractor=_extract_flexible,
     ),
     "google_genai": KeyConfig(
-        path=GOOGLE_GENAI_KEYS_FILE,
+        path=get_key_path("google_genai"),
         extractor=_extract_flexible,
     ),
 }

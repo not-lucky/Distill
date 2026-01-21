@@ -14,10 +14,14 @@ class G4FProvider(LLMProvider):
     def __init__(
         self,
         model: str = "",
-        provider: Optional[str] = "LMArena",
+        provider_name: Optional[str] = "LMArena",
+        max_retries: int = 3,
+        json_parse_retries: int = 3,
     ):
         self.model_name = model
-        self.provider_name = provider
+        self.provider_name = provider_name
+        self.max_retries = max_retries
+        self.json_parse_retries = json_parse_retries
         self.async_client = AsyncClient(provider=self.provider_name)
 
     @property
@@ -32,9 +36,8 @@ class G4FProvider(LLMProvider):
         self,
         chat_messages: List[Dict[str, Any]],
         json_schema: Dict[str, Any],
-        max_retries: int = 3,
     ) -> Optional[str]:
-        for attempt_number in range(max_retries):
+        for attempt_number in range(self.max_retries):
             try:
                 api_response = await self.async_client.chat.completions.create(
                     model=self.model_name,
@@ -44,7 +47,7 @@ class G4FProvider(LLMProvider):
                 response_content = api_response.choices[0].message.content
                 if not response_content:
                     logger.warning(
-                        f"[G4F:{self.model_name}] Attempt {attempt_number + 1}/{max_retries}: Received None content. Retrying..."
+                        f"[G4F:{self.model_name}] Attempt {attempt_number + 1}/{self.max_retries}: Received None content. Retrying..."
                     )
                     continue
 
@@ -66,7 +69,7 @@ class G4FProvider(LLMProvider):
 
             except Exception as error:
                 logger.error(
-                    f"[G4F:{self.model_name}] Attempt {attempt_number + 1}/{max_retries} Error: {error}"
+                    f"[G4F:{self.model_name}] Attempt {attempt_number + 1}/{self.max_retries} Error: {error}"
                 )
 
             await asyncio.sleep(1)
@@ -108,8 +111,8 @@ class G4FProvider(LLMProvider):
         combined_inputs: str,
         json_schema: Dict[str, Any],
         combine_prompt_template: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
-        # logger.info(f"[G4F:{self.model_name}] Combining cards for '{question}'...")
+    ) -> Optional[str]:
+        """Combine cards and return raw response string."""
         active_template = (
             combine_prompt_template
             if combine_prompt_template
@@ -128,16 +131,44 @@ class G4FProvider(LLMProvider):
             },
         ]
 
-        for attempt_number in range(3):
+        return await self._make_request(chat_messages, json_schema)
+
+    async def format_json(
+        self,
+        raw_content: str,
+        json_schema: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Format raw content into valid JSON matching the schema."""
+        chat_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a JSON formatting assistant. Your task is to extract and format "
+                    "the content into valid JSON matching the provided schema. "
+                    "Output ONLY valid JSON, nothing else. No markdown, no explanations."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Format the following content into valid JSON matching this schema:\n\n"
+                    f"Schema:\n{json.dumps(json_schema, indent=2, ensure_ascii=False)}\n\n"
+                    f"Content to format:\n{raw_content}"
+                ),
+            },
+        ]
+
+        for attempt in range(self.json_parse_retries):
             response_content = await self._make_request(chat_messages, json_schema)
             if response_content:
                 try:
                     return json.loads(response_content)
-                except json.JSONDecodeError as decode_error:
+                except json.JSONDecodeError as error:
                     logger.warning(
-                        f"[G4F:{self.model_name}] Attempt {attempt_number + 1}/3: JSON Decode Error: {decode_error}. Content preview: {response_content[:100]}... Retrying..."
+                        f"[G4F:{self.model_name}] format_json attempt {attempt + 1}/{self.json_parse_retries}: "
+                        f"JSON Decode Error: {error}. Retrying..."
                     )
                     continue
 
-        logger.error(f"[G4F:{self.model_name}] Failed to decode JSON after 3 attempts.")
+        logger.error(f"[G4F:{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
         return None

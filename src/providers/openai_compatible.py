@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Iterator
 from openai import AsyncOpenAI
 from openai import RateLimitError as OpenAIRateLimitError
 from openai import APITimeoutError as OpenAITimeoutError
-from tenacity import RetryError
+from tenacity import RetryError, retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 
 from src.providers.base import (
     LLMProvider,
@@ -41,9 +41,12 @@ class OpenAICompatibleProvider(LLMProvider):
         api_keys: Optional[Iterator[str]] = None,
         timeout: float = 120.0,
         max_retries: Optional[int] = None,
+        json_parse_retries: Optional[int] = None,
         temperature: float = 0.4,
         max_tokens: Optional[int] = None,
         strip_json_markers: bool = True,
+        top_p: Optional[float] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize an OpenAI-compatible provider.
@@ -54,18 +57,24 @@ class OpenAICompatibleProvider(LLMProvider):
             api_keys: Optional iterator of API keys (for rotation)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts for requests (default: DEFAULT_MAX_RETRIES)
+            json_parse_retries: Maximum retries for JSON parsing (default: DEFAULT_JSON_PARSE_RETRIES)
             temperature: Sampling temperature
             max_tokens: Maximum tokens in response (None for API default)
             strip_json_markers: Whether to strip ```json markers from responses
+            top_p: Nucleus sampling parameter (None for API default)
+            extra_params: Additional provider-specific parameters
         """
         self.model_name = model
         self.base_url = base_url
         self.api_key_iterator = api_keys
         self.timeout = timeout
         self.max_retries = max_retries if max_retries is not None else self.DEFAULT_MAX_RETRIES
+        self.json_parse_retries = json_parse_retries if json_parse_retries is not None else self.DEFAULT_JSON_PARSE_RETRIES
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.strip_json_markers = strip_json_markers
+        self.top_p = top_p
+        self.extra_params = extra_params or {}
 
     @property
     def model(self) -> str:
@@ -93,12 +102,19 @@ class OpenAICompatibleProvider(LLMProvider):
 
     def _get_extra_request_params(self) -> Dict[str, Any]:
         """
-        Override this method to add provider-specific request parameters.
+        Get provider-specific request parameters.
+
+        Uses top_p and extra_params from config. Subclasses can override
+        to add additional provider-specific logic.
 
         Returns:
             Dict of extra parameters to pass to chat.completions.create()
         """
-        return {}
+        params = {}
+        if self.top_p is not None:
+            params["top_p"] = self.top_p
+        params.update(self.extra_params)
+        return params
 
     async def _make_request(
         self,
@@ -196,8 +212,11 @@ class OpenAICompatibleProvider(LLMProvider):
         combined_inputs: str,
         json_schema: Dict[str, Any],
         combine_prompt_template: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
-        """Combine multiple sets of cards into a single deck."""
+    ) -> Optional[str]:
+        """Combine multiple sets of cards into a single deck.
+
+        Returns raw response string (may not be valid JSON).
+        """
         active_template = combine_prompt_template or COMBINE_PROMPT_TEMPLATE
 
         chat_messages = [
@@ -214,18 +233,59 @@ class OpenAICompatibleProvider(LLMProvider):
             },
         ]
 
-        # Retry JSON parsing separately from API calls
-        for attempt in range(self.DEFAULT_JSON_PARSE_RETRIES):
-            response_content = await self._make_request(chat_messages, json_schema)
-            if response_content:
-                try:
-                    return json.loads(response_content)
-                except json.JSONDecodeError as error:
-                    logger.warning(
-                        f"[{self.model_name}] Attempt {attempt + 1}/{self.DEFAULT_JSON_PARSE_RETRIES}: "
-                        f"JSON Decode Error: {error}. Retrying..."
-                    )
-                    continue
+        return await self._make_request(chat_messages, json_schema)
 
-        logger.error(f"[{self.model_name}] Failed to decode JSON after {self.DEFAULT_JSON_PARSE_RETRIES} attempts.")
-        return None
+    async def format_json(
+        self,
+        raw_content: str,
+        json_schema: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Format raw content into valid JSON matching the schema."""
+        chat_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a JSON formatting assistant. Your task is to extract and format "
+                    "the content into valid JSON matching the provided schema. "
+                    "Output ONLY valid JSON, nothing else. No markdown, no explanations."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Format the following content into valid JSON matching this schema:\n\n"
+                    f"Schema:\n{json.dumps(json_schema, indent=2, ensure_ascii=False)}\n\n"
+                    f"Content to format:\n{raw_content}"
+                ),
+            },
+        ]
+
+        model_name = self.model_name  # Capture for closure
+
+        def log_retry(retry_state):
+            logger.warning(
+                f"[{model_name}] format_json attempt {retry_state.attempt_number}/{self.json_parse_retries}: "
+                f"JSON Decode Error. Retrying..."
+            )
+
+        @retry(
+            stop=stop_after_attempt(self.json_parse_retries),
+            wait=wait_fixed(0.5),
+            retry=retry_if_exception_type((json.JSONDecodeError, RetryableError)),
+            before_sleep=log_retry,
+            reraise=True,
+        )
+        async def _parse_with_retry() -> Dict[str, Any]:
+            response_content = await self._make_request(chat_messages, json_schema)
+            if not response_content:
+                raise RetryableError("Empty response from format request")
+            return json.loads(response_content)
+
+        try:
+            return await _parse_with_retry()
+        except RetryError:
+            logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
+            return None
+        except json.JSONDecodeError:
+            logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
+            return None

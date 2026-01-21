@@ -24,8 +24,10 @@ class CardGenerator:
         self,
         providers: List[LLMProvider],
         combiner: LLMProvider,
-        repository: CardRepository,
+        formatter: Optional[LLMProvider],
+        repository: Optional[CardRepository],
         combine_prompt: Optional[str] = None,
+        dry_run: bool = False,
     ):
         """
         Initialize the card generator.
@@ -33,13 +35,17 @@ class CardGenerator:
         Args:
             providers: List of LLM providers for initial generation.
             combiner: LLM provider used to combine results.
-            repository: Repository for database operations.
+            formatter: Optional LLM provider for formatting combined output to JSON.
+            repository: Repository for database operations (None in dry run mode).
             combine_prompt: Optional prompt template for combining.
+            dry_run: If True, skip API calls and database operations.
         """
         self.llm_providers = providers
         self.card_combiner = combiner
+        self.formatter = formatter
         self.repository = repository
         self.combine_prompt = combine_prompt
+        self.dry_run = dry_run
 
     def _save_provider_results(
         self,
@@ -149,6 +155,9 @@ class CardGenerator:
         """
         Combine multiple provider results into final card data.
 
+        If a formatter is configured, the combiner output is passed to the formatter
+        to produce valid JSON. Otherwise, the combiner must output valid JSON directly.
+
         Args:
             question: The question being processed.
             valid_results: List of valid provider results.
@@ -161,9 +170,31 @@ class CardGenerator:
         for set_index, provider_result in enumerate(valid_results):
             combined_inputs += f"Set {set_index + 1}:\n{provider_result}\n\n"
 
-        return await self.card_combiner.combine_cards(
+        # Get raw combined output from combiner
+        raw_combined = await self.card_combiner.combine_cards(
             question, combined_inputs, json_schema, self.combine_prompt
         )
+
+        if not raw_combined:
+            return None
+
+        # If formatter is configured and different from combiner, use it to produce valid JSON
+        if self.formatter and not self._is_same_provider(self.card_combiner, self.formatter):
+            return await self.formatter.format_json(raw_combined, json_schema)
+
+        # Otherwise try to parse directly (combiner must output valid JSON)
+        try:
+            return json.loads(raw_combined)
+        except json.JSONDecodeError:
+            logger.error(
+                f"Failed to parse combiner output as JSON for '{question}'. "
+                "Consider configuring a different formatter provider."
+            )
+            return None
+
+    def _is_same_provider(self, provider1: LLMProvider, provider2: LLMProvider) -> bool:
+        """Check if two providers are the same (same name and model)."""
+        return provider1.name == provider2.name and provider1.model == provider2.model
 
     async def process_question(
         self,

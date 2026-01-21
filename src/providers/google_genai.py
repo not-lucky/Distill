@@ -22,6 +22,8 @@ class GoogleGenAIProvider(LLMProvider):
         api_keys: Iterator[str],
         model: str = "",
         thinking_level: str = "high",
+        max_retries: int = 5,
+        json_parse_retries: int = 3,
     ):
         """
         Initialize the GoogleGenAIProvider.
@@ -31,10 +33,14 @@ class GoogleGenAIProvider(LLMProvider):
             model: The model ID to use (e.g., "gemini-3-pro-preview", "gemini-3-flash-preview").
             thinking_level: The thinking level for Gemini 3 models ("low", "medium", "high", "minimal").
                            Note: "medium" and "minimal" are only supported by Gemini 3 Flash.
+            max_retries: Maximum number of retry attempts.
+            json_parse_retries: Maximum retries for JSON parsing.
         """
         self.api_key_iterator = api_keys
         self.model_name = model
         self.thinking_level = thinking_level
+        self.max_retries = max_retries
+        self.json_parse_retries = json_parse_retries
 
     @property
     def name(self) -> str:
@@ -53,7 +59,6 @@ class GoogleGenAIProvider(LLMProvider):
         self,
         contents: str,
         json_schema: Optional[Dict[str, Any]] = None,
-        max_retries: int = 5,
     ) -> Optional[str]:
         """
         Make a request to the Gemini API with retry logic.
@@ -61,12 +66,11 @@ class GoogleGenAIProvider(LLMProvider):
         Args:
             contents: The prompt/contents to send to the model.
             json_schema: Optional JSON schema for structured output.
-            max_retries: Maximum number of retry attempts.
 
         Returns:
             The response text or None if all retries failed.
         """
-        for attempt_number in range(max_retries):
+        for attempt_number in range(self.max_retries):
             try:
                 client = self._get_client()
 
@@ -101,13 +105,13 @@ class GoogleGenAIProvider(LLMProvider):
                     return response.text
 
                 logger.warning(
-                    f"[{self.model_name}] Attempt {attempt_number + 1}/{max_retries}: "
+                    f"[{self.model_name}] Attempt {attempt_number + 1}/{self.max_retries}: "
                     "Received empty response. Retrying..."
                 )
 
             except Exception as error:
                 logger.error(
-                    f"[{self.model_name}] Attempt {attempt_number + 1}/{max_retries} "
+                    f"[{self.model_name}] Attempt {attempt_number + 1}/{self.max_retries} "
                     f"Error: {error}"
                 )
 
@@ -151,7 +155,7 @@ class GoogleGenAIProvider(LLMProvider):
         combined_inputs: str,
         json_schema: Dict[str, Any],
         combine_prompt_template: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[str]:
         """
         Combines multiple sets of cards into a single deck.
 
@@ -162,7 +166,7 @@ class GoogleGenAIProvider(LLMProvider):
             combine_prompt_template: Optional custom combine prompt template.
 
         Returns:
-            The combined cards as a dictionary, or None on failure.
+            The raw response string, or None on failure.
         """
         active_template = (
             combine_prompt_template
@@ -174,17 +178,33 @@ class GoogleGenAIProvider(LLMProvider):
             question=question, inputs=combined_inputs
         )
 
-        for attempt_number in range(5):
-            response_content = await self._make_request(formatted_prompt, json_schema)
+        return await self._make_request(formatted_prompt, json_schema)
+
+    async def format_json(
+        self,
+        raw_content: str,
+        json_schema: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Format raw content into valid JSON matching the schema."""
+        prompt = (
+            "You are a JSON formatting assistant. Your task is to extract and format "
+            "the content into valid JSON matching the provided schema. "
+            "Output ONLY valid JSON, nothing else. No markdown, no explanations.\n\n"
+            f"Schema:\n{json.dumps(json_schema, indent=2, ensure_ascii=False)}\n\n"
+            f"Content to format:\n{raw_content}"
+        )
+
+        for attempt in range(self.json_parse_retries):
+            response_content = await self._make_request(prompt, json_schema)
             if response_content:
                 try:
                     return json.loads(response_content)
-                except json.JSONDecodeError as decode_error:
+                except json.JSONDecodeError as error:
                     logger.warning(
-                        f"[{self.model_name}] Attempt {attempt_number + 1}/5: "
-                        f"JSON Decode Error: {decode_error}. Retrying..."
+                        f"[{self.model_name}] format_json attempt {attempt + 1}/{self.json_parse_retries}: "
+                        f"JSON Decode Error: {error}. Retrying..."
                     )
                     continue
 
-        logger.error(f"[{self.model_name}] Failed to decode JSON after 5 attempts.")
+        logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
         return None
