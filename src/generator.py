@@ -24,8 +24,9 @@ class CardGenerator:
         self,
         providers: List[LLMProvider],
         combiner: LLMProvider,
-        repository: CardRepository,
+        repository: Optional[CardRepository],
         combine_prompt: Optional[str] = None,
+        dry_run: bool = False,
     ):
         """
         Initialize the card generator.
@@ -33,13 +34,15 @@ class CardGenerator:
         Args:
             providers: List of LLM providers for initial generation.
             combiner: LLM provider used to combine results.
-            repository: Repository for database operations.
+            repository: Repository for database operations (None in dry run mode).
             combine_prompt: Optional prompt template for combining.
+            dry_run: If True, skip API calls and database operations.
         """
         self.llm_providers = providers
         self.card_combiner = combiner
         self.repository = repository
         self.combine_prompt = combine_prompt
+        self.dry_run = dry_run
 
     def _save_provider_results(
         self,

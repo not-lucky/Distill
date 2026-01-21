@@ -55,7 +55,6 @@ class RunRepository:
 
     def initialize_database(self) -> None:
         """Initialize the database and create tables if needed."""
-        logger.info(f"Initializing database at {self.db_path}")
         init_database(self.db_path)
 
     def create_new_run(
@@ -89,7 +88,6 @@ class RunRepository:
                 card_type=card_type,
                 status="running",
             )
-            logger.info(f"Created run: {self._run_id}")
             return self._run_id
         finally:
             session.close()

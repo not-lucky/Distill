@@ -87,6 +87,11 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional label for this run",
     )
+    generate_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without making API calls or writing files",
+    )
 
     # ====== convert command ======
     convert_parser = subparsers.add_parser(
@@ -112,6 +117,11 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         help="Output .apkg filename (default: <input_stem>.apkg)",
     )
+    convert_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without writing files",
+    )
 
     # ====== merge command ======
     merge_parser = subparsers.add_parser(
@@ -122,6 +132,11 @@ def create_parser() -> argparse.ArgumentParser:
     merge_parser.add_argument(
         "subject",
         help=f"Subject to merge files for (available: {', '.join(available_subjects)})",
+    )
+    merge_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without writing files",
     )
 
     # ====== export-md command ======
@@ -142,6 +157,11 @@ def create_parser() -> argparse.ArgumentParser:
         default="anki_cards_markdown",
         help="Target directory for Markdown output",
     )
+    export_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without writing files",
+    )
 
     return parser
 
@@ -154,6 +174,7 @@ async def handle_generate(args: argparse.Namespace) -> int:
     from src.orchestrator import Orchestrator
 
     is_mcq = args.card_type == "mcq"
+    dry_run = getattr(args, "dry_run", False)
 
     # Get subject configuration using registry
     registry = SubjectRegistry()
@@ -166,7 +187,10 @@ async def handle_generate(args: argparse.Namespace) -> int:
 
     subject_config = registry.get_config(args.subject, is_mcq)
 
-    print(f"Running: Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
+    if dry_run:
+        print(f"[DRY RUN] Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
+    else:
+        print(f"Running: Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
     if args.label:
         print(f"Run Label: {args.label}")
 
@@ -174,6 +198,7 @@ async def handle_generate(args: argparse.Namespace) -> int:
         subject_config=subject_config,
         is_mcq=is_mcq,
         run_label=args.label,
+        dry_run=dry_run,
     )
 
     if not await orchestrator.initialize():
@@ -188,6 +213,8 @@ async def handle_generate(args: argparse.Namespace) -> int:
 def handle_convert(args: argparse.Namespace) -> int:
     """Handle the convert subcommand."""
     from src.anki.generator import DeckGenerator, load_card_data
+
+    dry_run = getattr(args, "dry_run", False)
 
     input_path = Path(args.json_file)
     if not input_path.exists():
@@ -206,6 +233,18 @@ def handle_convert(args: argparse.Namespace) -> int:
     # Determine output filename
     output_path = args.output if args.output else f"{input_path.stem}.apkg"
 
+    if dry_run:
+        logger.info(f"[DRY RUN] Would convert {input_path} to {output_path}")
+        logger.info(f"[DRY RUN] Deck prefix: {deck_prefix}")
+        try:
+            card_data = load_card_data(str(input_path))
+            card_count = sum(len(p.get("cards", [])) for p in card_data) if isinstance(card_data, list) else 0
+            logger.info(f"[DRY RUN] Would process {len(card_data)} problems with {card_count} total cards")
+        except Exception as error:
+            logger.error(f"[DRY RUN] Failed to read input file: {error}")
+            return 1
+        return 0
+
     logger.info(f"Converting {input_path} to {output_path} (deck: {deck_prefix})")
 
     try:
@@ -222,6 +261,8 @@ def handle_convert(args: argparse.Namespace) -> int:
 
 def handle_merge(args: argparse.Namespace) -> int:
     """Handle the merge subcommand."""
+    dry_run = getattr(args, "dry_run", False)
+
     base_directory = Path("anki_cards_archival")
     source_directory = base_directory / args.subject
 
@@ -259,6 +300,14 @@ def handle_merge(args: argparse.Namespace) -> int:
     timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
     output_filename = f"{args.subject}_anki_deck_{timestamp}.json"
 
+    if dry_run:
+        logger.info(f"[DRY RUN] Would merge {len(merged_data)} files into {output_filename}")
+        for json_path in json_files[:5]:
+            logger.info(f"[DRY RUN]   - {json_path.name}")
+        if len(json_files) > 5:
+            logger.info(f"[DRY RUN]   ... and {len(json_files) - 5} more")
+        return 0
+
     with open(output_filename, "w", encoding="utf-8") as f:
         json.dump(merged_data, f, indent=2, ensure_ascii=False)
 
@@ -269,6 +318,8 @@ def handle_merge(args: argparse.Namespace) -> int:
 
 def handle_export_md(args: argparse.Namespace) -> int:
     """Handle the export-md subcommand."""
+    dry_run = getattr(args, "dry_run", False)
+
     source_path = Path(args.source)
     target_path = Path(args.target)
 
@@ -276,13 +327,22 @@ def handle_export_md(args: argparse.Namespace) -> int:
         logger.error(f"Source directory '{args.source}' does not exist.")
         return 1
 
-    target_path.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Output directory: {target_path.resolve()}")
-
     json_files = list(source_path.rglob("*.json"))
     if not json_files:
         logger.warning("No JSON files found.")
         return 1
+
+    if dry_run:
+        logger.info(f"[DRY RUN] Would export {len(json_files)} JSON files to {target_path}")
+        for json_path in json_files[:5]:
+            md_filename = json_path.stem + ".md"
+            logger.info(f"[DRY RUN]   {json_path.name} -> {md_filename}")
+        if len(json_files) > 5:
+            logger.info(f"[DRY RUN]   ... and {len(json_files) - 5} more")
+        return 0
+
+    target_path.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Output directory: {target_path.resolve()}")
 
     logger.info(f"Found {len(json_files)} JSON files. Starting conversion...")
 
