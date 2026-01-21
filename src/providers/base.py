@@ -73,7 +73,7 @@ class LLMProvider(ABC):
 
     # Default retry configuration
     DEFAULT_MAX_RETRIES = 5
-    DEFAULT_JSON_PARSE_RETRIES = 3
+    DEFAULT_JSON_PARSE_RETRIES = 5
     DEFAULT_RETRY_DELAY = 1.0  # seconds
 
     @property

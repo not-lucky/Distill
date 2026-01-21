@@ -66,6 +66,10 @@ async def initialize_providers() -> Tuple[List[LLMProvider], Optional[LLMProvide
     combiner_cfg = get_combiner_config(config)  # Validates combiner config
     formatter_cfg = get_formatter_config(config)  # Validates formatter config
 
+    # Get retry configuration from generation settings
+    max_retries = config.generation.max_retries
+    json_parse_retries = config.generation.json_parse_retries
+
     active_providers: List[LLMProvider] = []
     combiner_provider: Optional[LLMProvider] = None
     formatter_provider: Optional[LLMProvider] = None
@@ -77,7 +81,11 @@ async def initialize_providers() -> Tuple[List[LLMProvider], Optional[LLMProvide
             continue
 
         try:
-            instances = await create_provider_instances(name, spec, cfg)
+            instances = await create_provider_instances(
+                name, spec, cfg,
+                max_retries=max_retries,
+                json_parse_retries=json_parse_retries,
+            )
 
             for instance in instances:
                 is_combiner = False

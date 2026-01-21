@@ -8,13 +8,21 @@ from src.providers.openai_compatible import OpenAICompatibleProvider
 class NvidiaProvider(OpenAICompatibleProvider):
     """LLM Provider for NVIDIA's API."""
 
-    def __init__(self, api_keys: Iterator[str], model: str):
+    def __init__(
+        self,
+        api_keys: Iterator[str],
+        model: str,
+        timeout: float = 900.0,
+        max_retries: int = 5,
+        json_parse_retries: int = 3,
+    ):
         super().__init__(
             model=model,
             base_url="https://integrate.api.nvidia.com/v1",
             api_keys=api_keys,
-            timeout=900.0,
-            max_retries=5,
+            timeout=timeout,
+            max_retries=max_retries,
+            json_parse_retries=json_parse_retries,
             max_tokens=16384,
         )
 

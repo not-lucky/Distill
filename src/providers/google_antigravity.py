@@ -8,13 +8,14 @@ from src.providers.openai_compatible import OpenAICompatibleProvider
 class GoogleAntigravityProvider(OpenAICompatibleProvider):
     """LLM Provider for Google's local OpenAI-compatible API (Gemini models)."""
 
-    def __init__(self, model: str):
+    def __init__(self, model: str, max_retries: int = 5, json_parse_retries: int = 3):
         super().__init__(
             model=model,
             base_url="http://127.0.0.1:8317/v1",
             api_keys=None,  # No API key needed for local
             timeout=900.0,
-            max_retries=5,
+            max_retries=max_retries,
+            json_parse_retries=json_parse_retries,
             max_tokens=16384,
         )
 

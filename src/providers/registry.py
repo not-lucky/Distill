@@ -77,6 +77,8 @@ async def create_provider_instances(
     name: str,
     spec: ProviderSpec,
     cfg: ProviderConfig,
+    max_retries: int = 5,
+    json_parse_retries: int = 3,
 ) -> List[LLMProvider]:
     """
     Create provider instance(s) based on the spec and config.
@@ -85,16 +87,29 @@ async def create_provider_instances(
         name: Provider name from config
         spec: Provider specification from registry
         cfg: Provider configuration from config.yaml
+        max_retries: Maximum retry attempts for API requests
+        json_parse_retries: Maximum retries for JSON parsing
 
     Returns:
         List of provider instances (usually 1, but can be multiple for multi_model)
     """
     # Handle multi-model providers (e.g., google_antigravity)
     if spec.multi_model:
-        return [spec.provider_class(model=model) for model in cfg.models]
+        return [
+            spec.provider_class(
+                model=model,
+                max_retries=max_retries,
+                json_parse_retries=json_parse_retries,
+            )
+            for model in cfg.models
+        ]
 
     # Build kwargs for provider instantiation
     kwargs: Dict[str, any] = {}
+
+    # Add retry configuration
+    kwargs["max_retries"] = max_retries
+    kwargs["json_parse_retries"] = json_parse_retries
 
     # Load API keys if required
     if spec.key_name:

@@ -41,6 +41,7 @@ class OpenAICompatibleProvider(LLMProvider):
         api_keys: Optional[Iterator[str]] = None,
         timeout: float = 120.0,
         max_retries: Optional[int] = None,
+        json_parse_retries: Optional[int] = None,
         temperature: float = 0.4,
         max_tokens: Optional[int] = None,
         strip_json_markers: bool = True,
@@ -54,6 +55,7 @@ class OpenAICompatibleProvider(LLMProvider):
             api_keys: Optional iterator of API keys (for rotation)
             timeout: Request timeout in seconds
             max_retries: Maximum retry attempts for requests (default: DEFAULT_MAX_RETRIES)
+            json_parse_retries: Maximum retries for JSON parsing (default: DEFAULT_JSON_PARSE_RETRIES)
             temperature: Sampling temperature
             max_tokens: Maximum tokens in response (None for API default)
             strip_json_markers: Whether to strip ```json markers from responses
@@ -63,6 +65,7 @@ class OpenAICompatibleProvider(LLMProvider):
         self.api_key_iterator = api_keys
         self.timeout = timeout
         self.max_retries = max_retries if max_retries is not None else self.DEFAULT_MAX_RETRIES
+        self.json_parse_retries = json_parse_retries if json_parse_retries is not None else self.DEFAULT_JSON_PARSE_RETRIES
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.strip_json_markers = strip_json_markers
@@ -245,17 +248,17 @@ class OpenAICompatibleProvider(LLMProvider):
         ]
 
         # Retry JSON parsing separately from API calls
-        for attempt in range(self.DEFAULT_JSON_PARSE_RETRIES):
+        for attempt in range(self.json_parse_retries):
             response_content = await self._make_request(chat_messages, json_schema)
             if response_content:
                 try:
                     return json.loads(response_content)
                 except json.JSONDecodeError as error:
                     logger.warning(
-                        f"[{self.model_name}] format_json attempt {attempt + 1}/{self.DEFAULT_JSON_PARSE_RETRIES}: "
+                        f"[{self.model_name}] format_json attempt {attempt + 1}/{self.json_parse_retries}: "
                         f"JSON Decode Error: {error}. Retrying..."
                     )
                     continue
 
-        logger.error(f"[{self.model_name}] format_json failed after {self.DEFAULT_JSON_PARSE_RETRIES} attempts.")
+        logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
         return None

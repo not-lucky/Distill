@@ -33,11 +33,14 @@ class CerebrasProvider(LLMProvider):
         api_keys: Iterator[str],
         model: str,
         reasoning_effort: str = "high",
+        max_retries: int = 5,
+        json_parse_retries: int = 3,
     ):
         self.api_key_iterator = api_keys
         self.model_name = model
         self.reasoning_effort = reasoning_effort
-        self.max_retries = self.DEFAULT_MAX_RETRIES
+        self.max_retries = max_retries
+        self.json_parse_retries = json_parse_retries
 
     @property
     def name(self) -> str:
@@ -190,17 +193,17 @@ class CerebrasProvider(LLMProvider):
             },
         ]
 
-        for attempt in range(self.DEFAULT_JSON_PARSE_RETRIES):
+        for attempt in range(self.json_parse_retries):
             content = await self._make_request(messages, json_schema)
             if content:
                 try:
                     return json.loads(content)
                 except json.JSONDecodeError as error:
                     logger.warning(
-                        f"[{self.model_name}] format_json attempt {attempt + 1}/{self.DEFAULT_JSON_PARSE_RETRIES}: "
+                        f"[{self.model_name}] format_json attempt {attempt + 1}/{self.json_parse_retries}: "
                         f"JSON Decode Error: {error}. Retrying..."
                     )
                     continue
 
-        logger.error(f"[{self.model_name}] format_json failed after {self.DEFAULT_JSON_PARSE_RETRIES} attempts.")
+        logger.error(f"[{self.model_name}] format_json failed after {self.json_parse_retries} attempts.")
         return None
