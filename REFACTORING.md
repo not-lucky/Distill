@@ -66,16 +66,11 @@
 
 ---
 
-## Priority 4 - Tech Debt
-
-### Reverse-Engineered Gemini API
-- **File:** `src/setup.py:131-160`
-- **Problem:** Uses `gemini_webapi` which relies on an unofficial API.
-- **Why it matters:** Unstable dependency, may break without notice.
-- **Fix:** Migrate to official API if available, or isolate into a strict `LLMProvider` adapter.
+## Priority 4 - Tech Debt (COMPLETED)
 
 ### Error Swallowing in Task Runner
 - **File:** `src/task_runner.py:57-59`
 - **Problem:** Task runner catches `Exception`, logs it, and returns `None`.
 - **Why it matters:** Forces callers to handle `None` checks, may obscure systemic failures.
 - **Fix:** Return a Result object (Success/Failure) or collect exceptions and raise `BatchExecutionError`.
+- **Status:** ✅ COMPLETED - Added `Success[T]` and `Failure` dataclasses with a `Result` type alias. Updated `run_all()` and `run_all_ordered()` to return `List[Result[T]]`. Updated orchestrator to extract successful values using `isinstance(result, Success)`.

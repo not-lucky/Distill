@@ -11,7 +11,7 @@ from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.repositories import RunRepository, RunStats
-from src.task_runner import ConcurrentTaskRunner
+from src.task_runner import ConcurrentTaskRunner, Success
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions
 
@@ -175,7 +175,12 @@ class Orchestrator:
             max_concurrent=self.concurrent_requests,
             request_delay=self.request_delay,
         )
-        all_generated_problems = await task_runner.run_all(tasks)
+        results = await task_runner.run_all(tasks)
+
+        # Extract successful results
+        all_generated_problems = [
+            result.value for result in results if isinstance(result, Success)
+        ]
 
         # Update run status
         self.run_repo.mark_run_completed(
