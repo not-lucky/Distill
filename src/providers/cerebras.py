@@ -139,8 +139,11 @@ class CerebrasProvider(LLMProvider):
         combined_inputs: str,
         json_schema: Dict[str, Any],
         combine_prompt_template: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
-        """Combine multiple sets of cards into a single deck."""
+    ) -> Optional[str]:
+        """Combine multiple sets of cards into a single deck.
+
+        Returns raw response string (may not be valid JSON).
+        """
         template = combine_prompt_template or COMBINE_PROMPT_TEMPLATE
 
         messages = [
@@ -157,6 +160,36 @@ class CerebrasProvider(LLMProvider):
             },
         ]
 
+        return await self._make_request(messages, json_schema)
+
+    async def format_json(
+        self,
+        raw_content: str,
+        json_schema: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Format raw content into valid JSON matching the schema.
+
+        Cerebras supports structured JSON output natively, making it ideal for formatting.
+        """
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a JSON formatting assistant. Your task is to extract and format "
+                    "the content into valid JSON matching the provided schema. "
+                    "Output ONLY valid JSON, nothing else."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Format the following content into valid JSON matching this schema:\n\n"
+                    f"Schema:\n{json.dumps(json_schema, indent=2, ensure_ascii=False)}\n\n"
+                    f"Content to format:\n{raw_content}"
+                ),
+            },
+        ]
+
         for attempt in range(self.DEFAULT_JSON_PARSE_RETRIES):
             content = await self._make_request(messages, json_schema)
             if content:
@@ -164,10 +197,10 @@ class CerebrasProvider(LLMProvider):
                     return json.loads(content)
                 except json.JSONDecodeError as error:
                     logger.warning(
-                        f"[{self.model_name}] Attempt {attempt + 1}/{self.DEFAULT_JSON_PARSE_RETRIES}: "
+                        f"[{self.model_name}] format_json attempt {attempt + 1}/{self.DEFAULT_JSON_PARSE_RETRIES}: "
                         f"JSON Decode Error: {error}. Retrying..."
                     )
                     continue
 
-        logger.error(f"[{self.model_name}] Failed to decode JSON after {self.DEFAULT_JSON_PARSE_RETRIES} attempts.")
+        logger.error(f"[{self.model_name}] format_json failed after {self.DEFAULT_JSON_PARSE_RETRIES} attempts.")
         return None

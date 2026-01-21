@@ -36,6 +36,15 @@ class CombinerConfig:
 
 
 @dataclass
+class FormatterConfig:
+    """Configuration for the JSON formatter provider."""
+
+    provider: str = ""  # Provider name (e.g., "cerebras", "openrouter")
+    model: str = ""  # Model to use for formatting
+    also_generate: bool = True  # If True, formatter also does initial generation
+
+
+@dataclass
 class GenerationConfig:
     """Configuration for card generation."""
 
@@ -43,6 +52,7 @@ class GenerationConfig:
     max_retries: int = 5
     json_parse_retries: int = 3
     combiner: Optional[CombinerConfig] = None  # Explicit combiner configuration
+    formatter: Optional[FormatterConfig] = None  # JSON formatter configuration
 
 
 @dataclass
@@ -125,14 +135,27 @@ def _parse_combiner_config(data: Dict[str, Any]) -> Optional[CombinerConfig]:
     )
 
 
+def _parse_formatter_config(data: Dict[str, Any]) -> Optional[FormatterConfig]:
+    """Parse formatter configuration from YAML data."""
+    if not data:
+        return None
+    return FormatterConfig(
+        provider=data.get("provider", ""),
+        model=data.get("model", ""),
+        also_generate=data.get("also_generate", True),
+    )
+
+
 def _parse_generation_config(data: Dict[str, Any]) -> GenerationConfig:
     """Parse generation configuration from YAML data."""
     combiner_data = data.get("combiner", {})
+    formatter_data = data.get("formatter", {})
     return GenerationConfig(
         concurrent_requests=data.get("concurrent_requests", 8),
         max_retries=data.get("max_retries", 5),
         json_parse_retries=data.get("json_parse_retries", 3),
         combiner=_parse_combiner_config(combiner_data),
+        formatter=_parse_formatter_config(formatter_data),
     )
 
 
@@ -262,6 +285,46 @@ def get_combiner_config(config: Optional[AppConfig] = None) -> Optional[Combiner
         )
 
     return combiner
+
+
+def get_formatter_config(config: Optional[AppConfig] = None) -> Optional[FormatterConfig]:
+    """
+    Get the formatter configuration.
+
+    Args:
+        config: Optional AppConfig. Will load from file if not provided.
+
+    Returns:
+        FormatterConfig if configured, None otherwise.
+
+    Raises:
+        ConfigurationError: If formatter references a disabled or non-existent provider.
+    """
+    if config is None:
+        config = load_config()
+
+    formatter = config.generation.formatter
+    if formatter is None or not formatter.provider:
+        return None
+
+    # Validate the formatter provider exists and is enabled
+    provider_cfg = config.providers.get(formatter.provider)
+    if provider_cfg is None:
+        raise ConfigurationError(
+            f"Formatter references unknown provider: '{formatter.provider}'"
+        )
+    if not provider_cfg.enabled:
+        raise ConfigurationError(
+            f"Formatter provider '{formatter.provider}' is not enabled"
+        )
+
+    # Validate model exists for multi-model providers
+    if provider_cfg.models and formatter.model not in provider_cfg.models:
+        raise ConfigurationError(
+            f"Formatter model '{formatter.model}' not found in provider '{formatter.provider}' models: {provider_cfg.models}"
+        )
+
+    return formatter
 
 
 def get_enabled_subjects(config: Optional[AppConfig] = None) -> Dict[str, SubjectSettings]:

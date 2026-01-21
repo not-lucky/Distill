@@ -80,8 +80,8 @@ class Orchestrator:
             )
             logger.info(f"Run ID: {self.run_id}")
 
-        # Initialize providers - returns (generators, combiner)
-        llm_providers, combiner = await initialize_providers()
+        # Initialize providers - returns (generators, combiner, formatter)
+        llm_providers, combiner, formatter = await initialize_providers()
 
         # If no explicit combiner configured, use first provider as combiner
         if combiner is None:
@@ -100,6 +100,8 @@ class Orchestrator:
 
         if self.dry_run:
             logger.info(f"[DRY RUN] Combiner: {combiner.name} ({combiner.model})")
+            if formatter:
+                logger.info(f"[DRY RUN] Formatter: {formatter.name} ({formatter.model})")
             logger.info(f"[DRY RUN] Generators: {[(p.name, p.model) for p in llm_providers]}")
 
         # Get repository for card operations (None in dry run mode)
@@ -109,6 +111,7 @@ class Orchestrator:
         self.card_generator = CardGenerator(
             providers=llm_providers,
             combiner=combiner,
+            formatter=formatter,
             repository=repository,
             combine_prompt=self.subject_config.combine_prompt,
             dry_run=self.dry_run,
