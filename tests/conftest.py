@@ -430,3 +430,79 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+# ============================================================================
+# Factory Fixtures (as specified in testing infrastructure)
+# ============================================================================
+
+@pytest.fixture
+def mock_llm_response():
+    """Factory for mock LLM API responses."""
+    def _make(content: str = "test", model: str = "test-model"):
+        return {
+            "choices": [{"message": {"content": content}}],
+            "model": model
+        }
+    return _make
+
+
+@pytest.fixture
+def mock_error_response():
+    """Factory for error responses."""
+    def _make(status: int, message: str = "error"):
+        return {"error": {"message": message, "code": status}}
+    return _make
+
+
+@pytest.fixture
+def card_factory():
+    """Factory for card dictionaries."""
+    def _make(
+        front: str = "Question?",
+        back: str = "Answer.",
+        card_type: str = "Basic",
+        tags: Optional[list] = None,
+        **kwargs
+    ):
+        return {
+            "front": front,
+            "back": back,
+            "card_type": card_type,
+            "tags": tags or [],
+            **kwargs
+        }
+    return _make
+
+
+@pytest.fixture
+def memory_db():
+    """Alias for in_memory_db for compatibility."""
+    manager = DatabaseManager()
+    manager.initialize(Path(":memory:"))
+    DatabaseManager.set_default(manager)
+    yield manager
+    DatabaseManager.reset_default()
+
+
+@pytest.fixture
+def sample_config():
+    """Default test configuration dictionary."""
+    return {
+        "defaults": {
+            "timeout": 60.0,
+            "temperature": 0.5,
+            "max_retries": 3,
+        },
+        "providers": {
+            "cerebras": {"enabled": True, "model": "llama3.1-70b"},
+        },
+        "generation": {
+            "concurrent_requests": 4,
+            "request_delay": 0.1,
+        },
+        "subjects": {
+            "leetcode": {"enabled": True},
+            "cs": {"enabled": True},
+        }
+    }
