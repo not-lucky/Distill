@@ -5,10 +5,7 @@ They test the entire system as a user would interact with it.
 """
 
 import pytest
-from pathlib import Path
 from click.testing import CliRunner
-
-from src.database import DatabaseManager
 
 
 @pytest.fixture
@@ -18,33 +15,17 @@ def cli_runner():
 
 
 @pytest.fixture
-def e2e_workspace(tmp_path):
+def e2e_workspace(workspace_factory):
     """Create a complete workspace for e2e tests.
 
     Sets up:
     - Output directory
-    - Archival directory
-    - Database
+    - Archival directory with subject subdirectories
     """
-    workspace = tmp_path / "e2e_workspace"
-    workspace.mkdir()
-
-    # Create subdirectories
-    (workspace / "output").mkdir()
-    (workspace / "archival").mkdir()
-    (workspace / "archival" / "leetcode").mkdir()
-    (workspace / "archival" / "cs").mkdir()
-    (workspace / "archival" / "physics").mkdir()
-
-    return workspace
+    return workspace_factory(name="e2e_workspace", include_output=True)
 
 
 @pytest.fixture
-def e2e_db(e2e_workspace):
+def e2e_db(db_factory):
     """Create a database for e2e tests."""
-    db_path = e2e_workspace / "e2e_test.db"
-    manager = DatabaseManager()
-    manager.initialize(db_path)
-    DatabaseManager.set_default(manager)
-    yield manager
-    DatabaseManager.reset_default()
+    return db_factory("e2e_test.db")

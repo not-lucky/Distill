@@ -159,24 +159,41 @@ class FailingMockProvider(MockLLMProvider):
 # ============================================================================
 
 @pytest.fixture
-def in_memory_db():
-    """Create an in-memory SQLite database for testing."""
-    manager = DatabaseManager()
-    manager.initialize(Path(":memory:"))
-    DatabaseManager.set_default(manager)
-    yield manager
-    DatabaseManager.reset_default()
+def db_factory(tmp_path):
+    """Factory fixture for creating database managers.
+
+    This centralizes database creation logic for all test types.
+    Usage: db = db_factory() for in-memory, db_factory("file.db") for file-based.
+    """
+    managers = []
+
+    def _create(filename: str = None):
+        manager = DatabaseManager()
+        if filename:
+            db_path = tmp_path / filename
+            manager.initialize(db_path)
+        else:
+            manager.initialize(Path(":memory:"))
+        DatabaseManager.set_default(manager)
+        managers.append(manager)
+        return manager
+
+    yield _create
+
+    for manager in managers:
+        DatabaseManager.reset_default()
 
 
 @pytest.fixture
-def temp_db(tmp_path):
+def in_memory_db(db_factory):
+    """Create an in-memory SQLite database for testing."""
+    return db_factory()
+
+
+@pytest.fixture
+def temp_db(db_factory):
     """Create a temporary file-based SQLite database for testing."""
-    db_path = tmp_path / "test.db"
-    manager = DatabaseManager()
-    manager.initialize(db_path)
-    DatabaseManager.set_default(manager)
-    yield manager
-    DatabaseManager.reset_default()
+    return db_factory("test.db")
 
 
 # ============================================================================
@@ -387,17 +404,42 @@ def sample_mcq_card_data():
 # ============================================================================
 
 @pytest.fixture
-def temp_archival_dir(tmp_path):
+def workspace_factory(tmp_path):
+    """Factory fixture for creating test workspace directories.
+
+    This consolidates workspace creation for all test types.
+    Usage: workspace = workspace_factory() creates a standard workspace.
+    """
+    def _create(
+        name: str = "workspace",
+        subjects: list = None,
+        include_output: bool = False,
+    ):
+        workspace = tmp_path / name
+        workspace.mkdir(exist_ok=True)
+
+        # Create archival structure
+        archival = workspace / "archival"
+        archival.mkdir(exist_ok=True)
+
+        subjects = subjects or ["leetcode", "cs", "physics"]
+        for subject in subjects:
+            (archival / subject).mkdir(exist_ok=True)
+
+        # Optionally create output directory
+        if include_output:
+            (workspace / "output").mkdir(exist_ok=True)
+
+        return workspace
+
+    return _create
+
+
+@pytest.fixture
+def temp_archival_dir(workspace_factory):
     """Create a temporary archival directory structure for testing."""
-    archival_dir = tmp_path / "archival"
-    archival_dir.mkdir()
-
-    # Create subject subdirectories
-    for subject in ["leetcode", "cs", "physics"]:
-        subject_dir = archival_dir / subject
-        subject_dir.mkdir()
-
-    return archival_dir
+    workspace = workspace_factory("archival_workspace")
+    return workspace / "archival"
 
 
 @pytest.fixture
@@ -476,13 +518,9 @@ def card_factory():
 
 
 @pytest.fixture
-def memory_db():
+def memory_db(in_memory_db):
     """Alias for in_memory_db for compatibility."""
-    manager = DatabaseManager()
-    manager.initialize(Path(":memory:"))
-    DatabaseManager.set_default(manager)
-    yield manager
-    DatabaseManager.reset_default()
+    return in_memory_db
 
 
 @pytest.fixture

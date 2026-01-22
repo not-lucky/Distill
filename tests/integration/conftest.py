@@ -7,22 +7,15 @@ They may touch databases but should not make external API calls.
 import pytest
 from pathlib import Path
 
-from src.database import DatabaseManager
-
 
 @pytest.fixture
-def integration_db(tmp_path):
+def integration_db(db_factory):
     """Create a file-based database for integration tests.
 
     Unlike unit tests which use in-memory databases, integration tests
     use a file-based database to better simulate production conditions.
     """
-    db_path = tmp_path / "integration_test.db"
-    manager = DatabaseManager()
-    manager.initialize(db_path)
-    DatabaseManager.set_default(manager)
-    yield manager
-    DatabaseManager.reset_default()
+    return db_factory("integration_test.db")
 
 
 @pytest.fixture
