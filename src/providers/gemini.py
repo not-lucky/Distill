@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 from gemini_webapi import GeminiClient
 from gemini_webapi.constants import Model
 from src.providers.base import LLMProvider
-from src.prompts import INITIAL_PROMPT_TEMPLATE
+from src.prompts import prompts
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class GeminiProvider(LLMProvider):
         # logger.info(f"[Gemini] Generating initial cards for '{question}'...")
         try:
             active_template = (
-                prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
+                prompt_template if prompt_template else prompts.initial
             )
             formatted_prompt = active_template.format(
                 question=question,

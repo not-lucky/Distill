@@ -13,7 +13,7 @@ from src.providers.base import (
     RetryableError,
     EmptyResponseError,
 )
-from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+from src.prompts import prompts
 from src.config.models import supports_reasoning_effort
 import logging
 
@@ -117,7 +117,7 @@ class CerebrasProvider(LLMProvider):
         prompt_template: Optional[str] = None,
     ) -> str:
         """Generate initial cards for a given question."""
-        template = prompt_template or INITIAL_PROMPT_TEMPLATE
+        template = prompt_template or prompts.initial
 
         messages = [
             {
@@ -147,7 +147,7 @@ class CerebrasProvider(LLMProvider):
 
         Returns raw response string (may not be valid JSON).
         """
-        template = combine_prompt_template or COMBINE_PROMPT_TEMPLATE
+        template = combine_prompt_template or prompts.combine
 
         messages = [
             {

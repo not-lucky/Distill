@@ -127,7 +127,7 @@ def sample_card_dict() -> Dict[str, Any]:
 @pytest.fixture
 def temp_database(tmp_path):
     """Create a temporary database for testing."""
-    from src.database import init_database
+    from src.database import DatabaseManager
     db_path = tmp_path / "test_llm2deck.db"
-    init_database(str(db_path))
+    DatabaseManager.get_default().initialize(db_path)
     return str(db_path)

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -25,10 +26,6 @@ from sqlalchemy.pool import StaticPool
 logger = logging.getLogger(__name__)
 
 Base = declarative_base()
-
-# Global engine and session maker (deprecated - use DatabaseManager)
-_engine = None
-_SessionLocal = None
 
 
 class DatabaseManager:
@@ -260,9 +257,14 @@ def init_database(db_path: Path) -> None:
     """
     Initialize database engine and create tables.
 
-    This is a backward-compatible wrapper around DatabaseManager.
-    For new code, prefer using DatabaseManager directly.
+    .. deprecated::
+        Use DatabaseManager.get_default().initialize() instead.
     """
+    warnings.warn(
+        "init_database() is deprecated. Use DatabaseManager.get_default().initialize() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     DatabaseManager.get_default().initialize(db_path)
 
 
@@ -270,9 +272,14 @@ def get_session() -> Session:
     """
     Get a new database session.
 
-    This is a backward-compatible wrapper around DatabaseManager.
-    For new code, prefer using DatabaseManager directly.
+    .. deprecated::
+        Use DatabaseManager.get_default().get_session() instead.
     """
+    warnings.warn(
+        "get_session() is deprecated. Use DatabaseManager.get_default().get_session() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return DatabaseManager.get_default().get_session()
 
 
@@ -281,9 +288,14 @@ def session_scope():
     """
     Provide a transactional scope around a series of operations.
 
-    This is a backward-compatible wrapper around DatabaseManager.
-    For new code, prefer using DatabaseManager.session_scope() directly.
+    .. deprecated::
+        Use DatabaseManager.get_default().session_scope() instead.
     """
+    warnings.warn(
+        "session_scope() is deprecated. Use DatabaseManager.get_default().session_scope() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     with DatabaseManager.get_default().session_scope() as session:
         yield session
 

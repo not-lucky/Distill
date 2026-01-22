@@ -1,6 +1,7 @@
 """Prompt loading utilities for LLM2Deck."""
 
 import os
+import warnings
 from functools import cached_property, lru_cache
 from pathlib import Path
 from typing import Optional, Tuple
@@ -163,27 +164,42 @@ class PromptLoader:
 # Singleton instance for module-level access
 prompts = PromptLoader()
 
-# Backwards-compatible module-level constants
-# These are evaluated lazily via the cached_property mechanism
-PROMPTS_DIR = prompts.prompts_dir
-INITIAL_PROMPT_TEMPLATE = prompts.initial
-INITIAL_LEETCODE_PROMPT_TEMPLATE = prompts.initial_leetcode
-INITIAL_CS_PROMPT_TEMPLATE = prompts.initial_cs
-COMBINE_PROMPT_TEMPLATE = prompts.combine
-COMBINE_LEETCODE_PROMPT_TEMPLATE = prompts.combine_leetcode
-COMBINE_CS_PROMPT_TEMPLATE = prompts.combine_cs
-MCQ_COMBINE_PROMPT_TEMPLATE = prompts.mcq_combine
-PHYSICS_PROMPT_TEMPLATE = prompts.physics
-MCQ_PROMPT_TEMPLATE = prompts.mcq
-PHYSICS_MCQ_PROMPT_TEMPLATE = prompts.physics_mcq
+
+# Deprecated module-level constants - use prompts singleton instead
+def __getattr__(name: str):
+    """Lazy access to deprecated module-level constants with deprecation warnings."""
+    _deprecated_constants = {
+        "PROMPTS_DIR": ("prompts_dir", prompts.prompts_dir),
+        "INITIAL_PROMPT_TEMPLATE": ("initial", prompts.initial),
+        "INITIAL_LEETCODE_PROMPT_TEMPLATE": ("initial_leetcode", prompts.initial_leetcode),
+        "INITIAL_CS_PROMPT_TEMPLATE": ("initial_cs", prompts.initial_cs),
+        "COMBINE_PROMPT_TEMPLATE": ("combine", prompts.combine),
+        "COMBINE_LEETCODE_PROMPT_TEMPLATE": ("combine_leetcode", prompts.combine_leetcode),
+        "COMBINE_CS_PROMPT_TEMPLATE": ("combine_cs", prompts.combine_cs),
+        "MCQ_COMBINE_PROMPT_TEMPLATE": ("mcq_combine", prompts.mcq_combine),
+        "PHYSICS_PROMPT_TEMPLATE": ("physics", prompts.physics),
+        "MCQ_PROMPT_TEMPLATE": ("mcq", prompts.mcq),
+        "PHYSICS_MCQ_PROMPT_TEMPLATE": ("physics_mcq", prompts.physics_mcq),
+    }
+
+    if name in _deprecated_constants:
+        attr_name, value = _deprecated_constants[name]
+        warnings.warn(
+            f"{name} is deprecated. Use prompts.{attr_name} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return value
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def load_prompt(prompt_filename: str) -> str:
     """
     Load prompt template from prompts directory.
 
-    This function is kept for backwards compatibility.
-    Prefer using the PromptLoader class or module-level constants.
+    .. deprecated::
+        Use prompts._load() or PromptLoader directly instead.
 
     Args:
         prompt_filename: Name of the prompt file (e.g., "initial.md")
@@ -194,4 +210,9 @@ def load_prompt(prompt_filename: str) -> str:
     Raises:
         FileNotFoundError: If prompt file doesn't exist.
     """
+    warnings.warn(
+        "load_prompt() is deprecated. Use prompts._load() or PromptLoader directly.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return prompts._load(prompt_filename)
