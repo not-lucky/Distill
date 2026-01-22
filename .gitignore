@@ -25,3 +25,7 @@ app.log
 # Database
 llm2deck.db
 
+.flow
+.claude
+AGENTS.md
+CLAUDE.md
