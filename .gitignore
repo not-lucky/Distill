@@ -30,3 +30,6 @@ llm2deck.db
 .claude
 AGENTS.md
 CLAUDE.md
+
+# Hypothesis test cache
+.hypothesis/
