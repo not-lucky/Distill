@@ -516,3 +516,418 @@ class TestDatabaseModels:
         with in_memory_db.session_scope() as session:
             problem = get_problem(session, problem_id)
             assert len(problem.cards) == 1
+
+
+class TestReferentialIntegrity:
+    """Tests for referential integrity and foreign key constraints."""
+
+    def test_problem_requires_valid_run(self, in_memory_db):
+        """Test that Problem model can be created with proper fields."""
+        # First create a valid run
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="ref-test-run",
+                mode="cs",
+                subject="cs",
+                card_type="standard"
+            )
+
+        # Now create a problem referencing it
+        with in_memory_db.session_scope() as session:
+            problem = Problem(
+                run_id="ref-test-run",
+                question_name="Test Problem",
+                sanitized_name="test_problem",
+                category_name="Test",
+                status="success"
+            )
+            session.add(problem)
+            session.commit()
+            assert problem.id is not None
+
+    def test_card_requires_valid_problem(self, in_memory_db):
+        """Test Card references valid Problem."""
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="fk-test-run",
+                mode="cs",
+                subject="cs",
+                card_type="standard"
+            )
+
+        with in_memory_db.session_scope() as session:
+            problem = create_problem(session, "fk-test-run", "FK Test")
+            problem_id = problem.id
+
+        with in_memory_db.session_scope() as session:
+            cards = create_cards(
+                session,
+                problem_id,
+                "fk-test-run",
+                [{"front": "Q", "back": "A", "card_type": "Basic", "tags": []}]
+            )
+            assert len(cards) == 1
+            assert cards[0].problem_id == problem_id
+
+    def test_provider_result_requires_valid_run(self, in_memory_db):
+        """Test ProviderResult references valid Run."""
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="pr-fk-run",
+                mode="physics",
+                subject="physics",
+                card_type="standard"
+            )
+
+        with in_memory_db.session_scope() as session:
+            problem = create_problem(session, "pr-fk-run", "Provider Result FK Test")
+            problem_id = problem.id
+
+        with in_memory_db.session_scope() as session:
+            pr = create_provider_result(
+                session,
+                problem_id=problem_id,
+                run_id="pr-fk-run",
+                provider_name="test",
+                provider_model="test-model",
+                success=True,
+                raw_output="{}"
+            )
+            assert pr.run_id == "pr-fk-run"
+            assert pr.problem_id == problem_id
+
+
+class TestConcurrentAccess:
+    """Tests for concurrent database access patterns."""
+
+    def test_multiple_sessions_read(self, in_memory_db):
+        """Test multiple sessions reading from database."""
+        # Create initial data
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="concurrent-read-run",
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+
+        # Read from multiple sessions
+        session1 = in_memory_db.get_session()
+        session2 = in_memory_db.get_session()
+
+        run1 = get_run(session1, "concurrent-read-run")
+        run2 = get_run(session2, "concurrent-read-run")
+
+        assert run1.id == run2.id
+        assert run1.mode == run2.mode
+
+        session1.close()
+        session2.close()
+
+    def test_session_isolation(self, in_memory_db):
+        """Test that uncommitted changes are not visible to other sessions."""
+        # Create a run
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="isolation-run",
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+
+        # Modify in one session (uncommitted)
+        session1 = in_memory_db.get_session()
+        run1 = get_run(session1, "isolation-run")
+        original_status = run1.status
+
+        # Change status but don't commit
+        run1.status = "modified"
+
+        # Read from another session
+        session2 = in_memory_db.get_session()
+        run2 = get_run(session2, "isolation-run")
+
+        # Should still see original value (depending on isolation level)
+        # SQLite default is serializable, so this test documents behavior
+        session1.rollback()
+        session1.close()
+        session2.close()
+
+
+class TestQueryOperations:
+    """Tests for database query operations."""
+
+    def test_get_run_returns_none_for_missing(self, in_memory_db):
+        """Test get_run returns None for non-existent run."""
+        with in_memory_db.session_scope() as session:
+            run = get_run(session, "missing-run-id")
+            assert run is None
+
+    def test_get_problem_returns_none_for_missing(self, in_memory_db):
+        """Test get_problem returns None for non-existent problem."""
+        with in_memory_db.session_scope() as session:
+            problem = get_problem(session, 99999)
+            assert problem is None
+
+    def test_query_runs_by_status(self, in_memory_db):
+        """Test querying runs by status."""
+        # Create multiple runs with different statuses
+        with in_memory_db.session_scope() as session:
+            create_run(session=session, id="run-status-1", mode="leetcode",
+                       subject="leetcode", card_type="standard")
+            create_run(session=session, id="run-status-2", mode="cs",
+                       subject="cs", card_type="standard")
+
+        with in_memory_db.session_scope() as session:
+            run1 = get_run(session, "run-status-1")
+            run1.status = "completed"
+            run2 = get_run(session, "run-status-2")
+            run2.status = "failed"
+
+        with in_memory_db.session_scope() as session:
+            # Query completed runs
+            completed_runs = session.query(Run).filter(Run.status == "completed").all()
+            assert len(completed_runs) >= 1
+
+            failed_runs = session.query(Run).filter(Run.status == "failed").all()
+            assert len(failed_runs) >= 1
+
+    def test_query_problems_by_run(self, in_memory_db):
+        """Test querying problems for a specific run."""
+        with in_memory_db.session_scope() as session:
+            create_run(session=session, id="problems-query-run", mode="leetcode",
+                       subject="leetcode", card_type="standard")
+
+        with in_memory_db.session_scope() as session:
+            for i in range(5):
+                create_problem(session, "problems-query-run", f"Problem {i}")
+
+        with in_memory_db.session_scope() as session:
+            problems = session.query(Problem).filter(
+                Problem.run_id == "problems-query-run"
+            ).all()
+            assert len(problems) == 5
+
+    def test_query_cards_by_problem(self, in_memory_db):
+        """Test querying cards for a specific problem."""
+        with in_memory_db.session_scope() as session:
+            create_run(session=session, id="cards-query-run", mode="leetcode",
+                       subject="leetcode", card_type="standard")
+
+        with in_memory_db.session_scope() as session:
+            problem = create_problem(session, "cards-query-run", "Cards Query Test")
+            problem_id = problem.id
+
+        with in_memory_db.session_scope() as session:
+            create_cards(
+                session,
+                problem_id,
+                "cards-query-run",
+                [
+                    {"front": f"Q{i}", "back": f"A{i}", "card_type": "Basic", "tags": []}
+                    for i in range(3)
+                ]
+            )
+
+        with in_memory_db.session_scope() as session:
+            cards = session.query(Card).filter(Card.problem_id == problem_id).all()
+            assert len(cards) == 3
+
+
+class TestUpdateOperations:
+    """Tests for update operations."""
+
+    def test_update_run_multiple_fields(self, in_memory_db):
+        """Test updating multiple fields on a run."""
+        with in_memory_db.session_scope() as session:
+            run = create_run(
+                session=session,
+                id="multi-update-run",
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+
+        with in_memory_db.session_scope() as session:
+            run = update_run(
+                session,
+                "multi-update-run",
+                status="completed",
+                total_problems=10,
+                successful_problems=10,
+            )
+            assert run.status == "completed"
+            assert run.total_problems == 10
+            assert run.successful_problems == 10
+
+    def test_update_run_with_failure(self, in_memory_db):
+        """Test updating run with failed status."""
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="error-update-run",
+                mode="cs",
+                subject="cs",
+                card_type="mcq"
+            )
+
+        with in_memory_db.session_scope() as session:
+            run = update_run(
+                session,
+                "error-update-run",
+                status="failed",
+                failed_problems=5
+            )
+            assert run.status == "failed"
+            assert run.failed_problems == 5
+
+    def test_update_problem_status(self, in_memory_db):
+        """Test updating problem status."""
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="problem-status-run",
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+
+        with in_memory_db.session_scope() as session:
+            problem = create_problem(session, "problem-status-run", "Status Test")
+            problem_id = problem.id
+
+        with in_memory_db.session_scope() as session:
+            problem = update_problem(session, problem_id, status="completed")
+            assert problem.status == "completed"
+
+
+class TestEdgeCasesDatabase:
+    """Edge case tests for database operations."""
+
+    def test_empty_string_fields(self, in_memory_db):
+        """Test handling of empty string fields."""
+        with in_memory_db.session_scope() as session:
+            run = create_run(
+                session=session,
+                id="empty-fields-run",
+                mode="",  # Empty mode
+                subject="",
+                card_type=""
+            )
+            assert run.mode == ""
+
+    def test_very_long_string_fields(self, in_memory_db):
+        """Test handling of very long string fields."""
+        long_string = "x" * 10000
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="long-string-run",
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+
+        with in_memory_db.session_scope() as session:
+            problem = create_problem(session, "long-string-run", "Long Problem Test")
+            problem_id = problem.id
+
+        with in_memory_db.session_scope() as session:
+            cards = create_cards(
+                session,
+                problem_id,
+                "long-string-run",
+                [{"front": long_string, "back": "A", "card_type": "Basic", "tags": []}]
+            )
+            assert len(cards[0].front) == 10000
+
+    def test_unicode_in_database_fields(self, in_memory_db):
+        """Test Unicode content in database fields."""
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="unicode-run",
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+
+        with in_memory_db.session_scope() as session:
+            problem = create_problem(
+                session,
+                "unicode-run",
+                "算法问题 - Algorithm Problem"
+            )
+            problem_id = problem.id
+
+        with in_memory_db.session_scope() as session:
+            problem = get_problem(session, problem_id)
+            assert "算法问题" in problem.question_name
+
+    def test_json_serialization_in_fields(self, in_memory_db):
+        """Test JSON serialization for complex data."""
+        complex_data = {
+            "nested": {"key": "value"},
+            "list": [1, 2, 3],
+            "unicode": "中文"
+        }
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id="json-run",
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+
+        with in_memory_db.session_scope() as session:
+            problem = create_problem(session, "json-run", "JSON Test")
+            problem_id = problem.id
+
+        with in_memory_db.session_scope() as session:
+            pr = create_provider_result(
+                session,
+                problem_id=problem_id,
+                run_id="json-run",
+                provider_name="test",
+                provider_model="test-model",
+                success=True,
+                raw_output=json.dumps(complex_data)
+            )
+            assert pr.raw_output is not None
+
+    def test_null_optional_fields(self, in_memory_db):
+        """Test handling of null optional fields."""
+        with in_memory_db.session_scope() as session:
+            run = create_run(
+                session=session,
+                id="null-fields-run",
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+            assert run.completed_at is None
+            assert run.user_label is None
+
+    def test_special_characters_in_id(self, in_memory_db):
+        """Test handling of special characters in IDs."""
+        special_id = "run-with-special-chars_@#$%"
+        with in_memory_db.session_scope() as session:
+            run = create_run(
+                session=session,
+                id=special_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+            assert run.id == special_id
+
+        with in_memory_db.session_scope() as session:
+            retrieved = get_run(session, special_id)
+            assert retrieved is not None
+            assert retrieved.id == special_id

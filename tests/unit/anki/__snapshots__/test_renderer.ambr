@@ -1,0 +1,55 @@
+# serializer version: 1
+# name: TestSnapshotRendering.test_code_block_snapshot
+  '''
+  <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">hello</span><span class="p">():</span>
+      <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;world&quot;</span><span class="p">)</span>
+  </code></pre></div>
+  '''
+# ---
+# name: TestSnapshotRendering.test_complex_document_snapshot
+  '''
+  <h1>Title</h1>
+  <p>This is <strong>bold</strong> text.</p>
+  <h2>Code Example</h2>
+  <div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1</span><span class="p">;</span>
+  </code></pre></div>
+  
+  <ul>
+  <li>Item 1</li>
+  <li>Item 2</li>
+  </ul>
+  '''
+# ---
+# name: TestSnapshotRendering.test_formatted_text_snapshot
+  '<p><strong>bold</strong> and <em>italic</em> and <code>code</code></p>'
+# ---
+# name: TestSnapshotRendering.test_list_snapshot
+  '''
+  <ul>
+  <li>Item 1</li>
+  <li>Item 2</li>
+  <li>Item 3</li>
+  </ul>
+  '''
+# ---
+# name: TestSnapshotRendering.test_simple_paragraph_snapshot
+  '<p>Hello World</p>'
+# ---
+# name: TestSnapshotRendering.test_table_snapshot
+  '''
+  <table>
+  <thead>
+  <tr>
+  <th>A</th>
+  <th>B</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td>1</td>
+  <td>2</td>
+  </tr>
+  </tbody>
+  </table>
+  '''
+# ---

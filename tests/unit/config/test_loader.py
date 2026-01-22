@@ -342,3 +342,297 @@ class TestAppConfig:
 
         assert config.generation.concurrent_requests == 8
         assert config.generation.request_delay == 0.0
+
+
+class TestPathsConfig:
+    """Tests for PathsConfig model."""
+
+    def test_paths_config_defaults(self):
+        """Test PathsConfig default values."""
+        paths = PathsConfig()
+
+        assert paths.archival_dir == "anki_cards_archival"
+        assert paths.markdown_dir == "anki_cards_markdown"
+        assert paths.timestamp_format == "%Y%m%dT%H%M%S"
+        assert paths.key_paths is not None
+
+    def test_paths_config_custom_values(self):
+        """Test PathsConfig with custom values."""
+        paths = PathsConfig(
+            archival_dir="/custom/archive",
+            markdown_dir="/custom/markdown",
+            timestamp_format="%Y-%m-%d",
+        )
+
+        assert paths.archival_dir == "/custom/archive"
+        assert paths.markdown_dir == "/custom/markdown"
+        assert paths.timestamp_format == "%Y-%m-%d"
+
+
+class TestConfigValidation:
+    """Tests for configuration validation."""
+
+    def test_temperature_bounds(self):
+        """Test temperature is within bounds."""
+        # Pydantic should accept valid temperatures
+        defaults = DefaultsConfig(temperature=0.0)
+        assert defaults.temperature == 0.0
+
+        defaults = DefaultsConfig(temperature=1.0)
+        assert defaults.temperature == 1.0
+
+        defaults = DefaultsConfig(temperature=0.5)
+        assert defaults.temperature == 0.5
+
+    def test_negative_timeout_handling(self):
+        """Test handling of negative timeout."""
+        # Depending on model validation, this should work or raise
+        defaults = DefaultsConfig(timeout=0.0)
+        assert defaults.timeout == 0.0
+
+    def test_max_retries_zero(self):
+        """Test max_retries can be zero."""
+        defaults = DefaultsConfig(max_retries=0)
+        assert defaults.max_retries == 0
+
+    def test_provider_with_multiple_models(self):
+        """Test provider config with multiple models."""
+        config = ProviderConfig(
+            enabled=True,
+            model="primary-model",
+            models=["model1", "model2", "model3"],
+        )
+
+        assert config.model == "primary-model"
+        assert len(config.models) == 3
+        assert "model1" in config.models
+
+    def test_extra_params_passthrough(self):
+        """Test that extra_params are preserved."""
+        config = ProviderConfig(
+            enabled=True,
+            model="test",
+            extra_params={"top_p": 0.9, "frequency_penalty": 0.5},
+        )
+
+        assert config.extra_params["top_p"] == 0.9
+        assert config.extra_params["frequency_penalty"] == 0.5
+
+
+class TestCombinerConfigDetails:
+    """Detailed tests for CombinerConfig."""
+
+    def test_combiner_config_creation(self):
+        """Test CombinerConfig creation."""
+        combiner = CombinerConfig(provider="cerebras", model="llama")
+
+        assert combiner.provider == "cerebras"
+        assert combiner.model == "llama"
+
+    def test_combiner_with_empty_values(self):
+        """Test CombinerConfig with empty string values."""
+        combiner = CombinerConfig(provider="", model="")
+
+        assert combiner.provider == ""
+        assert combiner.model == ""
+
+    def test_combiner_with_also_generate(self):
+        """Test CombinerConfig with also_generate flag."""
+        combiner = CombinerConfig(
+            provider="test",
+            model="model",
+            also_generate=False,
+        )
+
+        assert combiner.also_generate is False
+
+
+class TestFormatterConfigDetails:
+    """Detailed tests for FormatterConfig."""
+
+    def test_formatter_config_creation(self):
+        """Test FormatterConfig creation."""
+        formatter = FormatterConfig(provider="openrouter", model="gpt-4")
+
+        assert formatter.provider == "openrouter"
+        assert formatter.model == "gpt-4"
+
+    def test_formatter_with_also_generate(self):
+        """Test FormatterConfig with also_generate flag."""
+        formatter = FormatterConfig(
+            provider="test",
+            model="model",
+            also_generate=False,
+        )
+
+        assert formatter.also_generate is False
+
+
+class TestConfigMerging:
+    """Tests for configuration merging and defaults."""
+
+    def test_provider_inherits_defaults(self):
+        """Test that providers correctly inherit from defaults."""
+        defaults = DefaultsConfig(
+            timeout=120.0,
+            temperature=0.4,
+            max_tokens=4096,
+        )
+
+        provider = ProviderConfig(enabled=True, model="test")
+
+        assert provider.get_effective_timeout(defaults) == 120.0
+        assert provider.get_effective_temperature(defaults) == 0.4
+        assert provider.get_effective_max_tokens(defaults) == 4096
+
+    def test_provider_overrides_defaults(self):
+        """Test that provider-specific values override defaults."""
+        defaults = DefaultsConfig(
+            timeout=120.0,
+            temperature=0.4,
+            max_tokens=4096,
+        )
+
+        provider = ProviderConfig(
+            enabled=True,
+            model="test",
+            timeout=60.0,
+            temperature=0.8,
+            max_tokens=2048,
+        )
+
+        assert provider.get_effective_timeout(defaults) == 60.0
+        assert provider.get_effective_temperature(defaults) == 0.8
+        assert provider.get_effective_max_tokens(defaults) == 2048
+
+
+class TestEdgeCasesLoader:
+    """Edge case tests for config loading."""
+
+    def test_load_empty_yaml(self, tmp_path):
+        """Test loading empty YAML file."""
+        empty_file = tmp_path / "empty.yaml"
+        empty_file.write_text("")
+
+        config = load_config(empty_file)
+        assert config is not None
+        assert isinstance(config, AppConfig)
+
+    def test_load_yaml_with_unknown_keys(self, tmp_path):
+        """Test loading YAML with extra unknown keys."""
+        yaml_file = tmp_path / "extra.yaml"
+        yaml_file.write_text("""
+defaults:
+  timeout: 60.0
+unknown_section:
+  key: value
+""")
+        # Should not fail, extra keys should be ignored
+        config = load_config(yaml_file)
+        assert config.defaults.timeout == 60.0
+
+    def test_load_yaml_with_null_values(self, tmp_path):
+        """Test loading YAML with null values for optional fields."""
+        yaml_file = tmp_path / "nulls.yaml"
+        yaml_file.write_text("""
+defaults:
+  max_tokens: null
+  temperature: 0.5
+""")
+        config = load_config(yaml_file)
+        # null should be treated as None for optional field
+        assert config.defaults.max_tokens is None
+        assert config.defaults.temperature == 0.5
+
+    def test_enabled_providers_with_models_list(self):
+        """Test providers with both model and models list."""
+        config = AppConfig(
+            providers={
+                "multi": ProviderConfig(
+                    enabled=True,
+                    model="primary",
+                    models=["alt1", "alt2"],
+                ),
+            }
+        )
+
+        enabled = get_enabled_providers(config)
+        assert "multi" in enabled
+        assert enabled["multi"].model == "primary"
+        assert len(enabled["multi"].models) == 2
+
+    def test_all_providers_disabled(self):
+        """Test when all providers are disabled."""
+        config = AppConfig(
+            providers={
+                "p1": ProviderConfig(enabled=False),
+                "p2": ProviderConfig(enabled=False),
+            }
+        )
+
+        enabled = get_enabled_providers(config)
+        assert enabled == {}
+
+    def test_formatter_with_disabled_provider_raises(self):
+        """Test formatter referencing disabled provider raises error."""
+        config = AppConfig(
+            providers={
+                "test": ProviderConfig(enabled=False, model="m")
+            },
+            generation=GenerationConfig(
+                formatter=FormatterConfig(provider="test", model="m")
+            )
+        )
+
+        with pytest.raises(ConfigurationError, match="not enabled"):
+            get_formatter_config(config)
+
+
+class TestYAMLFixtures:
+    """Tests using YAML fixture files."""
+
+    @pytest.fixture
+    def sample_config_yaml(self, tmp_path):
+        """Create a sample config YAML file."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("""
+defaults:
+  timeout: 60.0
+  temperature: 0.5
+  max_retries: 3
+
+providers:
+  cerebras:
+    enabled: true
+    model: llama-3.1-8b
+  openrouter:
+    enabled: false
+    model: gpt-4
+
+subjects:
+  leetcode:
+    enabled: true
+  cs:
+    enabled: true
+  physics:
+    enabled: false
+""")
+        return config_file
+
+    def test_complete_config_loading(self, sample_config_yaml):
+        """Test loading a complete configuration file."""
+        config = load_config(sample_config_yaml)
+
+        # Check defaults
+        assert config.defaults.timeout == 60.0
+        assert config.defaults.temperature == 0.5
+        assert config.defaults.max_retries == 3
+
+        # Check providers
+        assert config.providers["cerebras"].enabled is True
+        assert config.providers["cerebras"].model == "llama-3.1-8b"
+        assert config.providers["openrouter"].enabled is False
+
+        # Check subjects
+        assert config.subjects["leetcode"].enabled is True
+        assert config.subjects["physics"].enabled is False

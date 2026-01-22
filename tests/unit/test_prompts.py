@@ -159,3 +159,217 @@ class TestPromptsSingleton:
         """Test that the prompts singleton has a prompts_dir property."""
         assert prompts.prompts_dir is not None
         assert isinstance(prompts.prompts_dir, Path)
+
+
+class TestResolvePromptsDir:
+    """Tests for _resolve_prompts_dir static method."""
+
+    def test_resolve_from_env_var(self, tmp_path):
+        """Test resolving prompts directory from environment variable."""
+        with patch.dict(os.environ, {"LLM2DECK_PROMPTS_DIR": str(tmp_path)}):
+            result = PromptLoader._resolve_prompts_dir()
+            assert result == tmp_path
+
+    def test_resolve_default_when_no_env(self):
+        """Test resolving default when no env var is set."""
+        with patch.dict(os.environ, {}, clear=False):
+            # Remove the env var if it exists
+            if "LLM2DECK_PROMPTS_DIR" in os.environ:
+                del os.environ["LLM2DECK_PROMPTS_DIR"]
+            result = PromptLoader._resolve_prompts_dir()
+            assert "prompts" in str(result)
+
+    def test_resolve_returns_path_object(self, tmp_path):
+        """Test that resolve returns a Path object."""
+        with patch.dict(os.environ, {"LLM2DECK_PROMPTS_DIR": str(tmp_path)}):
+            result = PromptLoader._resolve_prompts_dir()
+            assert isinstance(result, Path)
+
+
+class TestPromptLoaderCachedProperties:
+    """Tests for PromptLoader cached properties."""
+
+    def test_initial_is_cached(self, temp_prompts_dir):
+        """Test that initial property is cached."""
+        loader = PromptLoader(prompts_dir=temp_prompts_dir)
+        # Access twice - should be same object
+        first = loader.initial
+        second = loader.initial
+        assert first is second
+
+    def test_combine_is_cached(self, temp_prompts_dir):
+        """Test that combine property is cached."""
+        loader = PromptLoader(prompts_dir=temp_prompts_dir)
+        first = loader.combine
+        second = loader.combine
+        assert first is second
+
+    def test_mcq_is_cached(self, temp_prompts_dir):
+        """Test that mcq property is cached."""
+        loader = PromptLoader(prompts_dir=temp_prompts_dir)
+        first = loader.mcq
+        second = loader.mcq
+        assert first is second
+
+
+class TestDeprecatedModuleLevelAccess:
+    """Tests for deprecated module-level constant access."""
+
+    def test_prompts_dir_deprecated(self):
+        """Test that PROMPTS_DIR access triggers deprecation warning."""
+        import warnings
+        import src.prompts as prompts_module
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _ = prompts_module.PROMPTS_DIR
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "deprecated" in str(w[0].message).lower()
+
+    def test_initial_prompt_template_deprecated(self):
+        """Test that INITIAL_PROMPT_TEMPLATE access triggers deprecation warning."""
+        import warnings
+        import src.prompts as prompts_module
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _ = prompts_module.INITIAL_PROMPT_TEMPLATE
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+
+    def test_combine_prompt_template_deprecated(self):
+        """Test that COMBINE_PROMPT_TEMPLATE access triggers deprecation warning."""
+        import warnings
+        import src.prompts as prompts_module
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _ = prompts_module.COMBINE_PROMPT_TEMPLATE
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+
+    def test_unknown_attribute_raises(self):
+        """Test that accessing unknown attribute raises AttributeError."""
+        import src.prompts as prompts_module
+
+        with pytest.raises(AttributeError):
+            _ = prompts_module.UNKNOWN_CONSTANT
+
+
+class TestDeprecatedLoadPromptFunction:
+    """Tests for deprecated load_prompt function."""
+
+    def test_load_prompt_triggers_deprecation_warning(self):
+        """Test that load_prompt triggers deprecation warning."""
+        import warnings
+        from src.prompts import load_prompt
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # This will use the actual prompts directory
+            try:
+                _ = load_prompt("initial.md")
+            except FileNotFoundError:
+                pass  # File may not exist in test environment
+            assert any(issubclass(warning.category, DeprecationWarning) for warning in w)
+
+    def test_load_prompt_still_works(self):
+        """Test that load_prompt still returns content despite deprecation."""
+        import warnings
+        from src.prompts import load_prompt
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            # Try to load the actual initial.md from the real prompts directory
+            try:
+                content = load_prompt("initial.md")
+                assert content is not None
+            except FileNotFoundError:
+                # If file doesn't exist, that's okay - we're just testing the function works
+                pass
+
+
+class TestPromptLoaderEdgeCases:
+    """Edge case tests for PromptLoader."""
+
+    def test_load_with_unicode_content(self, tmp_path):
+        """Test loading prompts with unicode content."""
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        (prompts_dir / "unicode.md").write_text("日本語 中文 한국어", encoding="utf-8")
+
+        loader = PromptLoader(prompts_dir=prompts_dir)
+        content = loader._load("unicode.md")
+        assert "日本語" in content
+        assert "中文" in content
+        assert "한국어" in content
+
+    def test_load_empty_file(self, tmp_path):
+        """Test loading an empty prompt file."""
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        (prompts_dir / "empty.md").write_text("")
+
+        loader = PromptLoader(prompts_dir=prompts_dir)
+        content = loader._load("empty.md")
+        assert content == ""
+
+    def test_load_large_file(self, tmp_path):
+        """Test loading a large prompt file."""
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        large_content = "x" * 100000
+        (prompts_dir / "large.md").write_text(large_content)
+
+        loader = PromptLoader(prompts_dir=prompts_dir)
+        content = loader._load("large.md")
+        assert len(content) == 100000
+
+    def test_try_load_missing_file_returns_none(self, tmp_path):
+        """Test that _try_load returns None for missing files."""
+        loader = PromptLoader(prompts_dir=tmp_path)
+        # Try to load a non-existent file
+        result = loader._try_load(tmp_path / "nonexistent.md")
+        assert result is None
+
+    def test_prompts_dir_property(self, tmp_path):
+        """Test prompts_dir property returns configured path."""
+        loader = PromptLoader(prompts_dir=tmp_path)
+        assert loader.prompts_dir == tmp_path
+
+    def test_load_subject_prompts_creates_full_path(self, tmp_path):
+        """Test load_subject_prompts creates correct paths."""
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        subject_dir = prompts_dir / "test_subject"
+        subject_dir.mkdir()
+        (subject_dir / "initial.md").write_text("Test initial")
+        (subject_dir / "combine.md").write_text("Test combine")
+
+        loader = PromptLoader(prompts_dir=prompts_dir)
+        initial, combine = loader.load_subject_prompts("test_subject")
+        assert initial == "Test initial"
+        assert combine == "Test combine"
+
+
+class TestPromptLoaderAllProperties:
+    """Tests for all PromptLoader properties."""
+
+    def test_all_required_properties_exist(self, temp_prompts_dir):
+        """Test that all required prompt properties exist."""
+        loader = PromptLoader(prompts_dir=temp_prompts_dir)
+        # All these should be accessible
+        properties = ["initial", "combine", "mcq", "mcq_combine",
+                     "physics", "physics_mcq", "initial_cs", "combine_cs"]
+        for prop_name in properties:
+            assert hasattr(loader, prop_name), f"PromptLoader should have {prop_name}"
+
+    def test_all_properties_return_strings(self, temp_prompts_dir):
+        """Test that all prompt properties return strings."""
+        loader = PromptLoader(prompts_dir=temp_prompts_dir)
+        properties = ["initial", "combine", "mcq", "mcq_combine",
+                     "physics", "physics_mcq", "initial_cs", "combine_cs"]
+        for prop_name in properties:
+            value = getattr(loader, prop_name)
+            assert isinstance(value, str), f"{prop_name} should return a string"

@@ -1,6 +1,8 @@
 """Tests for Pydantic models in src/models.py."""
 
 import pytest
+from hypothesis import given, strategies as st, settings, assume
+from hypothesis.strategies import composite
 from pydantic import ValidationError
 
 from src.models import (
@@ -280,3 +282,397 @@ class TestBaseProblem:
             cards=[]
         )
         assert problem.cards == []
+
+
+# Custom Hypothesis Strategies
+@composite
+def valid_card_types(draw):
+    """Generate valid card type strings."""
+    types = ["Concept", "Code", "Algorithm", "Intuition", "EdgeCase", "Pattern", "Implementation"]
+    return draw(st.sampled_from(types))
+
+
+@composite
+def valid_tags(draw):
+    """Generate valid tag lists."""
+    tag_chars = st.text(
+        alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="_"),
+        min_size=1,
+        max_size=20
+    )
+    return draw(st.lists(tag_chars, min_size=0, max_size=5))
+
+
+@composite
+def valid_anki_cards(draw):
+    """Generate valid AnkiCard instances."""
+    return AnkiCard(
+        card_type=draw(valid_card_types()),
+        tags=draw(valid_tags()),
+        front=draw(st.text(min_size=1, max_size=500)),
+        back=draw(st.text(min_size=1, max_size=500)),
+    )
+
+
+@composite
+def valid_mcq_cards(draw):
+    """Generate valid MCQCard instances."""
+    return MCQCard(
+        card_type=draw(valid_card_types()),
+        tags=draw(valid_tags()),
+        question=draw(st.text(min_size=1, max_size=500)),
+        options=draw(st.lists(st.text(min_size=1, max_size=100), min_size=4, max_size=4)),
+        correct_answer=draw(st.sampled_from(["A", "B", "C", "D"])),
+        explanation=draw(st.text(min_size=1, max_size=500)),
+    )
+
+
+@composite
+def valid_difficulty_levels(draw):
+    """Generate valid difficulty level strings."""
+    return draw(st.sampled_from(["Easy", "Medium", "Hard", "Basic", "Intermediate", "Advanced"]))
+
+
+class TestAnkiCardPropertyBased:
+    """Property-based tests for AnkiCard model."""
+
+    @given(
+        card_type=st.text(min_size=1, max_size=50),
+        front=st.text(min_size=1, max_size=1000),
+        back=st.text(min_size=1, max_size=1000),
+    )
+    @settings(max_examples=50)
+    def test_anki_card_accepts_any_strings(self, card_type, front, back):
+        """Test that AnkiCard accepts any non-empty strings."""
+        card = AnkiCard(
+            card_type=card_type,
+            tags=[],
+            front=front,
+            back=back,
+        )
+        assert card.card_type == card_type
+        assert card.front == front
+        assert card.back == back
+
+    @given(tags=st.lists(st.text(min_size=1, max_size=30), min_size=0, max_size=10))
+    @settings(max_examples=50)
+    def test_anki_card_accepts_any_tags(self, tags):
+        """Test that AnkiCard accepts any list of tags."""
+        card = AnkiCard(
+            card_type="Test",
+            tags=tags,
+            front="Q",
+            back="A",
+        )
+        assert card.tags == tags
+
+    @given(card=valid_anki_cards())
+    @settings(max_examples=30)
+    def test_anki_card_roundtrip_serialization(self, card):
+        """Test that AnkiCard can be serialized and deserialized."""
+        data = card.model_dump()
+        restored = AnkiCard(**data)
+        assert restored == card
+
+    @given(card=valid_anki_cards())
+    @settings(max_examples=30)
+    def test_anki_card_json_roundtrip(self, card):
+        """Test that AnkiCard survives JSON roundtrip."""
+        json_str = card.model_dump_json()
+        restored = AnkiCard.model_validate_json(json_str)
+        assert restored == card
+
+
+class TestMCQCardPropertyBased:
+    """Property-based tests for MCQCard model."""
+
+    @given(correct_answer=st.sampled_from(["A", "B", "C", "D"]))
+    @settings(max_examples=20)
+    def test_mcq_card_correct_answer_values(self, correct_answer):
+        """Test that MCQCard accepts valid correct answer values."""
+        card = MCQCard(
+            card_type="Test",
+            tags=[],
+            question="Q?",
+            options=["A", "B", "C", "D"],
+            correct_answer=correct_answer,
+            explanation="Exp",
+        )
+        assert card.correct_answer == correct_answer
+
+    @given(
+        options=st.lists(st.text(min_size=1, max_size=100), min_size=4, max_size=4)
+    )
+    @settings(max_examples=30)
+    def test_mcq_card_accepts_any_options(self, options):
+        """Test that MCQCard accepts any 4 non-empty options."""
+        card = MCQCard(
+            card_type="Test",
+            tags=[],
+            question="Q?",
+            options=options,
+            correct_answer="A",
+            explanation="Exp",
+        )
+        assert card.options == options
+
+    @given(card=valid_mcq_cards())
+    @settings(max_examples=30)
+    def test_mcq_card_roundtrip_serialization(self, card):
+        """Test that MCQCard can be serialized and deserialized."""
+        data = card.model_dump()
+        restored = MCQCard(**data)
+        assert restored == card
+
+    @given(
+        question=st.text(min_size=1, max_size=500),
+        explanation=st.text(min_size=1, max_size=500),
+    )
+    @settings(max_examples=30)
+    def test_mcq_card_accepts_unicode_content(self, question, explanation):
+        """Test that MCQCard accepts unicode in question and explanation."""
+        card = MCQCard(
+            card_type="Test",
+            tags=[],
+            question=question,
+            options=["A", "B", "C", "D"],
+            correct_answer="A",
+            explanation=explanation,
+        )
+        assert card.question == question
+        assert card.explanation == explanation
+
+
+class TestProblemModelsPropertyBased:
+    """Property-based tests for problem models."""
+
+    @given(
+        title=st.text(min_size=1, max_size=100),
+        topic=st.text(min_size=1, max_size=50),
+        difficulty=valid_difficulty_levels(),
+    )
+    @settings(max_examples=30)
+    def test_leetcode_problem_accepts_valid_strings(self, title, topic, difficulty):
+        """Test that LeetCodeProblem accepts valid string fields."""
+        problem = LeetCodeProblem(
+            title=title,
+            topic=topic,
+            difficulty=difficulty,
+            cards=[],
+        )
+        assert problem.title == title
+        assert problem.topic == topic
+        assert problem.difficulty == difficulty
+
+    @given(
+        title=st.text(min_size=1, max_size=100),
+        topic=st.text(min_size=1, max_size=50),
+        difficulty=valid_difficulty_levels(),
+    )
+    @settings(max_examples=30)
+    def test_cs_problem_accepts_valid_strings(self, title, topic, difficulty):
+        """Test that CSProblem accepts valid string fields."""
+        problem = CSProblem(
+            title=title,
+            topic=topic,
+            difficulty=difficulty,
+            cards=[],
+        )
+        assert problem.title == title
+        assert problem.topic == topic
+
+    @given(
+        title=st.text(min_size=1, max_size=100),
+        topic=st.text(min_size=1, max_size=50),
+        difficulty=valid_difficulty_levels(),
+    )
+    @settings(max_examples=30)
+    def test_physics_problem_accepts_valid_strings(self, title, topic, difficulty):
+        """Test that PhysicsProblem accepts valid string fields."""
+        problem = PhysicsProblem(
+            title=title,
+            topic=topic,
+            difficulty=difficulty,
+            cards=[],
+        )
+        assert problem.title == title
+
+    @given(num_cards=st.integers(min_value=1, max_value=10))
+    @settings(max_examples=20)
+    def test_problem_accepts_multiple_cards(self, num_cards):
+        """Test that problems accept multiple cards."""
+        cards = [
+            AnkiCard(card_type="Test", tags=[], front=f"Q{i}", back=f"A{i}")
+            for i in range(num_cards)
+        ]
+        problem = LeetCodeProblem(
+            title="Test",
+            topic="Test",
+            difficulty="Easy",
+            cards=cards,
+        )
+        assert len(problem.cards) == num_cards
+
+    @given(
+        title=st.text(min_size=1, max_size=100),
+        topic=st.text(min_size=1, max_size=50),
+    )
+    @settings(max_examples=30)
+    def test_generic_problem_behaves_like_base(self, title, topic):
+        """Test that GenericProblem behaves like BaseProblem."""
+        generic = GenericProblem(
+            title=title,
+            topic=topic,
+            difficulty="Medium",
+            cards=[],
+        )
+        base = BaseProblem(
+            title=title,
+            topic=topic,
+            difficulty="Medium",
+            cards=[],
+        )
+        assert generic.title == base.title
+        assert generic.topic == base.topic
+
+
+class TestMCQProblemPropertyBased:
+    """Property-based tests for MCQProblem model."""
+
+    @given(
+        title=st.text(min_size=1, max_size=100),
+        topic=st.text(min_size=1, max_size=50),
+        difficulty=valid_difficulty_levels(),
+    )
+    @settings(max_examples=30)
+    def test_mcq_problem_accepts_valid_strings(self, title, topic, difficulty):
+        """Test that MCQProblem accepts valid string fields."""
+        problem = MCQProblem(
+            title=title,
+            topic=topic,
+            difficulty=difficulty,
+            cards=[],
+        )
+        assert problem.title == title
+        assert problem.topic == topic
+        assert problem.difficulty == difficulty
+
+    @given(num_cards=st.integers(min_value=1, max_value=10))
+    @settings(max_examples=20)
+    def test_mcq_problem_accepts_multiple_cards(self, num_cards):
+        """Test that MCQProblem accepts multiple MCQ cards."""
+        cards = [
+            MCQCard(
+                card_type="Test",
+                tags=[],
+                question=f"Q{i}?",
+                options=["A", "B", "C", "D"],
+                correct_answer="A",
+                explanation=f"Exp{i}",
+            )
+            for i in range(num_cards)
+        ]
+        problem = MCQProblem(
+            title="Test",
+            topic="Test",
+            difficulty="Easy",
+            cards=cards,
+        )
+        assert len(problem.cards) == num_cards
+
+
+class TestModelSerializationPropertyBased:
+    """Property-based tests for model serialization."""
+
+    @given(card=valid_anki_cards())
+    @settings(max_examples=30)
+    def test_anki_card_model_dump_contains_all_fields(self, card):
+        """Test that model_dump contains all fields."""
+        data = card.model_dump()
+        assert "card_type" in data
+        assert "tags" in data
+        assert "front" in data
+        assert "back" in data
+        assert len(data) == 4  # No extra fields
+
+    @given(card=valid_mcq_cards())
+    @settings(max_examples=30)
+    def test_mcq_card_model_dump_contains_all_fields(self, card):
+        """Test that MCQCard model_dump contains all fields."""
+        data = card.model_dump()
+        assert "card_type" in data
+        assert "tags" in data
+        assert "question" in data
+        assert "options" in data
+        assert "correct_answer" in data
+        assert "explanation" in data
+        assert len(data) == 6
+
+    @given(
+        title=st.text(min_size=1, max_size=50),
+        topic=st.text(min_size=1, max_size=50),
+        difficulty=valid_difficulty_levels(),
+    )
+    @settings(max_examples=30)
+    def test_problem_model_dump_roundtrip(self, title, topic, difficulty):
+        """Test that problem models survive model_dump roundtrip."""
+        original = LeetCodeProblem(
+            title=title,
+            topic=topic,
+            difficulty=difficulty,
+            cards=[AnkiCard(card_type="Test", tags=[], front="Q", back="A")],
+        )
+        data = original.model_dump()
+        restored = LeetCodeProblem(**data)
+        assert restored.title == original.title
+        assert restored.topic == original.topic
+        assert restored.difficulty == original.difficulty
+        assert len(restored.cards) == len(original.cards)
+
+
+class TestModelValidationPropertyBased:
+    """Property-based tests for model validation."""
+
+    @given(extra_key=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Ll",))))
+    @settings(max_examples=20)
+    def test_anki_card_rejects_extra_fields(self, extra_key):
+        """Test that AnkiCard rejects any extra field."""
+        assume(extra_key not in ["card_type", "tags", "front", "back"])
+        with pytest.raises(ValidationError):
+            AnkiCard(
+                card_type="Test",
+                tags=[],
+                front="Q",
+                back="A",
+                **{extra_key: "value"}
+            )
+
+    @given(extra_key=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Ll",))))
+    @settings(max_examples=20)
+    def test_mcq_card_rejects_extra_fields(self, extra_key):
+        """Test that MCQCard rejects any extra field."""
+        assume(extra_key not in ["card_type", "tags", "question", "options", "correct_answer", "explanation"])
+        with pytest.raises(ValidationError):
+            MCQCard(
+                card_type="Test",
+                tags=[],
+                question="Q?",
+                options=["A", "B", "C", "D"],
+                correct_answer="A",
+                explanation="Exp",
+                **{extra_key: "value"}
+            )
+
+    @given(extra_key=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Ll",))))
+    @settings(max_examples=20)
+    def test_problem_rejects_extra_fields(self, extra_key):
+        """Test that problem models reject extra fields."""
+        assume(extra_key not in ["title", "topic", "difficulty", "cards"])
+        with pytest.raises(ValidationError):
+            LeetCodeProblem(
+                title="Test",
+                topic="Test",
+                difficulty="Easy",
+                cards=[],
+                **{extra_key: "value"}
+            )
