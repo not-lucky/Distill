@@ -34,7 +34,10 @@ llm2deck = "src.cli:main"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
-    "integration: marks tests as integration tests (require API keys)",
+    "unit: Unit tests (fast, isolated)",
+    "integration: Integration tests (may touch multiple components)",
+    "e2e: End-to-end tests (full flows)",
+    "slow: Slow tests (>1s execution)",
 ]
 # Exclude experiments directory (contains runnable scripts, not tests)
 norecursedirs = ["tests/experiments"]
@@ -42,6 +45,16 @@ pythonpath = ["."]
 filterwarnings = [
     # Ignore unawaited coroutine warnings from unittest.mock internals (Python 3.12+ issue)
     "ignore:coroutine 'AsyncMockMixin._execute_mock_call' was never awaited:RuntimeWarning",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
 ]
 
 [dependency-groups]
