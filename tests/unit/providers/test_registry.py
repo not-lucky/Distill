@@ -4,6 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import itertools
 
+from assertpy import assert_that
+
 from src.providers.registry import (
     PROVIDER_REGISTRY,
     ProviderSpec,
@@ -22,7 +24,11 @@ class TestProviderRegistry:
     """Tests for PROVIDER_REGISTRY constant."""
 
     def test_registry_contains_expected_providers(self):
-        """Test that registry contains expected providers."""
+        """
+        Given the PROVIDER_REGISTRY constant
+        When checking for expected providers
+        Then all expected providers are present
+        """
         expected = [
             "cerebras",
             "openrouter",
@@ -36,161 +42,240 @@ class TestProviderRegistry:
         ]
 
         for provider in expected:
-            assert provider in PROVIDER_REGISTRY, f"Missing provider: {provider}"
+            assert_that(PROVIDER_REGISTRY).contains_key(provider)
 
     def test_registry_values_are_provider_specs(self):
-        """Test that all registry values are ProviderSpec instances."""
+        """
+        Given the PROVIDER_REGISTRY
+        When checking value types
+        Then all values are ProviderSpec instances
+        """
         for name, spec in PROVIDER_REGISTRY.items():
-            assert isinstance(spec, ProviderSpec), f"{name} is not a ProviderSpec"
+            assert_that(spec).is_instance_of(ProviderSpec)
 
     def test_registry_provider_classes_are_callable(self):
-        """Test that all provider classes in registry are callable."""
+        """
+        Given the PROVIDER_REGISTRY
+        When checking provider classes
+        Then all provider classes are callable
+        """
         for name, spec in PROVIDER_REGISTRY.items():
-            assert callable(spec.provider_class), f"{name} provider_class is not callable"
+            assert_that(callable(spec.provider_class)).is_true()
 
     def test_registry_count(self):
-        """Test registry contains expected number of providers."""
-        assert len(PROVIDER_REGISTRY) == 9
+        """
+        Given the PROVIDER_REGISTRY
+        When counting entries
+        Then it contains expected number of providers
+        """
+        assert_that(PROVIDER_REGISTRY).is_length(9)
 
     def test_cerebras_spec(self):
-        """Test Cerebras provider specification."""
+        """
+        Given the cerebras provider specification
+        When checking its fields
+        Then it has correct key_name and extra_params
+        """
         spec = PROVIDER_REGISTRY["cerebras"]
-        assert spec.key_name == "cerebras"
-        assert "reasoning_effort" in spec.extra_params
-        assert spec.multi_model is False
-        assert spec.no_keys is False
+        assert_that(spec.key_name).is_equal_to("cerebras")
+        assert_that(spec.extra_params).contains("reasoning_effort")
+        assert_that(spec.multi_model).is_false()
+        assert_that(spec.no_keys).is_false()
 
     def test_cerebras_spec_details(self):
-        """Test Cerebras spec has correct provider class."""
+        """
+        Given the cerebras provider specification
+        When checking provider class details
+        Then it has correct provider class and flags
+        """
         from src.providers.cerebras import CerebrasProvider
         spec = PROVIDER_REGISTRY["cerebras"]
-        assert spec.provider_class is CerebrasProvider
-        assert spec.uses_base_url is False
-        assert spec.factory is None
+        assert_that(spec.provider_class).is_same_as(CerebrasProvider)
+        assert_that(spec.uses_base_url).is_false()
+        assert_that(spec.factory).is_none()
 
     def test_openrouter_spec(self):
-        """Test OpenRouter provider specification."""
+        """
+        Given the openrouter provider specification
+        When checking its fields
+        Then it has correct configuration
+        """
         from src.providers.openrouter import OpenRouterProvider
         spec = PROVIDER_REGISTRY["openrouter"]
-        assert spec.provider_class is OpenRouterProvider
-        assert spec.key_name == "openrouter"
-        assert spec.uses_base_url is True
-        assert spec.multi_model is False
+        assert_that(spec.provider_class).is_same_as(OpenRouterProvider)
+        assert_that(spec.key_name).is_equal_to("openrouter")
+        assert_that(spec.uses_base_url).is_true()
+        assert_that(spec.multi_model).is_false()
 
     def test_nvidia_spec(self):
-        """Test NVIDIA provider specification."""
+        """
+        Given the nvidia provider specification
+        When checking its fields
+        Then it has correct configuration with extra_params
+        """
         from src.providers.nvidia import NvidiaProvider
         spec = PROVIDER_REGISTRY["nvidia"]
-        assert spec.provider_class is NvidiaProvider
-        assert spec.key_name == "nvidia"
-        assert spec.uses_base_url is True
-        assert "top_p" in spec.extra_params
-        assert "extra_params" in spec.extra_params
+        assert_that(spec.provider_class).is_same_as(NvidiaProvider)
+        assert_that(spec.key_name).is_equal_to("nvidia")
+        assert_that(spec.uses_base_url).is_true()
+        assert_that(spec.extra_params).contains("top_p")
+        assert_that(spec.extra_params).contains("extra_params")
 
     def test_google_antigravity_spec(self):
-        """Test Google Antigravity provider specification."""
+        """
+        Given the google_antigravity provider specification
+        When checking its fields
+        Then it has no_keys=True and multi_model=True
+        """
         spec = PROVIDER_REGISTRY["google_antigravity"]
-        assert spec.no_keys is True
-        assert spec.multi_model is True
-        assert spec.uses_base_url is True
+        assert_that(spec.no_keys).is_true()
+        assert_that(spec.multi_model).is_true()
+        assert_that(spec.uses_base_url).is_true()
 
     def test_google_antigravity_spec_details(self):
-        """Test Google Antigravity spec has correct provider class."""
+        """
+        Given the google_antigravity provider specification
+        When checking provider class details
+        Then it has correct provider class
+        """
         from src.providers.google_antigravity import GoogleAntigravityProvider
         spec = PROVIDER_REGISTRY["google_antigravity"]
-        assert spec.provider_class is GoogleAntigravityProvider
-        assert spec.key_name is None
-        assert spec.factory is None
+        assert_that(spec.provider_class).is_same_as(GoogleAntigravityProvider)
+        assert_that(spec.key_name).is_none()
+        assert_that(spec.factory).is_none()
 
     def test_g4f_spec(self):
-        """Test G4F provider specification."""
+        """
+        Given the g4f provider specification
+        When checking its fields
+        Then it has no_keys=True and provider_name in extra_params
+        """
         spec = PROVIDER_REGISTRY["g4f"]
-        assert spec.no_keys is True
-        assert "provider_name" in spec.extra_params
+        assert_that(spec.no_keys).is_true()
+        assert_that(spec.extra_params).contains("provider_name")
 
     def test_g4f_spec_details(self):
-        """Test G4F spec details."""
+        """
+        Given the g4f provider specification
+        When checking provider class details
+        Then it has correct configuration
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
             spec = PROVIDER_REGISTRY["g4f"]
-            assert spec.provider_class is G4FProvider
-            assert spec.uses_base_url is False
-            assert spec.multi_model is False
+            assert_that(spec.provider_class).is_same_as(G4FProvider)
+            assert_that(spec.uses_base_url).is_false()
+            assert_that(spec.multi_model).is_false()
 
     def test_canopywave_spec(self):
-        """Test Canopywave provider specification."""
+        """
+        Given the canopywave provider specification
+        When checking its fields
+        Then it has correct configuration
+        """
         from src.providers.canopywave import CanopywaveProvider
         spec = PROVIDER_REGISTRY["canopywave"]
-        assert spec.provider_class is CanopywaveProvider
-        assert spec.key_name == "canopywave"
-        assert spec.uses_base_url is True
+        assert_that(spec.provider_class).is_same_as(CanopywaveProvider)
+        assert_that(spec.key_name).is_equal_to("canopywave")
+        assert_that(spec.uses_base_url).is_true()
 
     def test_baseten_spec(self):
-        """Test Baseten provider specification."""
+        """
+        Given the baseten provider specification
+        When checking its fields
+        Then it has correct configuration with strip_json_markers param
+        """
         from src.providers.baseten import BasetenProvider
         spec = PROVIDER_REGISTRY["baseten"]
-        assert spec.provider_class is BasetenProvider
-        assert spec.key_name == "baseten"
-        assert spec.uses_base_url is True
-        assert "strip_json_markers" in spec.extra_params
+        assert_that(spec.provider_class).is_same_as(BasetenProvider)
+        assert_that(spec.key_name).is_equal_to("baseten")
+        assert_that(spec.uses_base_url).is_true()
+        assert_that(spec.extra_params).contains("strip_json_markers")
 
     def test_google_genai_spec(self):
-        """Test Google GenAI provider specification."""
+        """
+        Given the google_genai provider specification
+        When checking its fields
+        Then it has thinking_level in extra_params
+        """
         from src.providers.google_genai import GoogleGenAIProvider
         spec = PROVIDER_REGISTRY["google_genai"]
-        assert spec.provider_class is GoogleGenAIProvider
-        assert spec.key_name == "google_genai"
-        assert "thinking_level" in spec.extra_params
+        assert_that(spec.provider_class).is_same_as(GoogleGenAIProvider)
+        assert_that(spec.key_name).is_equal_to("google_genai")
+        assert_that(spec.extra_params).contains("thinking_level")
 
     def test_gemini_webapi_spec(self):
-        """Test Gemini WebAPI provider specification."""
+        """
+        Given the gemini_webapi provider specification
+        When checking its fields
+        Then it has no_keys=True and factory set
+        """
         spec = PROVIDER_REGISTRY["gemini_webapi"]
-        assert spec.no_keys is True
-        assert spec.factory is not None
+        assert_that(spec.no_keys).is_true()
+        assert_that(spec.factory).is_not_none()
 
 
 class TestProviderRegistryValidation:
     """Validation tests for provider registry."""
 
     def test_all_key_names_are_strings_or_none(self):
-        """Test that all key_name values are strings or None."""
+        """
+        Given the PROVIDER_REGISTRY
+        When checking key_name values
+        Then all are strings or None
+        """
         for name, spec in PROVIDER_REGISTRY.items():
-            assert spec.key_name is None or isinstance(spec.key_name, str), \
-                f"{name} key_name is not string or None"
+            is_valid = spec.key_name is None or isinstance(spec.key_name, str)
+            assert_that(is_valid).is_true()
 
     def test_all_extra_params_are_lists(self):
-        """Test that all extra_params are lists."""
+        """
+        Given the PROVIDER_REGISTRY
+        When checking extra_params types
+        Then all are lists
+        """
         for name, spec in PROVIDER_REGISTRY.items():
-            assert isinstance(spec.extra_params, list), \
-                f"{name} extra_params is not a list"
+            assert_that(spec.extra_params).is_instance_of(list)
 
     def test_all_extra_params_contain_strings(self):
-        """Test that all extra_params contain only strings."""
+        """
+        Given the PROVIDER_REGISTRY
+        When checking extra_params contents
+        Then all contain only strings
+        """
         for name, spec in PROVIDER_REGISTRY.items():
             for param in spec.extra_params:
-                assert isinstance(param, str), \
-                    f"{name} has non-string param: {param}"
+                assert_that(param).is_instance_of(str)
 
     def test_multi_model_providers_have_no_factory(self):
-        """Test that multi_model providers don't have custom factories."""
+        """
+        Given multi_model providers
+        When checking for factory
+        Then they have no custom factory
+        """
         for name, spec in PROVIDER_REGISTRY.items():
             if spec.multi_model:
-                assert spec.factory is None, \
-                    f"{name} is multi_model but has factory"
+                assert_that(spec.factory).is_none()
 
     def test_factory_providers_have_no_multi_model(self):
-        """Test that factory providers aren't multi_model."""
+        """
+        Given factory providers
+        When checking multi_model flag
+        Then it is False
+        """
         for name, spec in PROVIDER_REGISTRY.items():
             if spec.factory is not None:
-                assert not spec.multi_model, \
-                    f"{name} has factory but is multi_model"
+                assert_that(spec.multi_model).is_false()
 
     def test_no_keys_providers_have_no_key_name(self):
-        """Test that no_keys providers don't specify key_name."""
+        """
+        Given no_keys providers
+        When checking key_name
+        Then it is None
+        """
         for name, spec in PROVIDER_REGISTRY.items():
             if spec.no_keys:
-                assert spec.key_name is None, \
-                    f"{name} is no_keys but has key_name"
+                assert_that(spec.key_name).is_none()
 
 
 # =============================================================================
@@ -202,7 +287,11 @@ class TestProviderSpec:
     """Tests for ProviderSpec dataclass."""
 
     def test_create_provider_spec(self):
-        """Test creating a ProviderSpec."""
+        """
+        Given provider spec parameters
+        When ProviderSpec is created
+        Then all fields are set correctly
+        """
         spec = ProviderSpec(
             provider_class=MagicMock,
             key_name="test",
@@ -210,23 +299,31 @@ class TestProviderSpec:
             multi_model=True,
         )
 
-        assert spec.key_name == "test"
-        assert spec.extra_params == ["param1", "param2"]
-        assert spec.multi_model is True
+        assert_that(spec.key_name).is_equal_to("test")
+        assert_that(spec.extra_params).is_equal_to(["param1", "param2"])
+        assert_that(spec.multi_model).is_true()
 
     def test_default_values(self):
-        """Test ProviderSpec default values."""
+        """
+        Given only required provider_class
+        When ProviderSpec is created
+        Then default values are used
+        """
         spec = ProviderSpec(provider_class=MagicMock)
 
-        assert spec.key_name is None
-        assert spec.extra_params == []
-        assert spec.multi_model is False
-        assert spec.no_keys is False
-        assert spec.uses_base_url is False
-        assert spec.factory is None
+        assert_that(spec.key_name).is_none()
+        assert_that(spec.extra_params).is_equal_to([])
+        assert_that(spec.multi_model).is_false()
+        assert_that(spec.no_keys).is_false()
+        assert_that(spec.uses_base_url).is_false()
+        assert_that(spec.factory).is_none()
 
     def test_spec_with_all_params(self):
-        """Test creating spec with all parameters."""
+        """
+        Given all parameters
+        When ProviderSpec is created
+        Then all fields are set correctly
+        """
         async def mock_factory(cfg, defs):
             return []
 
@@ -240,20 +337,28 @@ class TestProviderSpec:
             factory=mock_factory,
         )
 
-        assert spec.key_name == "test_key"
-        assert len(spec.extra_params) == 3
-        assert spec.multi_model is True
-        assert spec.no_keys is True
-        assert spec.uses_base_url is True
-        assert spec.factory is mock_factory
+        assert_that(spec.key_name).is_equal_to("test_key")
+        assert_that(spec.extra_params).is_length(3)
+        assert_that(spec.multi_model).is_true()
+        assert_that(spec.no_keys).is_true()
+        assert_that(spec.uses_base_url).is_true()
+        assert_that(spec.factory).is_same_as(mock_factory)
 
     def test_spec_is_dataclass(self):
-        """Test that ProviderSpec is a dataclass."""
+        """
+        Given ProviderSpec
+        When checking if dataclass
+        Then it is a dataclass
+        """
         from dataclasses import is_dataclass
-        assert is_dataclass(ProviderSpec)
+        assert_that(is_dataclass(ProviderSpec)).is_true()
 
     def test_spec_has_expected_fields(self):
-        """Test that ProviderSpec has expected fields."""
+        """
+        Given ProviderSpec
+        When checking its fields
+        Then it has all expected fields
+        """
         from dataclasses import fields
         field_names = {f.name for f in fields(ProviderSpec)}
         expected = {
@@ -265,7 +370,7 @@ class TestProviderSpec:
             "uses_base_url",
             "factory",
         }
-        assert field_names == expected
+        assert_that(field_names).is_equal_to(expected)
 
 
 # =============================================================================
@@ -277,52 +382,92 @@ class TestDefaultBaseUrls:
     """Tests for DEFAULT_BASE_URLS constant."""
 
     def test_contains_expected_providers(self):
-        """Test that DEFAULT_BASE_URLS contains expected providers."""
-        assert "nvidia" in DEFAULT_BASE_URLS
-        assert "openrouter" in DEFAULT_BASE_URLS
-        assert "google_antigravity" in DEFAULT_BASE_URLS
-        assert "baseten" in DEFAULT_BASE_URLS
-        assert "canopywave" in DEFAULT_BASE_URLS
+        """
+        Given DEFAULT_BASE_URLS
+        When checking for expected providers
+        Then all expected providers are present
+        """
+        assert_that(DEFAULT_BASE_URLS).contains_key("nvidia")
+        assert_that(DEFAULT_BASE_URLS).contains_key("openrouter")
+        assert_that(DEFAULT_BASE_URLS).contains_key("google_antigravity")
+        assert_that(DEFAULT_BASE_URLS).contains_key("baseten")
+        assert_that(DEFAULT_BASE_URLS).contains_key("canopywave")
 
     def test_nvidia_url(self):
-        """Test Nvidia default URL."""
-        assert DEFAULT_BASE_URLS["nvidia"] == "https://integrate.api.nvidia.com/v1"
+        """
+        Given DEFAULT_BASE_URLS
+        When checking nvidia URL
+        Then it is correct
+        """
+        assert_that(DEFAULT_BASE_URLS["nvidia"]).is_equal_to("https://integrate.api.nvidia.com/v1")
 
     def test_openrouter_url(self):
-        """Test OpenRouter default URL."""
-        assert DEFAULT_BASE_URLS["openrouter"] == "https://openrouter.ai/api/v1"
+        """
+        Given DEFAULT_BASE_URLS
+        When checking openrouter URL
+        Then it is correct
+        """
+        assert_that(DEFAULT_BASE_URLS["openrouter"]).is_equal_to("https://openrouter.ai/api/v1")
 
     def test_google_antigravity_url(self):
-        """Test Google Antigravity default URL (local server)."""
-        assert DEFAULT_BASE_URLS["google_antigravity"] == "http://127.0.0.1:8317/v1"
+        """
+        Given DEFAULT_BASE_URLS
+        When checking google_antigravity URL
+        Then it is the local server
+        """
+        assert_that(DEFAULT_BASE_URLS["google_antigravity"]).is_equal_to("http://127.0.0.1:8317/v1")
 
     def test_baseten_url(self):
-        """Test Baseten default URL."""
-        assert DEFAULT_BASE_URLS["baseten"] == "https://inference.baseten.co/v1"
+        """
+        Given DEFAULT_BASE_URLS
+        When checking baseten URL
+        Then it is correct
+        """
+        assert_that(DEFAULT_BASE_URLS["baseten"]).is_equal_to("https://inference.baseten.co/v1")
 
     def test_canopywave_url(self):
-        """Test Canopywave default URL."""
-        assert DEFAULT_BASE_URLS["canopywave"] == "https://api.xiaomimimo.com/v1"
+        """
+        Given DEFAULT_BASE_URLS
+        When checking canopywave URL
+        Then it is correct
+        """
+        assert_that(DEFAULT_BASE_URLS["canopywave"]).is_equal_to("https://api.xiaomimimo.com/v1")
 
     def test_all_urls_are_strings(self):
-        """Test all URLs are strings."""
+        """
+        Given DEFAULT_BASE_URLS
+        When checking URL types
+        Then all are strings
+        """
         for name, url in DEFAULT_BASE_URLS.items():
-            assert isinstance(url, str), f"{name} URL is not a string"
+            assert_that(url).is_instance_of(str)
 
     def test_all_urls_start_with_http(self):
-        """Test all URLs start with http or https."""
+        """
+        Given DEFAULT_BASE_URLS
+        When checking URL prefixes
+        Then all start with http or https
+        """
         for name, url in DEFAULT_BASE_URLS.items():
-            assert url.startswith("http://") or url.startswith("https://"), \
-                f"{name} URL doesn't start with http(s)"
+            starts_with_http = url.startswith("http://") or url.startswith("https://")
+            assert_that(starts_with_http).is_true()
 
     def test_all_urls_end_with_v1(self):
-        """Test all URLs end with /v1."""
+        """
+        Given DEFAULT_BASE_URLS
+        When checking URL suffixes
+        Then all end with /v1
+        """
         for name, url in DEFAULT_BASE_URLS.items():
-            assert url.endswith("/v1"), f"{name} URL doesn't end with /v1"
+            assert_that(url).ends_with("/v1")
 
     def test_urls_count(self):
-        """Test expected number of default URLs."""
-        assert len(DEFAULT_BASE_URLS) == 5
+        """
+        Given DEFAULT_BASE_URLS
+        When counting entries
+        Then it contains expected number of URLs
+        """
+        assert_that(DEFAULT_BASE_URLS).is_length(5)
 
 
 # =============================================================================
@@ -346,7 +491,11 @@ class TestCreateProviderInstances:
 
     @pytest.mark.asyncio
     async def test_create_single_model_provider(self, defaults):
-        """Test creating a single-model provider."""
+        """
+        Given a single-model provider spec
+        When create_provider_instances is called
+        Then one instance is created
+        """
         MockProvider = MagicMock()
         mock_instance = MagicMock()
         MockProvider.return_value = mock_instance
@@ -369,12 +518,16 @@ class TestCreateProviderInstances:
 
             instances = await create_provider_instances("test", spec, cfg, defaults)
 
-            assert len(instances) == 1
+            assert_that(instances).is_length(1)
             MockProvider.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_multi_model_provider(self, defaults):
-        """Test creating a multi-model provider."""
+        """
+        Given a multi-model provider spec with 3 models
+        When create_provider_instances is called
+        Then 3 instances are created
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -391,12 +544,16 @@ class TestCreateProviderInstances:
 
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
-        assert len(instances) == 3
-        assert MockProvider.call_count == 3
+        assert_that(instances).is_length(3)
+        assert_that(MockProvider.call_count).is_equal_to(3)
 
     @pytest.mark.asyncio
     async def test_create_multi_model_provider_with_five_models(self, defaults):
-        """Test creating multi-model provider with five models."""
+        """
+        Given a multi-model provider spec with 5 models
+        When create_provider_instances is called
+        Then 5 instances are created
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -413,11 +570,15 @@ class TestCreateProviderInstances:
 
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
-        assert len(instances) == 5
+        assert_that(instances).is_length(5)
 
     @pytest.mark.asyncio
     async def test_create_multi_model_provider_empty_models(self, defaults):
-        """Test creating multi-model provider with no models."""
+        """
+        Given a multi-model provider spec with empty models
+        When create_provider_instances is called
+        Then empty list is returned
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -434,11 +595,15 @@ class TestCreateProviderInstances:
 
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
-        assert len(instances) == 0
+        assert_that(instances).is_length(0)
 
     @pytest.mark.asyncio
     async def test_create_provider_no_keys_found(self, defaults):
-        """Test creating provider when no keys found returns empty list."""
+        """
+        Given a provider requiring keys but none found
+        When create_provider_instances is called
+        Then empty list is returned
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -453,11 +618,15 @@ class TestCreateProviderInstances:
 
             instances = await create_provider_instances("test", spec, cfg, defaults)
 
-            assert instances == []
+            assert_that(instances).is_equal_to([])
 
     @pytest.mark.asyncio
     async def test_create_provider_with_extra_params(self, defaults):
-        """Test creating provider with extra parameters."""
+        """
+        Given a provider spec with extra_params
+        When create_provider_instances is called with those params set
+        Then the params are passed to the provider
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -475,14 +644,18 @@ class TestCreateProviderInstances:
 
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
-        assert len(instances) == 1
+        assert_that(instances).is_length(1)
         call_kwargs = MockProvider.call_args[1]
-        assert call_kwargs["reasoning_effort"] == "high"
-        assert call_kwargs["thinking_level"] == "medium"
+        assert_that(call_kwargs["reasoning_effort"]).is_equal_to("high")
+        assert_that(call_kwargs["thinking_level"]).is_equal_to("medium")
 
     @pytest.mark.asyncio
     async def test_create_provider_extra_params_none_skipped(self, defaults):
-        """Test that None extra params are not passed."""
+        """
+        Given extra_params with None values
+        When create_provider_instances is called
+        Then None values are not passed
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -501,12 +674,16 @@ class TestCreateProviderInstances:
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert call_kwargs["reasoning_effort"] == "high"
-        assert "thinking_level" not in call_kwargs
+        assert_that(call_kwargs["reasoning_effort"]).is_equal_to("high")
+        assert_that(call_kwargs).does_not_contain_key("thinking_level")
 
     @pytest.mark.asyncio
     async def test_create_provider_uses_effective_values(self, defaults):
-        """Test that effective values from config/defaults are used."""
+        """
+        Given provider config and defaults
+        When create_provider_instances is called
+        Then effective values are used correctly
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -525,12 +702,16 @@ class TestCreateProviderInstances:
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert call_kwargs["temperature"] == 0.7  # Uses config value
-        assert call_kwargs["timeout"] == 120.0  # Uses default
+        assert_that(call_kwargs["temperature"]).is_equal_to(0.7)  # Uses config value
+        assert_that(call_kwargs["timeout"]).is_equal_to(120.0)  # Uses default
 
     @pytest.mark.asyncio
     async def test_create_provider_with_custom_factory(self, defaults):
-        """Test creating provider with custom factory function."""
+        """
+        Given a spec with custom factory
+        When create_provider_instances is called
+        Then factory is used to create instances
+        """
         async def custom_factory(cfg, defs):
             return [MagicMock(), MagicMock()]
 
@@ -543,11 +724,15 @@ class TestCreateProviderInstances:
 
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
-        assert len(instances) == 2
+        assert_that(instances).is_length(2)
 
     @pytest.mark.asyncio
     async def test_create_provider_factory_receives_config(self, defaults):
-        """Test that factory receives correct config."""
+        """
+        Given a spec with custom factory
+        When create_provider_instances is called
+        Then factory receives correct config and defaults
+        """
         received_cfg = None
         received_defs = None
 
@@ -566,12 +751,16 @@ class TestCreateProviderInstances:
 
         await create_provider_instances("test", spec, cfg, defaults)
 
-        assert received_cfg is cfg
-        assert received_defs is defaults
+        assert_that(received_cfg).is_same_as(cfg)
+        assert_that(received_defs).is_same_as(defaults)
 
     @pytest.mark.asyncio
     async def test_create_provider_base_url_fallback(self, defaults):
-        """Test that base_url falls back to DEFAULT_BASE_URLS."""
+        """
+        Given no custom base_url
+        When create_provider_instances is called
+        Then DEFAULT_BASE_URLS fallback is used
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -590,11 +779,15 @@ class TestCreateProviderInstances:
             instances = await create_provider_instances("test", spec, cfg, defaults)
 
             call_kwargs = MockProvider.call_args[1]
-            assert call_kwargs["base_url"] == "https://default.url/v1"
+            assert_that(call_kwargs["base_url"]).is_equal_to("https://default.url/v1")
 
     @pytest.mark.asyncio
     async def test_create_provider_custom_base_url(self, defaults):
-        """Test that custom base_url overrides default."""
+        """
+        Given a custom base_url
+        When create_provider_instances is called
+        Then custom base_url is used
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -612,11 +805,15 @@ class TestCreateProviderInstances:
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert call_kwargs["base_url"] == "https://custom.url/v1"
+        assert_that(call_kwargs["base_url"]).is_equal_to("https://custom.url/v1")
 
     @pytest.mark.asyncio
     async def test_create_provider_with_max_tokens(self, defaults):
-        """Test creating provider with max_tokens."""
+        """
+        Given max_tokens in config
+        When create_provider_instances is called
+        Then max_tokens is passed to provider
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -634,11 +831,15 @@ class TestCreateProviderInstances:
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert call_kwargs["max_tokens"] == 8192
+        assert_that(call_kwargs["max_tokens"]).is_equal_to(8192)
 
     @pytest.mark.asyncio
     async def test_create_provider_max_tokens_none_not_passed(self, defaults):
-        """Test that max_tokens=None is not passed to provider."""
+        """
+        Given max_tokens=None
+        When create_provider_instances is called
+        Then max_tokens is not passed to provider
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -656,11 +857,15 @@ class TestCreateProviderInstances:
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert "max_tokens" not in call_kwargs
+        assert_that(call_kwargs).does_not_contain_key("max_tokens")
 
     @pytest.mark.asyncio
     async def test_create_provider_passes_retry_config(self, defaults):
-        """Test that retry configuration is passed to provider."""
+        """
+        Given retry configuration in defaults
+        When create_provider_instances is called
+        Then retry config is passed to provider
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -673,12 +878,16 @@ class TestCreateProviderInstances:
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert call_kwargs["max_retries"] == 5
-        assert call_kwargs["json_parse_retries"] == 5
+        assert_that(call_kwargs["max_retries"]).is_equal_to(5)
+        assert_that(call_kwargs["json_parse_retries"]).is_equal_to(5)
 
     @pytest.mark.asyncio
     async def test_create_provider_custom_retries(self):
-        """Test custom retry values are passed."""
+        """
+        Given custom retry values in defaults
+        When create_provider_instances is called
+        Then custom values are passed
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -699,12 +908,16 @@ class TestCreateProviderInstances:
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert call_kwargs["max_retries"] == 3
-        assert call_kwargs["json_parse_retries"] == 2
+        assert_that(call_kwargs["max_retries"]).is_equal_to(3)
+        assert_that(call_kwargs["json_parse_retries"]).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_create_provider_passes_model(self, defaults):
-        """Test that model is passed to provider."""
+        """
+        Given a model name in config
+        When create_provider_instances is called
+        Then model is passed to provider
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -717,11 +930,15 @@ class TestCreateProviderInstances:
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert call_kwargs["model"] == "custom-model-name"
+        assert_that(call_kwargs["model"]).is_equal_to("custom-model-name")
 
     @pytest.mark.asyncio
     async def test_create_provider_with_api_keys(self, defaults):
-        """Test that api_keys are passed as iterator."""
+        """
+        Given API keys for a provider
+        When create_provider_instances is called
+        Then api_keys iterator is passed to provider
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -737,13 +954,13 @@ class TestCreateProviderInstances:
             instances = await create_provider_instances("test", spec, cfg, defaults)
 
             call_kwargs = MockProvider.call_args[1]
-            assert "api_keys" in call_kwargs
+            assert_that(call_kwargs).contains_key("api_keys")
             # Verify it's a cycling iterator
             keys = call_kwargs["api_keys"]
-            assert next(keys) == "key1"
-            assert next(keys) == "key2"
-            assert next(keys) == "key3"
-            assert next(keys) == "key1"  # Cycles back
+            assert_that(next(keys)).is_equal_to("key1")
+            assert_that(next(keys)).is_equal_to("key2")
+            assert_that(next(keys)).is_equal_to("key3")
+            assert_that(next(keys)).is_equal_to("key1")  # Cycles back
 
 
 class TestCreateProviderInstancesMultiModel:
@@ -762,7 +979,11 @@ class TestCreateProviderInstancesMultiModel:
 
     @pytest.mark.asyncio
     async def test_multi_model_each_gets_correct_model(self, defaults):
-        """Test that each instance gets correct model name."""
+        """
+        Given a multi-model provider with multiple models
+        When create_provider_instances is called
+        Then each instance gets the correct model name
+        """
         MockProvider = MagicMock()
         models_used = []
 
@@ -786,11 +1007,15 @@ class TestCreateProviderInstancesMultiModel:
 
         await create_provider_instances("test", spec, cfg, defaults)
 
-        assert models_used == ["llama-70b", "mistral-large", "claude-opus"]
+        assert_that(models_used).is_equal_to(["llama-70b", "mistral-large", "claude-opus"])
 
     @pytest.mark.asyncio
     async def test_multi_model_uses_same_base_url(self, defaults):
-        """Test all instances get same base_url."""
+        """
+        Given a multi-model provider with custom base_url
+        When create_provider_instances is called
+        Then all instances get the same base_url
+        """
         MockProvider = MagicMock()
         base_urls_used = []
 
@@ -815,11 +1040,15 @@ class TestCreateProviderInstancesMultiModel:
 
         await create_provider_instances("test", spec, cfg, defaults)
 
-        assert all(url == "https://custom.url/v1" for url in base_urls_used)
+        assert_that(all(url == "https://custom.url/v1" for url in base_urls_used)).is_true()
 
     @pytest.mark.asyncio
     async def test_multi_model_uses_effective_values(self, defaults):
-        """Test multi-model uses effective timeout/temperature."""
+        """
+        Given a multi-model provider with custom timeout/temperature
+        When create_provider_instances is called
+        Then all instances use effective values
+        """
         MockProvider = MagicMock()
         captured_params = []
 
@@ -850,9 +1079,9 @@ class TestCreateProviderInstancesMultiModel:
         await create_provider_instances("test", spec, cfg, defaults)
 
         for params in captured_params:
-            assert params["timeout"] == 60.0
-            assert params["temperature"] == 0.8
-            assert params["max_tokens"] == 4096  # From defaults
+            assert_that(params["timeout"]).is_equal_to(60.0)
+            assert_that(params["temperature"]).is_equal_to(0.8)
+            assert_that(params["max_tokens"]).is_equal_to(4096)  # From defaults
 
 
 class TestCreateProviderInstancesEdgeCases:
@@ -871,7 +1100,11 @@ class TestCreateProviderInstancesEdgeCases:
 
     @pytest.mark.asyncio
     async def test_provider_without_uses_base_url_no_base_url_passed(self, defaults):
-        """Test provider without uses_base_url doesn't get base_url."""
+        """
+        Given a provider without uses_base_url
+        When create_provider_instances is called
+        Then base_url is not passed
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -889,13 +1122,17 @@ class TestCreateProviderInstancesEdgeCases:
         await create_provider_instances("test", spec, cfg, defaults)
 
         call_kwargs = MockProvider.call_args[1]
-        assert "base_url" not in call_kwargs
-        assert "timeout" not in call_kwargs
-        assert "temperature" not in call_kwargs
+        assert_that(call_kwargs).does_not_contain_key("base_url")
+        assert_that(call_kwargs).does_not_contain_key("timeout")
+        assert_that(call_kwargs).does_not_contain_key("temperature")
 
     @pytest.mark.asyncio
     async def test_provider_with_single_key(self, defaults):
-        """Test provider works with single API key."""
+        """
+        Given a provider with single API key
+        When create_provider_instances is called
+        Then key is cycled correctly
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -910,15 +1147,19 @@ class TestCreateProviderInstancesEdgeCases:
 
             instances = await create_provider_instances("test", spec, cfg, defaults)
 
-            assert len(instances) == 1
+            assert_that(instances).is_length(1)
             call_kwargs = MockProvider.call_args[1]
             keys = call_kwargs["api_keys"]
-            assert next(keys) == "only_one_key"
-            assert next(keys) == "only_one_key"  # Cycles
+            assert_that(next(keys)).is_equal_to("only_one_key")
+            assert_that(next(keys)).is_equal_to("only_one_key")  # Cycles
 
     @pytest.mark.asyncio
     async def test_empty_extra_params_list(self, defaults):
-        """Test provider with empty extra_params list."""
+        """
+        Given empty extra_params list
+        When create_provider_instances is called
+        Then it succeeds
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -931,11 +1172,15 @@ class TestCreateProviderInstancesEdgeCases:
 
         instances = await create_provider_instances("test", spec, cfg, defaults)
 
-        assert len(instances) == 1
+        assert_that(instances).is_length(1)
 
     @pytest.mark.asyncio
     async def test_nonexistent_extra_param_skipped(self, defaults):
-        """Test nonexistent extra param doesn't cause error."""
+        """
+        Given nonexistent extra_param in spec
+        When create_provider_instances is called
+        Then it succeeds without error
+        """
         MockProvider = MagicMock()
 
         spec = ProviderSpec(
@@ -948,7 +1193,7 @@ class TestCreateProviderInstancesEdgeCases:
 
         # Should not raise
         instances = await create_provider_instances("test", spec, cfg, defaults)
-        assert len(instances) == 1
+        assert_that(instances).is_length(1)
 
 
 # =============================================================================
@@ -968,9 +1213,13 @@ class TestProviderSpecParametrized:
         ("google_genai", "google_genai"),
     ])
     def test_providers_requiring_keys(self, provider_name, expected_key):
-        """Test providers that require API keys have correct key_name."""
+        """
+        Given providers that require API keys
+        When checking their key_name
+        Then it matches expected value
+        """
         spec = PROVIDER_REGISTRY[provider_name]
-        assert spec.key_name == expected_key
+        assert_that(spec.key_name).is_equal_to(expected_key)
 
     @pytest.mark.parametrize("provider_name", [
         "g4f",
@@ -978,10 +1227,14 @@ class TestProviderSpecParametrized:
         "gemini_webapi",
     ])
     def test_providers_without_keys(self, provider_name):
-        """Test providers that don't require API keys."""
+        """
+        Given providers that don't require API keys
+        When checking their no_keys flag
+        Then it is True and key_name is None
+        """
         spec = PROVIDER_REGISTRY[provider_name]
-        assert spec.no_keys is True
-        assert spec.key_name is None
+        assert_that(spec.no_keys).is_true()
+        assert_that(spec.key_name).is_none()
 
     @pytest.mark.parametrize("provider_name", [
         "nvidia",
@@ -991,9 +1244,13 @@ class TestProviderSpecParametrized:
         "google_antigravity",
     ])
     def test_openai_compatible_providers(self, provider_name):
-        """Test OpenAI-compatible providers use base_url."""
+        """
+        Given OpenAI-compatible providers
+        When checking uses_base_url flag
+        Then it is True
+        """
         spec = PROVIDER_REGISTRY[provider_name]
-        assert spec.uses_base_url is True
+        assert_that(spec.uses_base_url).is_true()
 
     @pytest.mark.parametrize("provider_name", [
         "cerebras",
@@ -1002,9 +1259,13 @@ class TestProviderSpecParametrized:
         "gemini_webapi",
     ])
     def test_non_openai_compatible_providers(self, provider_name):
-        """Test non-OpenAI-compatible providers don't use base_url."""
+        """
+        Given non-OpenAI-compatible providers
+        When checking uses_base_url flag
+        Then it is False
+        """
         spec = PROVIDER_REGISTRY[provider_name]
-        assert spec.uses_base_url is False
+        assert_that(spec.uses_base_url).is_false()
 
 
 class TestDefaultBaseUrlsParametrized:
@@ -1017,13 +1278,21 @@ class TestDefaultBaseUrlsParametrized:
         ("canopywave", "xiaomimimo.com"),
     ])
     def test_urls_contain_expected_domain(self, provider, expected_domain):
-        """Test URLs contain expected domain."""
+        """
+        Given a provider URL
+        When checking its domain
+        Then it contains expected domain
+        """
         url = DEFAULT_BASE_URLS[provider]
-        assert expected_domain in url
+        assert_that(url).contains(expected_domain)
 
     @pytest.mark.parametrize("provider", list(DEFAULT_BASE_URLS.keys()))
     def test_all_urls_valid_format(self, provider):
-        """Test all URLs have valid format."""
+        """
+        Given a provider URL
+        When checking its format
+        Then it starts with http and contains /v1
+        """
         url = DEFAULT_BASE_URLS[provider]
-        assert url.startswith("http")
-        assert "/v1" in url
+        assert_that(url).starts_with("http")
+        assert_that(url).contains("/v1")

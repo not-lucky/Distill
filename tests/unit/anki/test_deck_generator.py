@@ -5,6 +5,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from assertpy import assert_that
+
 from src.anki.generator import DeckGenerator, load_card_data
 
 
@@ -12,22 +14,34 @@ class TestLoadCardData:
     """Tests for load_card_data function."""
 
     def test_load_valid_json(self, tmp_path):
-        """Test loading valid JSON file."""
+        """
+        Given a valid JSON file
+        When load_card_data is called
+        Then the data is loaded correctly
+        """
         data = [{"title": "Test", "cards": []}]
         json_file = tmp_path / "test.json"
         json_file.write_text(json.dumps(data))
 
         result = load_card_data(str(json_file))
 
-        assert result == data
+        assert_that(result).is_equal_to(data)
 
     def test_load_nonexistent_file_raises(self, tmp_path):
-        """Test loading non-existent file raises error."""
+        """
+        Given a non-existent file path
+        When load_card_data is called
+        Then FileNotFoundError is raised
+        """
         with pytest.raises(FileNotFoundError):
             load_card_data(str(tmp_path / "missing.json"))
 
     def test_load_invalid_json_raises(self, tmp_path):
-        """Test loading invalid JSON raises error."""
+        """
+        Given a file with invalid JSON
+        When load_card_data is called
+        Then JSONDecodeError is raised
+        """
         json_file = tmp_path / "invalid.json"
         json_file.write_text("not valid json")
 
@@ -58,64 +72,96 @@ class TestDeckGenerator:
         ]
 
     def test_init(self, sample_data):
-        """Test DeckGenerator initialization."""
+        """
+        Given card data and a deck prefix
+        When DeckGenerator is initialized
+        Then all fields are set correctly
+        """
         generator = DeckGenerator(sample_data, deck_prefix="Test")
 
-        assert generator.card_data == sample_data
-        assert generator.deck_prefix == "Test"
-        assert generator.deck_collection == {}
+        assert_that(generator.card_data).is_equal_to(sample_data)
+        assert_that(generator.deck_prefix).is_equal_to("Test")
+        assert_that(generator.deck_collection).is_equal_to({})
 
     def test_init_default_prefix(self, sample_data):
-        """Test DeckGenerator with default prefix."""
+        """
+        Given card data without explicit prefix
+        When DeckGenerator is initialized
+        Then default prefix 'LeetCode' is used
+        """
         generator = DeckGenerator(sample_data)
 
-        assert generator.deck_prefix == "LeetCode"
+        assert_that(generator.deck_prefix).is_equal_to("LeetCode")
 
     def test_generate_id_consistent(self, sample_data):
-        """Test _generate_id produces consistent IDs."""
+        """
+        Given the same text
+        When _generate_id is called multiple times
+        Then the same ID is returned
+        """
         generator = DeckGenerator(sample_data)
 
         id1 = generator._generate_id("test text")
         id2 = generator._generate_id("test text")
 
-        assert id1 == id2
-        assert isinstance(id1, int)
+        assert_that(id1).is_equal_to(id2)
+        assert_that(id1).is_instance_of(int)
 
     def test_generate_id_different_for_different_text(self, sample_data):
-        """Test _generate_id produces different IDs for different text."""
+        """
+        Given different text inputs
+        When _generate_id is called
+        Then different IDs are returned
+        """
         generator = DeckGenerator(sample_data)
 
         id1 = generator._generate_id("text one")
         id2 = generator._generate_id("text two")
 
-        assert id1 != id2
+        assert_that(id1).is_not_equal_to(id2)
 
     def test_get_or_create_deck_creates_new(self, sample_data):
-        """Test get_or_create_deck creates new deck."""
+        """
+        Given a deck path that doesn't exist
+        When get_or_create_deck is called
+        Then a new deck is created and added to collection
+        """
         generator = DeckGenerator(sample_data)
 
         deck = generator.get_or_create_deck("Test::Category::Problem")
 
-        assert deck is not None
-        assert "Test::Category::Problem" in generator.deck_collection
+        assert_that(deck).is_not_none()
+        assert_that(generator.deck_collection).contains_key("Test::Category::Problem")
 
     def test_get_or_create_deck_returns_existing(self, sample_data):
-        """Test get_or_create_deck returns existing deck."""
+        """
+        Given an existing deck path
+        When get_or_create_deck is called
+        Then the same deck instance is returned
+        """
         generator = DeckGenerator(sample_data)
 
         deck1 = generator.get_or_create_deck("Test::Deck")
         deck2 = generator.get_or_create_deck("Test::Deck")
 
-        assert deck1 is deck2
+        assert_that(deck1).is_same_as(deck2)
 
     def test_get_prefix(self, sample_data):
-        """Test _get_prefix returns configured prefix."""
+        """
+        Given a generator with custom prefix
+        When _get_prefix is called
+        Then the custom prefix is returned
+        """
         generator = DeckGenerator(sample_data, deck_prefix="Custom")
 
-        assert generator._get_prefix() == "Custom"
+        assert_that(generator._get_prefix()).is_equal_to("Custom")
 
     def test_build_deck_path_with_metadata(self, sample_data):
-        """Test _build_deck_path with category metadata."""
+        """
+        Given problem with category metadata
+        When _build_deck_path is called
+        Then numbered hierarchical path is returned
+        """
         generator = DeckGenerator(sample_data, deck_prefix="LeetCode")
 
         path = generator._build_deck_path(
@@ -126,10 +172,14 @@ class TestDeckGenerator:
             problem_index=2,
         )
 
-        assert path == "LeetCode::001 Binary Search::002 Binary Search"
+        assert_that(path).is_equal_to("LeetCode::001 Binary Search::002 Binary Search")
 
     def test_build_deck_path_without_metadata(self, sample_data):
-        """Test _build_deck_path without category metadata (legacy)."""
+        """
+        Given problem without category metadata (legacy)
+        When _build_deck_path is called
+        Then unnumbered path is returned
+        """
         generator = DeckGenerator(sample_data, deck_prefix="LeetCode")
 
         path = generator._build_deck_path(
@@ -137,18 +187,25 @@ class TestDeckGenerator:
             topic_name="Arrays",
         )
 
-        assert path == "LeetCode::Arrays::Binary Search"
+        assert_that(path).is_equal_to("LeetCode::Arrays::Binary Search")
 
     def test_process_creates_decks(self, sample_data):
-        """Test process creates decks and notes."""
+        """
+        Given sample data with cards
+        When process is called
+        Then decks are created
+        """
         generator = DeckGenerator(sample_data, deck_prefix="Test")
         generator.process()
 
-        # Should have created at least one deck
-        assert len(generator.deck_collection) > 0
+        assert_that(generator.deck_collection).is_not_empty()
 
     def test_process_with_category_metadata(self):
-        """Test process with category metadata."""
+        """
+        Given data with category metadata
+        When process is called
+        Then numbered deck path is created
+        """
         data = [
             {
                 "title": "Two Sum",
@@ -171,30 +228,36 @@ class TestDeckGenerator:
         generator = DeckGenerator(data, deck_prefix="LeetCode")
         generator.process()
 
-        # Deck should be created with numbered path
         expected_path = "LeetCode::001 Arrays::001 Two Sum"
-        assert expected_path in generator.deck_collection
+        assert_that(generator.deck_collection).contains_key(expected_path)
 
     def test_save_package_empty_collection(self, sample_data, tmp_path):
-        """Test save_package with empty collection logs warning."""
+        """
+        Given empty deck collection
+        When save_package is called
+        Then no file is created
+        """
         generator = DeckGenerator(sample_data)
         # Don't call process, so deck_collection is empty
 
         output_path = str(tmp_path / "output.apkg")
         generator.save_package(output_path)
 
-        # File should not be created
-        assert not (tmp_path / "output.apkg").exists()
+        assert_that((tmp_path / "output.apkg").exists()).is_false()
 
     def test_save_package_creates_file(self, sample_data, tmp_path):
-        """Test save_package creates .apkg file."""
+        """
+        Given populated deck collection
+        When save_package is called
+        Then .apkg file is created
+        """
         generator = DeckGenerator(sample_data)
         generator.process()
 
         output_path = str(tmp_path / "output.apkg")
         generator.save_package(output_path)
 
-        assert (tmp_path / "output.apkg").exists()
+        assert_that((tmp_path / "output.apkg").exists()).is_true()
 
 
 class TestAddCards:
@@ -206,7 +269,11 @@ class TestAddCards:
         return DeckGenerator([])
 
     def test_add_basic_card(self, generator):
-        """Test adding a basic card."""
+        """
+        Given a deck and card data
+        When _add_basic_card is called
+        Then a note is added to the deck
+        """
         deck = generator.get_or_create_deck("Test::Deck")
 
         card_data = {
@@ -225,11 +292,14 @@ class TestAddCards:
             ["Tag1", "topic::Topic"]
         )
 
-        # Deck should have one note
-        assert len(deck.notes) == 1
+        assert_that(deck.notes).is_length(1)
 
     def test_add_mcq_card(self):
-        """Test adding an MCQ card."""
+        """
+        Given an MCQ deck and MCQ card data
+        When _add_mcq_card is called
+        Then a note is added to the deck
+        """
         generator = DeckGenerator([], deck_prefix="Test_MCQ")
         deck = generator.get_or_create_deck("Test_MCQ::Deck")
 
@@ -251,7 +321,7 @@ class TestAddCards:
             ["MCQ"]
         )
 
-        assert len(deck.notes) == 1
+        assert_that(deck.notes).is_length(1)
 
 
 class TestShuffleOptions:
@@ -263,47 +333,58 @@ class TestShuffleOptions:
         return DeckGenerator([])
 
     def test_shuffle_preserves_correct_answer(self, generator):
-        """Test that shuffling preserves the correct answer mapping."""
+        """
+        Given options and correct answer
+        When _shuffle_options is called
+        Then the correct answer mapping is preserved
+        """
         options = ["A answer", "B answer", "C answer", "D answer"]
         correct = "B"
 
-        # Run multiple times to test randomness
         for _ in range(10):
             shuffled, new_correct = generator._shuffle_options(options, correct)
 
-            # Find where the original B answer ended up
-            original_b_index = options.index("B answer")
             new_b_index = shuffled.index("B answer")
-
-            # The new correct answer should point to where B answer is now
             expected_letter = ["A", "B", "C", "D"][new_b_index]
-            assert new_correct == expected_letter
+            assert_that(new_correct).is_equal_to(expected_letter)
 
     def test_shuffle_with_non_4_options(self, generator):
-        """Test shuffling with non-4 options returns unchanged."""
-        options = ["A", "B", "C"]  # Only 3 options
+        """
+        Given fewer than 4 options
+        When _shuffle_options is called
+        Then options are returned unchanged
+        """
+        options = ["A", "B", "C"]
         correct = "A"
 
         shuffled, new_correct = generator._shuffle_options(options, correct)
 
-        assert shuffled == options
-        assert new_correct == correct
+        assert_that(shuffled).is_equal_to(options)
+        assert_that(new_correct).is_equal_to(correct)
 
     def test_shuffle_returns_4_options(self, generator):
-        """Test that shuffle always returns 4 options."""
+        """
+        Given 4 options
+        When _shuffle_options is called
+        Then 4 options are returned
+        """
         options = ["A", "B", "C", "D"]
         correct = "A"
 
         shuffled, _ = generator._shuffle_options(options, correct)
 
-        assert len(shuffled) == 4
+        assert_that(shuffled).is_length(4)
 
 
 class TestMCQDetection:
     """Tests for MCQ mode detection."""
 
     def test_mcq_prefix_detection(self):
-        """Test that MCQ mode is detected from prefix."""
+        """
+        Given MCQ prefix in deck_prefix
+        When process is called
+        Then MCQ cards are added
+        """
         data = [
             {
                 "title": "Test",
@@ -325,11 +406,14 @@ class TestMCQDetection:
         generator = DeckGenerator(data, deck_prefix="LeetCode_MCQ")
         generator.process()
 
-        # MCQ should be detected and MCQ card added
-        assert len(generator.deck_collection) > 0
+        assert_that(generator.deck_collection).is_not_empty()
 
     def test_non_mcq_prefix_uses_basic(self):
-        """Test that non-MCQ prefix uses basic cards even with options."""
+        """
+        Given non-MCQ prefix
+        When process is called with cards having options
+        Then basic card format is used
+        """
         data = [
             {
                 "title": "Test",
@@ -341,24 +425,27 @@ class TestMCQDetection:
                         "tags": [],
                         "front": "Q",
                         "back": "A",
-                        "options": ["A", "B", "C", "D"],  # Has options but not MCQ mode
+                        "options": ["A", "B", "C", "D"],
                     }
                 ]
             }
         ]
 
-        generator = DeckGenerator(data, deck_prefix="LeetCode")  # Not MCQ
+        generator = DeckGenerator(data, deck_prefix="LeetCode")
         generator.process()
 
-        # Should use basic card format
-        assert len(generator.deck_collection) > 0
+        assert_that(generator.deck_collection).is_not_empty()
 
 
 class TestHierarchicalDeckStructure:
     """Tests for hierarchical deck creation and naming."""
 
     def test_deep_nested_deck_structure(self):
-        """Test creating deeply nested deck hierarchies."""
+        """
+        Given multiple problems with category metadata
+        When process is called
+        Then deeply nested deck hierarchies are created
+        """
         data = [
             {
                 "title": "Problem 1",
@@ -392,14 +479,17 @@ class TestHierarchicalDeckStructure:
         generator = DeckGenerator(data, deck_prefix="LeetCode")
         generator.process()
 
-        # Should have 3 separate leaf decks
-        assert len(generator.deck_collection) == 3
-        assert "LeetCode::001 Algorithms::001 Problem 1" in generator.deck_collection
-        assert "LeetCode::001 Algorithms::002 Problem 2" in generator.deck_collection
-        assert "LeetCode::002 Data Structures::001 Problem 3" in generator.deck_collection
+        assert_that(generator.deck_collection).is_length(3)
+        assert_that(generator.deck_collection).contains_key("LeetCode::001 Algorithms::001 Problem 1")
+        assert_that(generator.deck_collection).contains_key("LeetCode::001 Algorithms::002 Problem 2")
+        assert_that(generator.deck_collection).contains_key("LeetCode::002 Data Structures::001 Problem 3")
 
     def test_multiple_cards_per_problem(self):
-        """Test multiple cards within a single problem."""
+        """
+        Given a problem with multiple cards
+        When process is called
+        Then one deck with multiple notes is created
+        """
         data = [
             {
                 "title": "Multi-Card Problem",
@@ -416,14 +506,17 @@ class TestHierarchicalDeckStructure:
         generator = DeckGenerator(data, deck_prefix="Test")
         generator.process()
 
-        # Should have one deck with multiple notes
-        assert len(generator.deck_collection) == 1
+        assert_that(generator.deck_collection).is_length(1)
         deck_path = "Test::Testing::Multi-Card Problem"
-        assert deck_path in generator.deck_collection
-        assert len(generator.deck_collection[deck_path].notes) == 3
+        assert_that(generator.deck_collection).contains_key(deck_path)
+        assert_that(generator.deck_collection[deck_path].notes).is_length(3)
 
     def test_special_characters_in_deck_path(self):
-        """Test deck paths with special characters."""
+        """
+        Given problem with special characters in title/topic
+        When process is called
+        Then deck path handles special characters
+        """
         data = [
             {
                 "title": "Two Sum (Easy)",
@@ -436,12 +529,15 @@ class TestHierarchicalDeckStructure:
         generator = DeckGenerator(data, deck_prefix="LeetCode")
         generator.process()
 
-        # Should handle special chars in path
         expected_path = "LeetCode::Arrays & Hashing::Two Sum (Easy)"
-        assert expected_path in generator.deck_collection
+        assert_that(generator.deck_collection).contains_key(expected_path)
 
     def test_unicode_in_deck_path(self):
-        """Test deck paths with unicode characters."""
+        """
+        Given problem with unicode characters
+        When process is called
+        Then deck path handles unicode correctly
+        """
         data = [
             {
                 "title": "算法问题",
@@ -455,10 +551,14 @@ class TestHierarchicalDeckStructure:
         generator.process()
 
         expected_path = "中文::数据结构::算法问题"
-        assert expected_path in generator.deck_collection
+        assert_that(generator.deck_collection).contains_key(expected_path)
 
     def test_large_category_and_problem_indices(self):
-        """Test formatting with large indices (3-digit)."""
+        """
+        Given large category and problem indices
+        When process is called
+        Then indices are formatted correctly
+        """
         data = [
             {
                 "title": "Problem 100",
@@ -475,10 +575,14 @@ class TestHierarchicalDeckStructure:
         generator.process()
 
         expected_path = "LeetCode::100 Advanced::999 Problem 100"
-        assert expected_path in generator.deck_collection
+        assert_that(generator.deck_collection).contains_key(expected_path)
 
     def test_mixed_metadata_and_legacy_problems(self):
-        """Test mixing problems with and without category metadata."""
+        """
+        Given problems with and without category metadata
+        When process is called
+        Then both formats are handled correctly
+        """
         data = [
             {
                 "title": "With Metadata",
@@ -500,15 +604,19 @@ class TestHierarchicalDeckStructure:
         generator = DeckGenerator(data, deck_prefix="Mixed")
         generator.process()
 
-        assert "Mixed::001 Category::001 With Metadata" in generator.deck_collection
-        assert "Mixed::Cat2::Without Metadata" in generator.deck_collection
+        assert_that(generator.deck_collection).contains_key("Mixed::001 Category::001 With Metadata")
+        assert_that(generator.deck_collection).contains_key("Mixed::Cat2::Without Metadata")
 
 
 class TestApkgFileValidity:
     """Tests for .apkg file generation and validity."""
 
     def test_apkg_file_is_valid_zip(self, tmp_path):
-        """Test that generated .apkg is a valid zip file."""
+        """
+        Given processed card data
+        When save_package is called
+        Then a valid zip file is created
+        """
         import zipfile
 
         data = [
@@ -526,11 +634,14 @@ class TestApkgFileValidity:
         output_path = tmp_path / "test.apkg"
         generator.save_package(str(output_path))
 
-        # .apkg should be a valid zip file
-        assert zipfile.is_zipfile(output_path)
+        assert_that(zipfile.is_zipfile(output_path)).is_true()
 
     def test_apkg_contains_required_files(self, tmp_path):
-        """Test that .apkg contains required Anki database files."""
+        """
+        Given processed card data
+        When save_package is called
+        Then .apkg contains required Anki database files
+        """
         import zipfile
 
         data = [
@@ -549,13 +660,16 @@ class TestApkgFileValidity:
         generator.save_package(str(output_path))
 
         with zipfile.ZipFile(output_path, 'r') as zf:
-            # genanki creates collection.anki2 and media file
             names = zf.namelist()
-            assert "collection.anki2" in names
-            assert "media" in names
+            assert_that(names).contains("collection.anki2")
+            assert_that(names).contains("media")
 
     def test_apkg_with_multiple_decks(self, tmp_path):
-        """Test .apkg with multiple decks inside."""
+        """
+        Given multiple problems
+        When save_package is called
+        Then all decks are included in .apkg
+        """
         import zipfile
 
         data = [
@@ -576,16 +690,20 @@ class TestApkgFileValidity:
         generator = DeckGenerator(data, deck_prefix="Multi")
         generator.process()
 
-        assert len(generator.deck_collection) == 2
+        assert_that(generator.deck_collection).is_length(2)
 
         output_path = tmp_path / "multi.apkg"
         generator.save_package(str(output_path))
 
-        assert output_path.exists()
-        assert zipfile.is_zipfile(output_path)
+        assert_that(output_path.exists()).is_true()
+        assert_that(zipfile.is_zipfile(output_path)).is_true()
 
     def test_apkg_with_many_cards(self, tmp_path):
-        """Test .apkg with large number of cards."""
+        """
+        Given a problem with many cards
+        When save_package is called
+        Then all cards are included
+        """
         cards = [{"card_type": f"Type{i}", "tags": [], "front": f"Q{i}", "back": f"A{i}"}
                  for i in range(100)]
 
@@ -602,16 +720,20 @@ class TestApkgFileValidity:
         generator.process()
 
         deck = list(generator.deck_collection.values())[0]
-        assert len(deck.notes) == 100
+        assert_that(deck.notes).is_length(100)
 
         output_path = tmp_path / "stress.apkg"
         generator.save_package(str(output_path))
 
-        assert output_path.exists()
-        assert output_path.stat().st_size > 0
+        assert_that(output_path.exists()).is_true()
+        assert_that(output_path.stat().st_size).is_greater_than(0)
 
     def test_apkg_filename_with_spaces(self, tmp_path):
-        """Test saving .apkg with spaces in filename."""
+        """
+        Given a filename with spaces
+        When save_package is called
+        Then the file is created successfully
+        """
         data = [
             {
                 "title": "Test",
@@ -627,14 +749,18 @@ class TestApkgFileValidity:
         output_path = tmp_path / "my deck output.apkg"
         generator.save_package(str(output_path))
 
-        assert output_path.exists()
+        assert_that(output_path.exists()).is_true()
 
 
 class TestFieldTypes:
     """Tests for all card field types and content."""
 
     def test_basic_card_all_fields(self):
-        """Test basic card with all fields populated."""
+        """
+        Given a card with all fields populated
+        When process is called
+        Then all fields are stored in the note
+        """
         data = [
             {
                 "title": "Complete Card",
@@ -655,15 +781,18 @@ class TestFieldTypes:
         generator.process()
 
         deck = list(generator.deck_collection.values())[0]
-        assert len(deck.notes) == 1
+        assert_that(deck.notes).is_length(1)
 
         note = deck.notes[0]
-        # Fields should be populated (rendered to HTML)
-        assert len(note.fields) == 7  # Basic model has 7 fields
-        assert all(f is not None for f in note.fields)
+        assert_that(note.fields).is_length(7)
+        assert_that(all(f is not None for f in note.fields)).is_true()
 
     def test_mcq_card_all_fields(self):
-        """Test MCQ card with all fields populated."""
+        """
+        Given an MCQ card with all fields populated
+        When process is called
+        Then all MCQ fields are stored in the note
+        """
         data = [
             {
                 "title": "MCQ Test",
@@ -686,15 +815,18 @@ class TestFieldTypes:
         generator.process()
 
         deck = list(generator.deck_collection.values())[0]
-        assert len(deck.notes) == 1
+        assert_that(deck.notes).is_length(1)
 
         note = deck.notes[0]
-        # MCQ model has 12 fields
-        assert len(note.fields) == 12
-        assert all(f is not None for f in note.fields)
+        assert_that(note.fields).is_length(12)
+        assert_that(all(f is not None for f in note.fields)).is_true()
 
     def test_empty_front_content(self):
-        """Test card with empty front content."""
+        """
+        Given a card with empty front content
+        When process is called
+        Then the card is still created
+        """
         data = [
             {
                 "title": "Empty Front",
@@ -708,10 +840,14 @@ class TestFieldTypes:
         generator.process()
 
         deck = list(generator.deck_collection.values())[0]
-        assert len(deck.notes) == 1
+        assert_that(deck.notes).is_length(1)
 
     def test_empty_back_content(self):
-        """Test card with empty back content."""
+        """
+        Given a card with empty back content
+        When process is called
+        Then the card is still created
+        """
         data = [
             {
                 "title": "Empty Back",
@@ -725,10 +861,14 @@ class TestFieldTypes:
         generator.process()
 
         deck = list(generator.deck_collection.values())[0]
-        assert len(deck.notes) == 1
+        assert_that(deck.notes).is_length(1)
 
     def test_very_long_content(self):
-        """Test card with very long content."""
+        """
+        Given a card with very long content
+        When process is called
+        Then the card is created successfully
+        """
         long_text = "x" * 10000
 
         data = [
@@ -744,10 +884,14 @@ class TestFieldTypes:
         generator.process()
 
         deck = list(generator.deck_collection.values())[0]
-        assert len(deck.notes) == 1
+        assert_that(deck.notes).is_length(1)
 
     def test_tags_with_special_characters(self):
-        """Test tags with special characters are handled (no spaces allowed)."""
+        """
+        Given tags with special characters
+        When process is called
+        Then tags are handled correctly
+        """
         data = [
             {
                 "title": "Special Tags",
@@ -770,11 +914,14 @@ class TestFieldTypes:
         deck = list(generator.deck_collection.values())[0]
         note = deck.notes[0]
         # Should have original tags plus auto-generated ones
-        assert len(note.tags) > 4
+        assert_that(len(note.tags)).is_greater_than(4)
 
     def test_difficulty_levels(self):
-        """Test various difficulty levels are preserved."""
-        # Note: Anki tags cannot contain spaces, so "Very Hard" becomes "Very_Hard"
+        """
+        Given various difficulty levels
+        When process is called
+        Then difficulty is included in tags
+        """
         difficulties = ["Easy", "Medium", "Hard", "Expert", "Unknown", "VeryHard"]
 
         for difficulty in difficulties:
@@ -792,12 +939,14 @@ class TestFieldTypes:
 
             deck = list(generator.deck_collection.values())[0]
             note = deck.notes[0]
-            # Difficulty should be in tags
-            assert any(difficulty.replace(" ", "_") in tag for tag in note.tags)
+            assert_that(any(difficulty.replace(" ", "_") in tag for tag in note.tags)).is_true()
 
     def test_card_types_are_tagged(self):
-        """Test that card types are added to tags (no spaces allowed)."""
-        # Note: Anki tags cannot contain spaces, so use types without spaces
+        """
+        Given various card types
+        When process is called
+        Then card types are added to tags
+        """
         card_types = ["Algorithm", "Concept", "Implementation", "Pattern", "EdgeCase"]
 
         for card_type in card_types:
@@ -815,21 +964,29 @@ class TestFieldTypes:
 
             deck = list(generator.deck_collection.values())[0]
             note = deck.notes[0]
-            assert f"type::{card_type}" in note.tags
+            assert_that(note.tags).contains(f"type::{card_type}")
 
 
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
 
     def test_empty_card_data(self):
-        """Test with empty card data list."""
+        """
+        Given empty card data list
+        When process is called
+        Then no decks are created
+        """
         generator = DeckGenerator([], deck_prefix="Empty")
         generator.process()
 
-        assert len(generator.deck_collection) == 0
+        assert_that(generator.deck_collection).is_empty()
 
     def test_problem_with_no_cards(self):
-        """Test problem with empty cards list."""
+        """
+        Given a problem with empty cards list
+        When process is called
+        Then deck is created but has no notes
+        """
         data = [
             {
                 "title": "No Cards",
@@ -842,18 +999,16 @@ class TestEdgeCases:
         generator = DeckGenerator(data, deck_prefix="Empty")
         generator.process()
 
-        # Deck is NOT created when there are no cards (no notes to add)
-        # Looking at process(): deck is only created when _add_card_to_deck is called
-        # Actually, process() iterates cards, so deck only gets created via get_or_create_deck
-        # when _add_card_to_deck is called. Let me check actual behavior:
-        # The deck IS created via get_or_create_deck before the cards loop, so deck exists
-        # but has no notes
-        assert len(generator.deck_collection) == 1
+        assert_that(generator.deck_collection).is_length(1)
         deck = list(generator.deck_collection.values())[0]
-        assert len(deck.notes) == 0
+        assert_that(deck.notes).is_empty()
 
     def test_missing_title_uses_default(self):
-        """Test that missing title uses default value."""
+        """
+        Given a problem without title
+        When process is called
+        Then default title is used
+        """
         data = [
             {
                 "topic": "Topic",
@@ -865,10 +1020,14 @@ class TestEdgeCases:
         generator = DeckGenerator(data, deck_prefix="Default")
         generator.process()
 
-        assert "Default::Topic::Unknown Title" in generator.deck_collection
+        assert_that(generator.deck_collection).contains_key("Default::Topic::Unknown Title")
 
     def test_missing_topic_uses_default(self):
-        """Test that missing topic uses default value."""
+        """
+        Given a problem without topic
+        When process is called
+        Then default topic is used
+        """
         data = [
             {
                 "title": "Title",
@@ -880,10 +1039,14 @@ class TestEdgeCases:
         generator = DeckGenerator(data, deck_prefix="Default")
         generator.process()
 
-        assert "Default::Unknown Topic::Title" in generator.deck_collection
+        assert_that(generator.deck_collection).contains_key("Default::Unknown Topic::Title")
 
     def test_missing_difficulty_uses_default(self):
-        """Test that missing difficulty uses default value."""
+        """
+        Given a problem without difficulty
+        When process is called
+        Then default difficulty is used in tags
+        """
         data = [
             {
                 "title": "Title",
@@ -897,10 +1060,14 @@ class TestEdgeCases:
 
         deck = list(generator.deck_collection.values())[0]
         note = deck.notes[0]
-        assert "difficulty::Unknown" in note.tags
+        assert_that(note.tags).contains("difficulty::Unknown")
 
     def test_mcq_with_less_than_4_options(self):
-        """Test MCQ card with fewer than 4 options."""
+        """
+        Given an MCQ card with fewer than 4 options
+        When process is called
+        Then the card is still processed
+        """
         data = [
             {
                 "title": "Few Options",
@@ -922,11 +1089,14 @@ class TestEdgeCases:
         generator = DeckGenerator(data, deck_prefix="Test_MCQ")
         generator.process()
 
-        # Should still process (shuffle returns unchanged for non-4 options)
-        assert len(generator.deck_collection) == 1
+        assert_that(generator.deck_collection).is_length(1)
 
     def test_mcq_with_invalid_correct_answer(self):
-        """Test MCQ with invalid correct answer letter."""
+        """
+        Given an MCQ with invalid correct answer letter
+        When process is called
+        Then the card is still processed
+        """
         data = [
             {
                 "title": "Invalid Answer",
@@ -938,7 +1108,7 @@ class TestEdgeCases:
                         "tags": [],
                         "question": "Q?",
                         "options": ["A", "B", "C", "D"],
-                        "correct_answer": "Z",  # Invalid
+                        "correct_answer": "Z",
                         "explanation": "Explanation"
                     }
                 ]
@@ -948,11 +1118,14 @@ class TestEdgeCases:
         generator = DeckGenerator(data, deck_prefix="Test_MCQ")
         generator.process()
 
-        # Should still process (defaults to index 0)
-        assert len(generator.deck_collection) == 1
+        assert_that(generator.deck_collection).is_length(1)
 
     def test_deck_id_consistency_across_runs(self):
-        """Test that deck IDs are consistent across generator instances."""
+        """
+        Given the same data across multiple generator instances
+        When process is called
+        Then deck IDs are consistent
+        """
         data = [
             {
                 "title": "Consistent",
@@ -970,11 +1143,14 @@ class TestEdgeCases:
         generator2.process()
         deck2 = list(generator2.deck_collection.values())[0]
 
-        # Same deck path should produce same ID
-        assert deck1.deck_id == deck2.deck_id
+        assert_that(deck1.deck_id).is_equal_to(deck2.deck_id)
 
     def test_fallback_from_question_to_front(self):
-        """Test that 'question' field is used when 'front' is missing."""
+        """
+        Given a card with 'question' field but no 'front'
+        When process is called
+        Then 'question' is used as front content
+        """
         data = [
             {
                 "title": "Fallback",
@@ -996,11 +1172,16 @@ class TestEdgeCases:
 
         deck = list(generator.deck_collection.values())[0]
         note = deck.notes[0]
-        # Front should contain the question content (rendered)
-        assert "Question content" in note.fields[0] or len(note.fields[0]) > 0
+        # Front should contain the question content (rendered) or be non-empty
+        front_field = note.fields[0]
+        assert_that(front_field).is_not_empty()
 
     def test_whitespace_in_content_preserved(self):
-        """Test that significant whitespace is preserved."""
+        """
+        Given a card with significant whitespace
+        When process is called
+        Then the card is created successfully
+        """
         data = [
             {
                 "title": "Whitespace",
@@ -1021,14 +1202,18 @@ class TestEdgeCases:
         generator.process()
 
         deck = list(generator.deck_collection.values())[0]
-        assert len(deck.notes) == 1
+        assert_that(deck.notes).is_length(1)
 
 
 class TestSavePackageBehavior:
     """Tests for save_package method behavior."""
 
     def test_save_to_nested_directory(self, tmp_path):
-        """Test saving to a nested directory that doesn't exist."""
+        """
+        Given a nested directory path
+        When save_package is called
+        Then the file is saved successfully
+        """
         data = [
             {
                 "title": "Test",
@@ -1046,10 +1231,14 @@ class TestSavePackageBehavior:
         output_path = nested_dir / "output.apkg"
 
         generator.save_package(str(output_path))
-        assert output_path.exists()
+        assert_that(output_path.exists()).is_true()
 
     def test_save_overwrites_existing(self, tmp_path):
-        """Test that save_package overwrites existing file."""
+        """
+        Given an existing file
+        When save_package is called
+        Then the file is overwritten
+        """
         data = [
             {
                 "title": "Test",
@@ -1067,12 +1256,15 @@ class TestSavePackageBehavior:
         generator.process()
         generator.save_package(str(output_path))
 
-        # File should be overwritten with actual apkg content
-        assert output_path.exists()
-        assert output_path.stat().st_size != initial_size
+        assert_that(output_path.exists()).is_true()
+        assert_that(output_path.stat().st_size).is_not_equal_to(initial_size)
 
     def test_empty_collection_logs_warning(self, tmp_path, caplog):
-        """Test that empty collection logs a warning."""
+        """
+        Given an empty deck collection
+        When save_package is called
+        Then a warning is logged
+        """
         import logging
 
         generator = DeckGenerator([], deck_prefix="Empty")
@@ -1080,5 +1272,5 @@ class TestSavePackageBehavior:
         with caplog.at_level(logging.WARNING):
             generator.save_package(str(tmp_path / "empty.apkg"))
 
-        assert "No decks generated" in caplog.text
-        assert not (tmp_path / "empty.apkg").exists()
+        assert_that(caplog.text).contains("No decks generated")
+        assert_that((tmp_path / "empty.apkg").exists()).is_false()

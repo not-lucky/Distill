@@ -10,6 +10,8 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from assertpy import assert_that
+
 
 # =============================================================================
 # OpenAI-Compatible Provider Tests (thin wrappers)
@@ -20,7 +22,11 @@ class TestNvidiaProvider:
     """Tests for NvidiaProvider."""
 
     def test_init_default_parameters(self):
-        """Test initialization with default parameters."""
+        """
+        Given default initialization parameters
+        When NvidiaProvider is created
+        Then all default values are set correctly
+        """
         from src.providers.nvidia import NvidiaProvider
 
         provider = NvidiaProvider(
@@ -28,15 +34,19 @@ class TestNvidiaProvider:
             model="test-model",
         )
 
-        assert provider.model == "test-model"
-        assert provider.base_url == "https://integrate.api.nvidia.com/v1"
-        assert provider.timeout == 900.0
-        assert provider.temperature == 0.4
-        assert provider.max_tokens == 16384
-        assert provider.top_p == 0.95
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.base_url).is_equal_to("https://integrate.api.nvidia.com/v1")
+        assert_that(provider.timeout).is_equal_to(900.0)
+        assert_that(provider.temperature).is_equal_to(0.4)
+        assert_that(provider.max_tokens).is_equal_to(16384)
+        assert_that(provider.top_p).is_equal_to(0.95)
 
     def test_init_custom_parameters(self):
-        """Test initialization with custom parameters."""
+        """
+        Given custom initialization parameters
+        When NvidiaProvider is created
+        Then all custom values are set correctly
+        """
         from src.providers.nvidia import NvidiaProvider
 
         provider = NvidiaProvider(
@@ -51,27 +61,35 @@ class TestNvidiaProvider:
             json_parse_retries=2,
         )
 
-        assert provider.model == "custom-model"
-        assert provider.base_url == "https://custom.nvidia.com/v1"
-        assert provider.timeout == 120.0
-        assert provider.temperature == 0.7
-        assert provider.max_tokens == 8192
-        assert provider.top_p == 0.8
-        assert provider.max_retries == 3
-        assert provider.json_parse_retries == 2
+        assert_that(provider.model).is_equal_to("custom-model")
+        assert_that(provider.base_url).is_equal_to("https://custom.nvidia.com/v1")
+        assert_that(provider.timeout).is_equal_to(120.0)
+        assert_that(provider.temperature).is_equal_to(0.7)
+        assert_that(provider.max_tokens).is_equal_to(8192)
+        assert_that(provider.top_p).is_equal_to(0.8)
+        assert_that(provider.max_retries).is_equal_to(3)
+        assert_that(provider.json_parse_retries).is_equal_to(2)
 
     def test_name_property(self):
-        """Test name property returns correct value."""
+        """
+        Given an initialized NvidiaProvider
+        When the name property is accessed
+        Then the correct provider name is returned
+        """
         from src.providers.nvidia import NvidiaProvider
 
         provider = NvidiaProvider(
             api_keys=itertools.cycle(["key1"]),
             model="test-model",
         )
-        assert provider.name == "llm2deck_nvidia"
+        assert_that(provider.name).is_equal_to("llm2deck_nvidia")
 
     def test_extra_body_chat_template_kwargs(self):
-        """Test that extra_body with thinking is set by default."""
+        """
+        Given an initialized NvidiaProvider
+        When extra request params are retrieved
+        Then thinking is enabled in chat_template_kwargs
+        """
         from src.providers.nvidia import NvidiaProvider
 
         provider = NvidiaProvider(
@@ -80,11 +98,15 @@ class TestNvidiaProvider:
         )
 
         extra_params = provider._get_extra_request_params()
-        assert "extra_body" in extra_params
-        assert extra_params["extra_body"]["chat_template_kwargs"]["thinking"] is True
+        assert_that(extra_params).contains_key("extra_body")
+        assert_that(extra_params["extra_body"]["chat_template_kwargs"]["thinking"]).is_true()
 
     def test_extra_params_merged(self):
-        """Test that extra_params are merged with defaults."""
+        """
+        Given extra_params in initialization
+        When extra request params are retrieved
+        Then custom params are merged with defaults
+        """
         from src.providers.nvidia import NvidiaProvider
 
         provider = NvidiaProvider(
@@ -94,15 +116,19 @@ class TestNvidiaProvider:
         )
 
         extra_params = provider._get_extra_request_params()
-        assert "extra_body" in extra_params
-        assert "custom_param" in extra_params
+        assert_that(extra_params).contains_key("extra_body")
+        assert_that(extra_params).contains_key("custom_param")
 
 
 class TestOpenRouterProvider:
     """Tests for OpenRouterProvider."""
 
     def test_init_default_parameters(self):
-        """Test initialization with default parameters."""
+        """
+        Given default initialization parameters
+        When OpenRouterProvider is created
+        Then all default values are set correctly
+        """
         from src.providers.openrouter import OpenRouterProvider
 
         provider = OpenRouterProvider(
@@ -110,15 +136,19 @@ class TestOpenRouterProvider:
             model="test-model",
         )
 
-        assert provider.model == "test-model"
-        assert provider.base_url == "https://openrouter.ai/api/v1"
-        assert provider.timeout == 120.0
-        assert provider.temperature == 0.4
-        assert provider.max_tokens is None
-        assert provider.max_retries == 3
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.base_url).is_equal_to("https://openrouter.ai/api/v1")
+        assert_that(provider.timeout).is_equal_to(120.0)
+        assert_that(provider.temperature).is_equal_to(0.4)
+        assert_that(provider.max_tokens).is_none()
+        assert_that(provider.max_retries).is_equal_to(3)
 
     def test_init_custom_parameters(self):
-        """Test initialization with custom parameters."""
+        """
+        Given custom initialization parameters
+        When OpenRouterProvider is created
+        Then all custom values are set correctly
+        """
         from src.providers.openrouter import OpenRouterProvider
 
         provider = OpenRouterProvider(
@@ -132,27 +162,35 @@ class TestOpenRouterProvider:
             json_parse_retries=4,
         )
 
-        assert provider.model == "openai/gpt-4"
-        assert provider.timeout == 60.0
-        assert provider.max_tokens == 4096
-        assert provider.max_retries == 5
+        assert_that(provider.model).is_equal_to("openai/gpt-4")
+        assert_that(provider.timeout).is_equal_to(60.0)
+        assert_that(provider.max_tokens).is_equal_to(4096)
+        assert_that(provider.max_retries).is_equal_to(5)
 
     def test_name_property(self):
-        """Test name property returns correct value."""
+        """
+        Given an initialized OpenRouterProvider
+        When the name property is accessed
+        Then the correct provider name is returned
+        """
         from src.providers.openrouter import OpenRouterProvider
 
         provider = OpenRouterProvider(
             api_keys=itertools.cycle(["key1"]),
             model="test-model",
         )
-        assert provider.name == "llm2deck_openrouter"
+        assert_that(provider.name).is_equal_to("llm2deck_openrouter")
 
 
 class TestBasetenProvider:
     """Tests for BasetenProvider."""
 
     def test_init_default_parameters(self):
-        """Test initialization with default parameters."""
+        """
+        Given default initialization parameters
+        When BasetenProvider is created
+        Then all default values are set correctly
+        """
         from src.providers.baseten import BasetenProvider
 
         provider = BasetenProvider(
@@ -160,14 +198,18 @@ class TestBasetenProvider:
             model="test-model",
         )
 
-        assert provider.model == "test-model"
-        assert provider.base_url == "https://inference.baseten.co/v1"
-        assert provider.timeout == 120.0
-        assert provider.temperature == 0.4
-        assert provider.strip_json_markers is False
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.base_url).is_equal_to("https://inference.baseten.co/v1")
+        assert_that(provider.timeout).is_equal_to(120.0)
+        assert_that(provider.temperature).is_equal_to(0.4)
+        assert_that(provider.strip_json_markers).is_false()
 
     def test_init_with_strip_json_markers(self):
-        """Test initialization with strip_json_markers enabled."""
+        """
+        Given strip_json_markers=True
+        When BasetenProvider is created
+        Then strip_json_markers is enabled
+        """
         from src.providers.baseten import BasetenProvider
 
         provider = BasetenProvider(
@@ -176,24 +218,32 @@ class TestBasetenProvider:
             strip_json_markers=True,
         )
 
-        assert provider.strip_json_markers is True
+        assert_that(provider.strip_json_markers).is_true()
 
     def test_name_property(self):
-        """Test name property returns correct value."""
+        """
+        Given an initialized BasetenProvider
+        When the name property is accessed
+        Then the correct provider name is returned
+        """
         from src.providers.baseten import BasetenProvider
 
         provider = BasetenProvider(
             api_keys=itertools.cycle(["key1"]),
             model="test-model",
         )
-        assert provider.name == "llm2deck_baseten"
+        assert_that(provider.name).is_equal_to("llm2deck_baseten")
 
 
 class TestCanopywaveProvider:
     """Tests for CanopywaveProvider."""
 
     def test_init_default_parameters(self):
-        """Test initialization with default parameters."""
+        """
+        Given default initialization parameters
+        When CanopywaveProvider is created
+        Then all default values are set correctly
+        """
         from src.providers.canopywave import CanopywaveProvider
 
         provider = CanopywaveProvider(
@@ -201,42 +251,53 @@ class TestCanopywaveProvider:
             model="test-model",
         )
 
-        assert provider.model == "test-model"
-        assert provider.base_url == "https://api.xiaomimimo.com/v1"
-        assert provider.timeout == 900.0
-        assert provider.temperature == 0.4
-        assert provider.max_tokens == 16384
-        assert provider.max_retries == 5
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.base_url).is_equal_to("https://api.xiaomimimo.com/v1")
+        assert_that(provider.timeout).is_equal_to(900.0)
+        assert_that(provider.temperature).is_equal_to(0.4)
+        assert_that(provider.max_tokens).is_equal_to(16384)
+        assert_that(provider.max_retries).is_equal_to(5)
 
     def test_name_property(self):
-        """Test name property returns correct value."""
+        """
+        Given an initialized CanopywaveProvider
+        When the name property is accessed
+        Then the correct provider name is returned
+        """
         from src.providers.canopywave import CanopywaveProvider
 
         provider = CanopywaveProvider(
             api_keys=itertools.cycle(["key1"]),
             model="test-model",
         )
-        assert provider.name == "llm2deck_canopywave"
+        assert_that(provider.name).is_equal_to("llm2deck_canopywave")
 
 
 class TestGoogleAntigravityProvider:
     """Tests for GoogleAntigravityProvider."""
 
     def test_init_default_parameters(self):
-        """Test initialization with default parameters."""
+        """
+        Given default initialization parameters
+        When GoogleAntigravityProvider is created
+        Then all default values are set correctly (no API key needed for local)
+        """
         from src.providers.google_antigravity import GoogleAntigravityProvider
 
         provider = GoogleAntigravityProvider(model="test-model")
 
-        assert provider.model == "test-model"
-        assert provider.base_url == "http://127.0.0.1:8317/v1"
-        assert provider.timeout == 900.0
-        assert provider.temperature == 0.4
-        assert provider.max_tokens == 16384
-        # No API key needed for local
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.base_url).is_equal_to("http://127.0.0.1:8317/v1")
+        assert_that(provider.timeout).is_equal_to(900.0)
+        assert_that(provider.temperature).is_equal_to(0.4)
+        assert_that(provider.max_tokens).is_equal_to(16384)
 
     def test_init_custom_base_url(self):
-        """Test initialization with custom local URL."""
+        """
+        Given a custom base URL
+        When GoogleAntigravityProvider is created
+        Then the custom URL is used
+        """
         from src.providers.google_antigravity import GoogleAntigravityProvider
 
         provider = GoogleAntigravityProvider(
@@ -244,14 +305,18 @@ class TestGoogleAntigravityProvider:
             base_url="http://192.168.1.100:8080/v1",
         )
 
-        assert provider.base_url == "http://192.168.1.100:8080/v1"
+        assert_that(provider.base_url).is_equal_to("http://192.168.1.100:8080/v1")
 
     def test_name_property(self):
-        """Test name property returns correct value."""
+        """
+        Given an initialized GoogleAntigravityProvider
+        When the name property is accessed
+        Then the correct provider name is returned
+        """
         from src.providers.google_antigravity import GoogleAntigravityProvider
 
         provider = GoogleAntigravityProvider(model="test-model")
-        assert provider.name == "llm2deck_google_antigravity"
+        assert_that(provider.name).is_equal_to("llm2deck_google_antigravity")
 
 
 # =============================================================================
@@ -264,7 +329,11 @@ class TestOpenAICompatibleProvidersRequestFlow:
 
     @pytest.mark.asyncio
     async def test_nvidia_generate_initial_cards(self):
-        """Test NvidiaProvider generate_initial_cards."""
+        """
+        Given an initialized NvidiaProvider with mocked client
+        When generate_initial_cards is called
+        Then the response content is returned correctly
+        """
         from src.providers.nvidia import NvidiaProvider
 
         provider = NvidiaProvider(
@@ -286,12 +355,16 @@ class TestOpenAICompatibleProvidersRequestFlow:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
             mock_client.chat.completions.create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_openrouter_generate_initial_cards(self):
-        """Test OpenRouterProvider generate_initial_cards."""
+        """
+        Given an initialized OpenRouterProvider with mocked client
+        When generate_initial_cards is called
+        Then the response content is returned correctly
+        """
         from src.providers.openrouter import OpenRouterProvider
 
         provider = OpenRouterProvider(
@@ -313,11 +386,15 @@ class TestOpenAICompatibleProvidersRequestFlow:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_baseten_generate_initial_cards(self):
-        """Test BasetenProvider generate_initial_cards."""
+        """
+        Given an initialized BasetenProvider with mocked client
+        When generate_initial_cards is called
+        Then the response content is returned correctly
+        """
         from src.providers.baseten import BasetenProvider
 
         provider = BasetenProvider(
@@ -339,11 +416,15 @@ class TestOpenAICompatibleProvidersRequestFlow:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_canopywave_generate_initial_cards(self):
-        """Test CanopywaveProvider generate_initial_cards."""
+        """
+        Given an initialized CanopywaveProvider with mocked client
+        When generate_initial_cards is called
+        Then the response content is returned correctly
+        """
         from src.providers.canopywave import CanopywaveProvider
 
         provider = CanopywaveProvider(
@@ -365,11 +446,15 @@ class TestOpenAICompatibleProvidersRequestFlow:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_google_antigravity_generate_initial_cards(self):
-        """Test GoogleAntigravityProvider generate_initial_cards."""
+        """
+        Given an initialized GoogleAntigravityProvider with mocked client
+        When generate_initial_cards is called
+        Then the response content is returned correctly
+        """
         from src.providers.google_antigravity import GoogleAntigravityProvider
 
         provider = GoogleAntigravityProvider(model="test-model")
@@ -388,7 +473,7 @@ class TestOpenAICompatibleProvidersRequestFlow:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
 
 # =============================================================================
@@ -400,7 +485,11 @@ class TestCerebrasProvider:
     """Tests for CerebrasProvider."""
 
     def test_init_default_parameters(self):
-        """Test initialization with default parameters."""
+        """
+        Given default initialization parameters
+        When CerebrasProvider is created
+        Then all default values are set correctly
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
@@ -408,13 +497,17 @@ class TestCerebrasProvider:
             model="test-model",
         )
 
-        assert provider.model == "test-model"
-        assert provider.reasoning_effort == "high"
-        assert provider.max_retries == 5
-        assert provider.json_parse_retries == 3
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.reasoning_effort).is_equal_to("high")
+        assert_that(provider.max_retries).is_equal_to(5)
+        assert_that(provider.json_parse_retries).is_equal_to(3)
 
     def test_init_custom_parameters(self):
-        """Test initialization with custom parameters."""
+        """
+        Given custom initialization parameters
+        When CerebrasProvider is created
+        Then all custom values are set correctly
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
@@ -425,33 +518,45 @@ class TestCerebrasProvider:
             json_parse_retries=2,
         )
 
-        assert provider.model == "llama3.1-70b"
-        assert provider.reasoning_effort == "low"
-        assert provider.max_retries == 3
-        assert provider.json_parse_retries == 2
+        assert_that(provider.model).is_equal_to("llama3.1-70b")
+        assert_that(provider.reasoning_effort).is_equal_to("low")
+        assert_that(provider.max_retries).is_equal_to(3)
+        assert_that(provider.json_parse_retries).is_equal_to(2)
 
     def test_name_property(self):
-        """Test name property returns correct value."""
+        """
+        Given an initialized CerebrasProvider
+        When the name property is accessed
+        Then the correct provider name is returned
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
             api_keys=itertools.cycle(["key1"]),
             model="test-model",
         )
-        assert provider.name == "llm2deck_cerebras"
+        assert_that(provider.name).is_equal_to("llm2deck_cerebras")
 
     def test_model_property(self):
-        """Test model property returns correct value."""
+        """
+        Given an initialized CerebrasProvider
+        When the model property is accessed
+        Then the correct model name is returned
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
             api_keys=itertools.cycle(["key1"]),
             model="cerebras-gpt-13b",
         )
-        assert provider.model == "cerebras-gpt-13b"
+        assert_that(provider.model).is_equal_to("cerebras-gpt-13b")
 
     def test_get_client_rotates_keys(self):
-        """Test that _get_client rotates API keys."""
+        """
+        Given a CerebrasProvider with multiple API keys
+        When _get_client is called multiple times
+        Then API keys are rotated in order
+        """
         from src.providers.cerebras import CerebrasProvider
 
         keys = ["key1", "key2", "key3"]
@@ -472,7 +577,11 @@ class TestCerebrasProvider:
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_success(self):
-        """Test generate_initial_cards with successful response."""
+        """
+        Given a CerebrasProvider with mocked successful response
+        When generate_initial_cards is called
+        Then the response content is returned correctly
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
@@ -494,11 +603,15 @@ class TestCerebrasProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_empty_returns_empty_string(self):
-        """Test generate_initial_cards returns empty string on failure."""
+        """
+        Given a CerebrasProvider with None response content
+        When generate_initial_cards is called
+        Then an empty string is returned
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
@@ -521,11 +634,15 @@ class TestCerebrasProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == ""
+            assert_that(result).is_equal_to("")
 
     @pytest.mark.asyncio
     async def test_combine_cards_success(self):
-        """Test combine_cards with successful response."""
+        """
+        Given a CerebrasProvider with mocked successful response
+        When combine_cards is called
+        Then the response content is returned correctly
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
@@ -548,11 +665,15 @@ class TestCerebrasProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"combined": true}'
+            assert_that(result).is_equal_to('{"combined": true}')
 
     @pytest.mark.asyncio
     async def test_format_json_success(self):
-        """Test format_json with successful response."""
+        """
+        Given a CerebrasProvider with mocked successful response
+        When format_json is called
+        Then parsed JSON is returned
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
@@ -574,11 +695,15 @@ class TestCerebrasProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == {"formatted": True}
+            assert_that(result).is_equal_to({"formatted": True})
 
     @pytest.mark.asyncio
     async def test_format_json_invalid_json_retries(self):
-        """Test format_json retries on invalid JSON."""
+        """
+        Given a CerebrasProvider with initial invalid JSON response
+        When format_json is called
+        Then it retries and returns valid JSON on success
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
@@ -611,7 +736,7 @@ class TestCerebrasProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == {"valid": True}
+            assert_that(result).is_equal_to({"valid": True})
 
 
 # =============================================================================
@@ -623,7 +748,11 @@ class TestGoogleGenAIProvider:
     """Tests for GoogleGenAIProvider."""
 
     def test_init_default_parameters(self):
-        """Test initialization with default parameters."""
+        """
+        Given default initialization parameters
+        When GoogleGenAIProvider is created
+        Then all default values are set correctly
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
@@ -631,13 +760,17 @@ class TestGoogleGenAIProvider:
             model="gemini-3-pro-preview",
         )
 
-        assert provider.model == "gemini-3-pro-preview"
-        assert provider.thinking_level == "high"
-        assert provider.max_retries == 5
-        assert provider.json_parse_retries == 3
+        assert_that(provider.model).is_equal_to("gemini-3-pro-preview")
+        assert_that(provider.thinking_level).is_equal_to("high")
+        assert_that(provider.max_retries).is_equal_to(5)
+        assert_that(provider.json_parse_retries).is_equal_to(3)
 
     def test_init_custom_parameters(self):
-        """Test initialization with custom parameters."""
+        """
+        Given custom initialization parameters
+        When GoogleGenAIProvider is created
+        Then all custom values are set correctly
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
@@ -648,33 +781,45 @@ class TestGoogleGenAIProvider:
             json_parse_retries=2,
         )
 
-        assert provider.model == "gemini-3-flash-preview"
-        assert provider.thinking_level == "medium"
-        assert provider.max_retries == 3
-        assert provider.json_parse_retries == 2
+        assert_that(provider.model).is_equal_to("gemini-3-flash-preview")
+        assert_that(provider.thinking_level).is_equal_to("medium")
+        assert_that(provider.max_retries).is_equal_to(3)
+        assert_that(provider.json_parse_retries).is_equal_to(2)
 
     def test_name_property(self):
-        """Test name property returns correct value."""
+        """
+        Given an initialized GoogleGenAIProvider
+        When the name property is accessed
+        Then the correct provider name is returned
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
             api_keys=itertools.cycle(["key1"]),
             model="test-model",
         )
-        assert provider.name == "llm2deck_google_genai"
+        assert_that(provider.name).is_equal_to("llm2deck_google_genai")
 
     def test_model_property(self):
-        """Test model property returns correct value."""
+        """
+        Given an initialized GoogleGenAIProvider
+        When the model property is accessed
+        Then the correct model name is returned
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
             api_keys=itertools.cycle(["key1"]),
             model="gemini-3-pro",
         )
-        assert provider.model == "gemini-3-pro"
+        assert_that(provider.model).is_equal_to("gemini-3-pro")
 
     def test_get_client_rotates_keys(self):
-        """Test that _get_client rotates API keys."""
+        """
+        Given a GoogleGenAIProvider with multiple API keys
+        When _get_client is called multiple times
+        Then API keys are rotated in order
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         keys = ["key1", "key2"]
@@ -692,7 +837,11 @@ class TestGoogleGenAIProvider:
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_success(self):
-        """Test generate_initial_cards with successful response."""
+        """
+        Given a GoogleGenAIProvider with mocked successful response
+        When generate_initial_cards is called
+        Then the response text is returned correctly
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
@@ -713,11 +862,15 @@ class TestGoogleGenAIProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_empty_returns_empty_string(self):
-        """Test generate_initial_cards returns empty string on failure."""
+        """
+        Given a GoogleGenAIProvider with None response text
+        When generate_initial_cards is called
+        Then an empty string is returned
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
@@ -739,11 +892,15 @@ class TestGoogleGenAIProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == ""
+            assert_that(result).is_equal_to("")
 
     @pytest.mark.asyncio
     async def test_combine_cards_success(self):
-        """Test combine_cards with successful response."""
+        """
+        Given a GoogleGenAIProvider with mocked successful response
+        When combine_cards is called
+        Then the response text is returned correctly
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
@@ -765,11 +922,15 @@ class TestGoogleGenAIProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"combined": true}'
+            assert_that(result).is_equal_to('{"combined": true}')
 
     @pytest.mark.asyncio
     async def test_format_json_success(self):
-        """Test format_json with successful response."""
+        """
+        Given a GoogleGenAIProvider with mocked successful response
+        When format_json is called
+        Then parsed JSON is returned
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
@@ -790,7 +951,7 @@ class TestGoogleGenAIProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == {"formatted": True}
+            assert_that(result).is_equal_to({"formatted": True})
 
 
 # =============================================================================
@@ -802,19 +963,27 @@ class TestG4FProvider:
     """Tests for G4FProvider."""
 
     def test_init_default_parameters(self):
-        """Test initialization with default parameters."""
+        """
+        Given default initialization parameters
+        When G4FProvider is created
+        Then all default values are set correctly
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
             provider = G4FProvider(model="test-model")
 
-            assert provider.model == "test-model"
-            assert provider.provider_name == "LMArena"
-            assert provider.max_retries == 3
-            assert provider.json_parse_retries == 3
+            assert_that(provider.model).is_equal_to("test-model")
+            assert_that(provider.provider_name).is_equal_to("LMArena")
+            assert_that(provider.max_retries).is_equal_to(3)
+            assert_that(provider.json_parse_retries).is_equal_to(3)
 
     def test_init_custom_parameters(self):
-        """Test initialization with custom parameters."""
+        """
+        Given custom initialization parameters
+        When G4FProvider is created
+        Then all custom values are set correctly
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
@@ -825,30 +994,42 @@ class TestG4FProvider:
                 json_parse_retries=2,
             )
 
-            assert provider.model == "custom-model"
-            assert provider.provider_name == "DDG"
-            assert provider.max_retries == 5
-            assert provider.json_parse_retries == 2
+            assert_that(provider.model).is_equal_to("custom-model")
+            assert_that(provider.provider_name).is_equal_to("DDG")
+            assert_that(provider.max_retries).is_equal_to(5)
+            assert_that(provider.json_parse_retries).is_equal_to(2)
 
     def test_name_property(self):
-        """Test name property returns correct value."""
+        """
+        Given an initialized G4FProvider
+        When the name property is accessed
+        Then the correct provider name is returned
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
             provider = G4FProvider(model="test-model")
-            assert provider.name == "llm2deck_g4f"
+            assert_that(provider.name).is_equal_to("llm2deck_g4f")
 
     def test_model_property(self):
-        """Test model property returns correct value."""
+        """
+        Given an initialized G4FProvider
+        When the model property is accessed
+        Then the correct model name is returned
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
             provider = G4FProvider(model="gpt-4o")
-            assert provider.model == "gpt-4o"
+            assert_that(provider.model).is_equal_to("gpt-4o")
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_success(self):
-        """Test generate_initial_cards with successful response."""
+        """
+        Given a G4FProvider with mocked successful response
+        When generate_initial_cards is called
+        Then the response content is returned correctly
+        """
         with patch("src.providers.g4f_provider.AsyncClient") as mock_client_class:
             from src.providers.g4f_provider import G4FProvider
 
@@ -867,11 +1048,15 @@ class TestG4FProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_strips_json_markers(self):
-        """Test generate_initial_cards strips JSON code block markers."""
+        """
+        Given response with JSON code block markers
+        When generate_initial_cards is called
+        Then the markers are stripped and clean JSON is returned
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
@@ -890,11 +1075,15 @@ class TestG4FProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_strips_generic_code_block(self):
-        """Test generate_initial_cards strips generic code block markers."""
+        """
+        Given response with generic code block markers
+        When generate_initial_cards is called
+        Then the markers are stripped and clean JSON is returned
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
@@ -913,11 +1102,15 @@ class TestG4FProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_combine_cards_success(self):
-        """Test combine_cards with successful response."""
+        """
+        Given a G4FProvider with mocked successful response
+        When combine_cards is called
+        Then the response content is returned correctly
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
@@ -937,11 +1130,15 @@ class TestG4FProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == '{"combined": true}'
+            assert_that(result).is_equal_to('{"combined": true}')
 
     @pytest.mark.asyncio
     async def test_format_json_success(self):
-        """Test format_json with successful response."""
+        """
+        Given a G4FProvider with mocked successful response
+        When format_json is called
+        Then parsed JSON is returned
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
@@ -960,11 +1157,15 @@ class TestG4FProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result == {"formatted": True}
+            assert_that(result).is_equal_to({"formatted": True})
 
     @pytest.mark.asyncio
     async def test_format_json_returns_none_on_failure(self):
-        """Test format_json returns None after max retries."""
+        """
+        Given a G4FProvider with invalid JSON response after max retries
+        When format_json is called
+        Then None is returned
+        """
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
 
@@ -983,7 +1184,7 @@ class TestG4FProvider:
                 json_schema={"type": "object"},
             )
 
-            assert result is None
+            assert_that(result).is_none()
 
 
 # =============================================================================
@@ -999,10 +1200,10 @@ class TestGeminiProvider:
     """
 
     def test_gemini_provider_is_abstract(self):
-        """Test that GeminiProvider cannot be instantiated directly.
-
-        GeminiProvider is missing the format_json implementation,
-        making it abstract.
+        """
+        Given the GeminiProvider class
+        When attempting to instantiate directly
+        Then TypeError is raised due to missing abstract method
         """
         from src.providers.gemini import GeminiProvider
 
@@ -1011,21 +1212,28 @@ class TestGeminiProvider:
             GeminiProvider(gemini_client=mock_client)
 
     def test_gemini_module_defines_expected_attributes(self):
-        """Test that the gemini module has expected structure."""
+        """
+        Given the gemini module
+        When checking its attributes
+        Then expected classes and attributes exist
+        """
         from src.providers import gemini
 
-        assert hasattr(gemini, "GeminiProvider")
-        assert hasattr(gemini, "logger")
+        assert_that(hasattr(gemini, "GeminiProvider")).is_true()
+        assert_that(hasattr(gemini, "logger")).is_true()
 
     def test_gemini_provider_has_expected_methods(self):
-        """Test that GeminiProvider defines expected method signatures."""
+        """
+        Given the GeminiProvider class
+        When checking its method signatures
+        Then all expected methods exist
+        """
         from src.providers.gemini import GeminiProvider
 
-        # Check class-level attributes and methods exist
-        assert hasattr(GeminiProvider, "generate_initial_cards")
-        assert hasattr(GeminiProvider, "combine_cards")
-        assert hasattr(GeminiProvider, "name")
-        assert hasattr(GeminiProvider, "model")
+        assert_that(hasattr(GeminiProvider, "generate_initial_cards")).is_true()
+        assert_that(hasattr(GeminiProvider, "combine_cards")).is_true()
+        assert_that(hasattr(GeminiProvider, "name")).is_true()
+        assert_that(hasattr(GeminiProvider, "model")).is_true()
 
 
 # =============================================================================
@@ -1037,7 +1245,11 @@ class TestProviderInheritance:
     """Tests to verify all providers inherit from LLMProvider."""
 
     def test_openai_compatible_providers_inherit_correctly(self):
-        """Test that OpenAI-compatible providers inherit from OpenAICompatibleProvider."""
+        """
+        Given OpenAI-compatible provider classes
+        When checking their inheritance
+        Then all inherit from OpenAICompatibleProvider
+        """
         from src.providers.openai_compatible import OpenAICompatibleProvider
         from src.providers.nvidia import NvidiaProvider
         from src.providers.openrouter import OpenRouterProvider
@@ -1045,27 +1257,31 @@ class TestProviderInheritance:
         from src.providers.canopywave import CanopywaveProvider
         from src.providers.google_antigravity import GoogleAntigravityProvider
 
-        assert issubclass(NvidiaProvider, OpenAICompatibleProvider)
-        assert issubclass(OpenRouterProvider, OpenAICompatibleProvider)
-        assert issubclass(BasetenProvider, OpenAICompatibleProvider)
-        assert issubclass(CanopywaveProvider, OpenAICompatibleProvider)
-        assert issubclass(GoogleAntigravityProvider, OpenAICompatibleProvider)
+        assert_that(issubclass(NvidiaProvider, OpenAICompatibleProvider)).is_true()
+        assert_that(issubclass(OpenRouterProvider, OpenAICompatibleProvider)).is_true()
+        assert_that(issubclass(BasetenProvider, OpenAICompatibleProvider)).is_true()
+        assert_that(issubclass(CanopywaveProvider, OpenAICompatibleProvider)).is_true()
+        assert_that(issubclass(GoogleAntigravityProvider, OpenAICompatibleProvider)).is_true()
 
     def test_all_providers_inherit_from_llmprovider(self):
-        """Test that all providers inherit from LLMProvider."""
+        """
+        Given all provider classes
+        When checking their inheritance
+        Then all inherit from LLMProvider
+        """
         from src.providers.base import LLMProvider
         from src.providers.cerebras import CerebrasProvider
         from src.providers.google_genai import GoogleGenAIProvider
         from src.providers.gemini import GeminiProvider
 
-        assert issubclass(CerebrasProvider, LLMProvider)
-        assert issubclass(GoogleGenAIProvider, LLMProvider)
-        assert issubclass(GeminiProvider, LLMProvider)
+        assert_that(issubclass(CerebrasProvider, LLMProvider)).is_true()
+        assert_that(issubclass(GoogleGenAIProvider, LLMProvider)).is_true()
+        assert_that(issubclass(GeminiProvider, LLMProvider)).is_true()
 
         # G4F needs patching
         with patch("src.providers.g4f_provider.AsyncClient"):
             from src.providers.g4f_provider import G4FProvider
-            assert issubclass(G4FProvider, LLMProvider)
+            assert_that(issubclass(G4FProvider, LLMProvider)).is_true()
 
 
 # =============================================================================
@@ -1084,7 +1300,11 @@ class TestProviderVariations:
         "mistral-large",
     ])
     def test_openrouter_accepts_various_models(self, model_name):
-        """Test OpenRouterProvider accepts various model names."""
+        """
+        Given various model names
+        When OpenRouterProvider is created
+        Then the model is accepted and stored correctly
+        """
         from src.providers.openrouter import OpenRouterProvider
 
         provider = OpenRouterProvider(
@@ -1092,7 +1312,7 @@ class TestProviderVariations:
             model=model_name,
         )
 
-        assert provider.model == model_name
+        assert_that(provider.model).is_equal_to(model_name)
 
     @pytest.mark.parametrize("thinking_level", [
         "low",
@@ -1101,7 +1321,11 @@ class TestProviderVariations:
         "minimal",
     ])
     def test_google_genai_thinking_levels(self, thinking_level):
-        """Test GoogleGenAIProvider accepts various thinking levels."""
+        """
+        Given various thinking levels
+        When GoogleGenAIProvider is created
+        Then the thinking level is accepted and stored correctly
+        """
         from src.providers.google_genai import GoogleGenAIProvider
 
         provider = GoogleGenAIProvider(
@@ -1110,7 +1334,7 @@ class TestProviderVariations:
             thinking_level=thinking_level,
         )
 
-        assert provider.thinking_level == thinking_level
+        assert_that(provider.thinking_level).is_equal_to(thinking_level)
 
     @pytest.mark.parametrize("reasoning_effort", [
         "low",
@@ -1118,7 +1342,11 @@ class TestProviderVariations:
         "high",
     ])
     def test_cerebras_reasoning_efforts(self, reasoning_effort):
-        """Test CerebrasProvider accepts various reasoning efforts."""
+        """
+        Given various reasoning efforts
+        When CerebrasProvider is created
+        Then the reasoning effort is accepted and stored correctly
+        """
         from src.providers.cerebras import CerebrasProvider
 
         provider = CerebrasProvider(
@@ -1127,11 +1355,15 @@ class TestProviderVariations:
             reasoning_effort=reasoning_effort,
         )
 
-        assert provider.reasoning_effort == reasoning_effort
+        assert_that(provider.reasoning_effort).is_equal_to(reasoning_effort)
 
     @pytest.mark.parametrize("timeout", [30.0, 60.0, 120.0, 300.0, 600.0, 900.0])
     def test_nvidia_accepts_various_timeouts(self, timeout):
-        """Test NvidiaProvider accepts various timeout values."""
+        """
+        Given various timeout values
+        When NvidiaProvider is created
+        Then the timeout is accepted and stored correctly
+        """
         from src.providers.nvidia import NvidiaProvider
 
         provider = NvidiaProvider(
@@ -1140,11 +1372,15 @@ class TestProviderVariations:
             timeout=timeout,
         )
 
-        assert provider.timeout == timeout
+        assert_that(provider.timeout).is_equal_to(timeout)
 
     @pytest.mark.parametrize("max_tokens", [1024, 2048, 4096, 8192, 16384, 32768])
     def test_canopywave_accepts_various_max_tokens(self, max_tokens):
-        """Test CanopywaveProvider accepts various max_tokens values."""
+        """
+        Given various max_tokens values
+        When CanopywaveProvider is created
+        Then the max_tokens is accepted and stored correctly
+        """
         from src.providers.canopywave import CanopywaveProvider
 
         provider = CanopywaveProvider(
@@ -1153,4 +1389,4 @@ class TestProviderVariations:
             max_tokens=max_tokens,
         )
 
-        assert provider.max_tokens == max_tokens
+        assert_that(provider.max_tokens).is_equal_to(max_tokens)

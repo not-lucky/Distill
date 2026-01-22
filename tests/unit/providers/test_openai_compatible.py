@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 import itertools
 from typing import Iterator
 
+from assertpy import assert_that
+
 from src.providers.openai_compatible import OpenAICompatibleProvider
 from src.providers.base import RateLimitError, TimeoutError, EmptyResponseError, RetryableError
 
@@ -57,16 +59,24 @@ class TestOpenAICompatibleProviderInit:
     """Tests for OpenAICompatibleProvider initialization."""
 
     def test_init_basic(self):
-        """Test basic provider initialization."""
+        """
+        Given basic initialization parameters
+        When ConcreteOpenAIProvider is created
+        Then model and base_url are set correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
         )
-        assert provider.model == "test-model"
-        assert provider.base_url == "https://api.test.com/v1"
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.base_url).is_equal_to("https://api.test.com/v1")
 
     def test_init_all_parameters(self):
-        """Test initialization with all parameters."""
+        """
+        Given all initialization parameters
+        When ConcreteOpenAIProvider is created
+        Then all values are set correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -80,30 +90,34 @@ class TestOpenAICompatibleProviderInit:
             top_p=0.9,
             extra_params={"custom": "value"},
         )
-        assert provider.model == "test-model"
-        assert provider.timeout == 120.0
-        assert provider.max_retries == 3
-        assert provider.json_parse_retries == 2
-        assert provider.temperature == 0.7
-        assert provider.max_tokens == 4096
-        assert provider.strip_json_markers is False
-        assert provider.top_p == 0.9
-        assert provider.extra_params == {"custom": "value"}
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.timeout).is_equal_to(120.0)
+        assert_that(provider.max_retries).is_equal_to(3)
+        assert_that(provider.json_parse_retries).is_equal_to(2)
+        assert_that(provider.temperature).is_equal_to(0.7)
+        assert_that(provider.max_tokens).is_equal_to(4096)
+        assert_that(provider.strip_json_markers).is_false()
+        assert_that(provider.top_p).is_equal_to(0.9)
+        assert_that(provider.extra_params).is_equal_to({"custom": "value"})
 
     def test_init_defaults(self):
-        """Test provider initialization with defaults."""
+        """
+        Given minimal initialization parameters
+        When ConcreteOpenAIProvider is created
+        Then default values are set correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
         )
-        assert provider.max_retries == 5
-        assert provider.json_parse_retries == 5
-        assert provider.timeout == 120.0
-        assert provider.temperature == 0.4
-        assert provider.max_tokens is None
-        assert provider.strip_json_markers is True
-        assert provider.top_p is None
-        assert provider.extra_params == {}
+        assert_that(provider.max_retries).is_equal_to(5)
+        assert_that(provider.json_parse_retries).is_equal_to(5)
+        assert_that(provider.timeout).is_equal_to(120.0)
+        assert_that(provider.temperature).is_equal_to(0.4)
+        assert_that(provider.max_tokens).is_none()
+        assert_that(provider.strip_json_markers).is_true()
+        assert_that(provider.top_p).is_none()
+        assert_that(provider.extra_params).is_equal_to({})
 
     @pytest.mark.parametrize("model_name", [
         "gpt-4",
@@ -113,12 +127,16 @@ class TestOpenAICompatibleProviderInit:
         "model-with-numbers-123",
     ])
     def test_init_various_model_names(self, model_name):
-        """Test initialization with various model names."""
+        """
+        Given various model name strings
+        When ConcreteOpenAIProvider is created
+        Then the model name is stored correctly
+        """
         provider = ConcreteOpenAIProvider(
             model=model_name,
             base_url="https://api.test.com/v1",
         )
-        assert provider.model == model_name
+        assert_that(provider.model).is_equal_to(model_name)
 
     @pytest.mark.parametrize("base_url", [
         "https://api.openai.com/v1",
@@ -127,52 +145,72 @@ class TestOpenAICompatibleProviderInit:
         "https://custom.domain.com/api/v2",
     ])
     def test_init_various_base_urls(self, base_url):
-        """Test initialization with various base URLs."""
+        """
+        Given various base URL strings
+        When ConcreteOpenAIProvider is created
+        Then the base URL is stored correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url=base_url,
         )
-        assert provider.base_url == base_url
+        assert_that(provider.base_url).is_equal_to(base_url)
 
     @pytest.mark.parametrize("timeout", [10.0, 30.0, 60.0, 120.0, 300.0])
     def test_init_various_timeouts(self, timeout):
-        """Test initialization with various timeout values."""
+        """
+        Given various timeout values
+        When ConcreteOpenAIProvider is created
+        Then the timeout is stored correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
             timeout=timeout,
         )
-        assert provider.timeout == timeout
+        assert_that(provider.timeout).is_equal_to(timeout)
 
     @pytest.mark.parametrize("temperature", [0.0, 0.3, 0.5, 0.7, 1.0, 2.0])
     def test_init_various_temperatures(self, temperature):
-        """Test initialization with various temperature values."""
+        """
+        Given various temperature values
+        When ConcreteOpenAIProvider is created
+        Then the temperature is stored correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
             temperature=temperature,
         )
-        assert provider.temperature == temperature
+        assert_that(provider.temperature).is_equal_to(temperature)
 
 
 class TestOpenAICompatibleProviderProperties:
     """Tests for provider properties."""
 
     def test_model_property(self):
-        """Test model property returns model_name."""
+        """
+        Given an initialized provider
+        When the model property is accessed
+        Then the model name is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model-v1",
             base_url="https://api.test.com/v1",
         )
-        assert provider.model == "test-model-v1"
+        assert_that(provider.model).is_equal_to("test-model-v1")
 
     def test_name_property_abstract(self):
-        """Test that name property is defined by subclass."""
+        """
+        Given an initialized concrete provider
+        When the name property is accessed
+        Then the subclass-defined name is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
         )
-        assert provider.name == "test_provider"
+        assert_that(provider.name).is_equal_to("test_provider")
 
 
 # =============================================================================
@@ -184,48 +222,64 @@ class TestAPIKeyManagement:
     """Tests for API key management."""
 
     def test_get_api_key_cycles(self):
-        """Test API key cycling."""
+        """
+        Given a provider with multiple API keys
+        When _get_api_key is called multiple times
+        Then keys cycle in order
+        """
         keys = itertools.cycle(["key1", "key2", "key3"])
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
             api_keys=keys,
         )
-        assert provider._get_api_key() == "key1"
-        assert provider._get_api_key() == "key2"
-        assert provider._get_api_key() == "key3"
-        assert provider._get_api_key() == "key1"  # Cycles back
+        assert_that(provider._get_api_key()).is_equal_to("key1")
+        assert_that(provider._get_api_key()).is_equal_to("key2")
+        assert_that(provider._get_api_key()).is_equal_to("key3")
+        assert_that(provider._get_api_key()).is_equal_to("key1")  # Cycles back
 
     def test_get_api_key_none(self):
-        """Test getting API key when none configured."""
+        """
+        Given a provider with no API keys configured
+        When _get_api_key is called
+        Then an empty string is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
             api_keys=None,
         )
-        assert provider._get_api_key() == ""
+        assert_that(provider._get_api_key()).is_equal_to("")
 
     def test_get_api_key_single_key(self):
-        """Test with single key that cycles."""
+        """
+        Given a provider with a single cycling key
+        When _get_api_key is called multiple times
+        Then the same key is returned each time
+        """
         keys = itertools.cycle(["only-key"])
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
             api_keys=keys,
         )
-        assert provider._get_api_key() == "only-key"
-        assert provider._get_api_key() == "only-key"
+        assert_that(provider._get_api_key()).is_equal_to("only-key")
+        assert_that(provider._get_api_key()).is_equal_to("only-key")
 
     def test_get_api_key_iterator_exhausted(self):
-        """Test with iterator that exhausts."""
+        """
+        Given a provider with a finite key iterator
+        When the iterator is exhausted
+        Then StopIteration is raised
+        """
         keys = iter(["key1", "key2"])
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
             api_keys=keys,
         )
-        assert provider._get_api_key() == "key1"
-        assert provider._get_api_key() == "key2"
+        assert_that(provider._get_api_key()).is_equal_to("key1")
+        assert_that(provider._get_api_key()).is_equal_to("key2")
         with pytest.raises(StopIteration):
             provider._get_api_key()
 
@@ -239,36 +293,52 @@ class TestExtraRequestParams:
     """Tests for _get_extra_request_params method."""
 
     def test_get_extra_request_params_empty(self):
-        """Test getting extra params when none set."""
+        """
+        Given a provider with no extra params configured
+        When _get_extra_request_params is called
+        Then an empty dict is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
         )
         params = provider._get_extra_request_params()
-        assert params == {}
+        assert_that(params).is_equal_to({})
 
     def test_get_extra_request_params_top_p_only(self):
-        """Test extra params with top_p only."""
+        """
+        Given a provider with only top_p configured
+        When _get_extra_request_params is called
+        Then top_p is included in the result
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
             top_p=0.9,
         )
         params = provider._get_extra_request_params()
-        assert params == {"top_p": 0.9}
+        assert_that(params).is_equal_to({"top_p": 0.9})
 
     def test_get_extra_request_params_extra_only(self):
-        """Test extra params with extra_params only."""
+        """
+        Given a provider with only extra_params configured
+        When _get_extra_request_params is called
+        Then all extra_params are included
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
             extra_params={"custom_param": "value", "another": 42},
         )
         params = provider._get_extra_request_params()
-        assert params == {"custom_param": "value", "another": 42}
+        assert_that(params).is_equal_to({"custom_param": "value", "another": 42})
 
     def test_get_extra_request_params_combined(self):
-        """Test extra params with both top_p and extra_params."""
+        """
+        Given a provider with both top_p and extra_params
+        When _get_extra_request_params is called
+        Then both are included in the result
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
@@ -276,11 +346,15 @@ class TestExtraRequestParams:
             extra_params={"custom_param": "value"},
         )
         params = provider._get_extra_request_params()
-        assert params["top_p"] == 0.9
-        assert params["custom_param"] == "value"
+        assert_that(params["top_p"]).is_equal_to(0.9)
+        assert_that(params["custom_param"]).is_equal_to("value")
 
     def test_extra_params_override_top_p(self):
-        """Test that extra_params can override top_p."""
+        """
+        Given a provider with conflicting top_p values
+        When _get_extra_request_params is called
+        Then extra_params takes precedence
+        """
         provider = ConcreteOpenAIProvider(
             model="model",
             base_url="https://api.test.com/v1",
@@ -288,7 +362,7 @@ class TestExtraRequestParams:
             extra_params={"top_p": 0.5},  # Override
         )
         params = provider._get_extra_request_params()
-        assert params["top_p"] == 0.5  # extra_params wins
+        assert_that(params["top_p"]).is_equal_to(0.5)  # extra_params wins
 
 
 # =============================================================================
@@ -300,7 +374,11 @@ class TestGetClient:
     """Tests for _get_client method."""
 
     def test_get_client_creates_async_openai(self):
-        """Test that _get_client creates an AsyncOpenAI client."""
+        """
+        Given a configured provider
+        When _get_client is called
+        Then AsyncOpenAI client is created with correct parameters
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -316,7 +394,11 @@ class TestGetClient:
             )
 
     def test_get_client_uses_correct_timeout(self):
-        """Test client uses configured timeout."""
+        """
+        Given a provider with custom timeout
+        When _get_client is called
+        Then the timeout is passed to AsyncOpenAI
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -325,10 +407,14 @@ class TestGetClient:
         with patch("src.providers.openai_compatible.AsyncOpenAI") as MockAsyncOpenAI:
             provider._get_client()
             call_kwargs = MockAsyncOpenAI.call_args[1]
-            assert call_kwargs["timeout"] == 60.0
+            assert_that(call_kwargs["timeout"]).is_equal_to(60.0)
 
     def test_get_client_rotates_keys(self):
-        """Test client creation rotates API keys."""
+        """
+        Given a provider with multiple API keys
+        When _get_client is called multiple times
+        Then API keys are rotated
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -336,10 +422,10 @@ class TestGetClient:
         )
         with patch("src.providers.openai_compatible.AsyncOpenAI") as MockAsyncOpenAI:
             provider._get_client()
-            assert MockAsyncOpenAI.call_args[1]["api_key"] == "key1"
+            assert_that(MockAsyncOpenAI.call_args[1]["api_key"]).is_equal_to("key1")
 
             provider._get_client()
-            assert MockAsyncOpenAI.call_args[1]["api_key"] == "key2"
+            assert_that(MockAsyncOpenAI.call_args[1]["api_key"]).is_equal_to("key2")
 
 
 # =============================================================================
@@ -352,7 +438,11 @@ class TestMakeRequestSuccess:
 
     @pytest.mark.asyncio
     async def test_make_request_success(self):
-        """Test successful request."""
+        """
+        Given a provider with mocked successful response
+        When _make_request is called
+        Then the response content is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -365,11 +455,15 @@ class TestMakeRequestSuccess:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == "response content"
+            assert_that(result).is_equal_to("response content")
 
     @pytest.mark.asyncio
     async def test_make_request_with_json_schema(self):
-        """Test request with JSON schema."""
+        """
+        Given a request with json_schema parameter
+        When _make_request is called
+        Then the response is returned correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -383,11 +477,15 @@ class TestMakeRequestSuccess:
                 chat_messages=[{"role": "user", "content": "test"}],
                 json_schema={"type": "object"},
             )
-            assert result == '{"key": "value"}'
+            assert_that(result).is_equal_to('{"key": "value"}')
 
     @pytest.mark.asyncio
     async def test_make_request_with_max_tokens(self):
-        """Test request includes max_tokens when set."""
+        """
+        Given a provider with max_tokens configured
+        When _make_request is called
+        Then max_tokens is passed to the API
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -404,7 +502,7 @@ class TestMakeRequestSuccess:
             )
 
             call_kwargs = mock_client.chat.completions.create.call_args[1]
-            assert call_kwargs["max_tokens"] == 4096
+            assert_that(call_kwargs["max_tokens"]).is_equal_to(4096)
 
 
 class TestMakeRequestJSONStripping:
@@ -412,7 +510,11 @@ class TestMakeRequestJSONStripping:
 
     @pytest.mark.asyncio
     async def test_strips_json_markers(self):
-        """Test that JSON markers are stripped when enabled."""
+        """
+        Given strip_json_markers=True and response with markers
+        When _make_request is called with json_schema
+        Then JSON markers are stripped from response
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -427,11 +529,15 @@ class TestMakeRequestJSONStripping:
                 chat_messages=[{"role": "user", "content": "test"}],
                 json_schema={"type": "object"},
             )
-            assert result == '{"key": "value"}'
+            assert_that(result).is_equal_to('{"key": "value"}')
 
     @pytest.mark.asyncio
     async def test_strips_plain_markdown_markers(self):
-        """Test stripping plain markdown code markers."""
+        """
+        Given strip_json_markers=True and response with plain code block markers
+        When _make_request is called with json_schema
+        Then markers are stripped from response
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -446,11 +552,15 @@ class TestMakeRequestJSONStripping:
                 chat_messages=[{"role": "user", "content": "test"}],
                 json_schema={"type": "object"},
             )
-            assert result == '{"key": "value"}'
+            assert_that(result).is_equal_to('{"key": "value"}')
 
     @pytest.mark.asyncio
     async def test_no_strip_when_disabled(self):
-        """Test that markers are not stripped when disabled."""
+        """
+        Given strip_json_markers=False
+        When _make_request is called
+        Then markers are preserved in response
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -465,11 +575,15 @@ class TestMakeRequestJSONStripping:
                 chat_messages=[{"role": "user", "content": "test"}],
                 json_schema={"type": "object"},
             )
-            assert result == '```json\n{"key": "value"}\n```'
+            assert_that(result).is_equal_to('```json\n{"key": "value"}\n```')
 
     @pytest.mark.asyncio
     async def test_no_strip_without_json_schema(self):
-        """Test that markers are not stripped without json_schema."""
+        """
+        Given strip_json_markers=True but no json_schema
+        When _make_request is called
+        Then markers are preserved in response
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -484,7 +598,7 @@ class TestMakeRequestJSONStripping:
                 chat_messages=[{"role": "user", "content": "test"}],
                 json_schema=None,  # No schema
             )
-            assert result == '```json\n{"key": "value"}\n```'
+            assert_that(result).is_equal_to('```json\n{"key": "value"}\n```')
 
 
 class TestMakeRequestErrorHandling:
@@ -492,7 +606,11 @@ class TestMakeRequestErrorHandling:
 
     @pytest.mark.asyncio
     async def test_handles_rate_limit_error(self):
-        """Test handling of rate limit errors."""
+        """
+        Given a rate limit error from the API
+        When _make_request is called
+        Then None is returned
+        """
         from openai import RateLimitError as OpenAIRateLimitError
 
         provider = ConcreteOpenAIProvider(
@@ -515,11 +633,15 @@ class TestMakeRequestErrorHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_timeout_error(self):
-        """Test handling of timeout errors."""
+        """
+        Given a timeout error from the API
+        When _make_request is called
+        Then None is returned
+        """
         from openai import APITimeoutError as OpenAITimeoutError
 
         provider = ConcreteOpenAIProvider(
@@ -536,11 +658,15 @@ class TestMakeRequestErrorHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_empty_response(self):
-        """Test handling of empty response."""
+        """
+        Given an empty response from the API
+        When _make_request is called
+        Then None is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -554,11 +680,15 @@ class TestMakeRequestErrorHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_none_content(self):
-        """Test handling of None content."""
+        """
+        Given None content in response
+        When _make_request is called
+        Then None is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -572,11 +702,15 @@ class TestMakeRequestErrorHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_generic_exception(self):
-        """Test handling of generic exceptions."""
+        """
+        Given a generic exception from the API
+        When _make_request is called
+        Then None is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -591,7 +725,7 @@ class TestMakeRequestErrorHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
 
 class TestMakeRequestRetryBehavior:
@@ -599,7 +733,11 @@ class TestMakeRequestRetryBehavior:
 
     @pytest.mark.asyncio
     async def test_retries_on_empty_response(self):
-        """Test that empty responses trigger retry."""
+        """
+        Given empty responses followed by successful response
+        When _make_request is called
+        Then retries until success and returns valid content
+        """
         call_count = 0
 
         async def create_response(*args, **kwargs):
@@ -623,12 +761,16 @@ class TestMakeRequestRetryBehavior:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == "success"
-            assert call_count == 3
+            assert_that(result).is_equal_to("success")
+            assert_that(call_count).is_equal_to(3)
 
     @pytest.mark.asyncio
     async def test_max_retries_respected(self):
-        """Test that max_retries is respected."""
+        """
+        Given always empty responses
+        When _make_request is called
+        Then max_retries is respected and None is returned
+        """
         call_count = 0
 
         async def always_empty(*args, **kwargs):
@@ -650,8 +792,8 @@ class TestMakeRequestRetryBehavior:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
-            assert call_count == 3
+            assert_that(result).is_none()
+            assert_that(call_count).is_equal_to(3)
 
 
 # =============================================================================
@@ -664,7 +806,11 @@ class TestGenerateInitialCards:
 
     @pytest.mark.asyncio
     async def test_success(self):
-        """Test successful card generation."""
+        """
+        Given a successful API response
+        When generate_initial_cards is called
+        Then the response content is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -679,11 +825,15 @@ class TestGenerateInitialCards:
                 json_schema={"type": "object"},
                 prompt_template="Generate cards for {question}",
             )
-            assert result == SAMPLE_CARD_RESPONSE
+            assert_that(result).is_equal_to(SAMPLE_CARD_RESPONSE)
 
     @pytest.mark.asyncio
     async def test_uses_custom_prompt_template(self):
-        """Test that custom prompt template is used."""
+        """
+        Given a custom prompt template
+        When generate_initial_cards is called
+        Then the template is used with the question
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -702,11 +852,15 @@ class TestGenerateInitialCards:
 
             call_args = mock_client.chat.completions.create.call_args[1]
             messages = call_args["messages"]
-            assert "Custom template for Test Question" in messages[1]["content"]
+            assert_that(messages[1]["content"]).contains("Custom template for Test Question")
 
     @pytest.mark.asyncio
     async def test_empty_returns_empty_string(self):
-        """Test that empty response returns empty string."""
+        """
+        Given an empty API response
+        When generate_initial_cards is called
+        Then an empty string is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -721,11 +875,15 @@ class TestGenerateInitialCards:
                 question="Test",
                 json_schema={},
             )
-            assert result == ""
+            assert_that(result).is_equal_to("")
 
     @pytest.mark.asyncio
     async def test_includes_system_message(self):
-        """Test that system message is included."""
+        """
+        Given generate_initial_cards is called
+        When checking the API call
+        Then system message is included first
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -743,8 +901,8 @@ class TestGenerateInitialCards:
 
             call_args = mock_client.chat.completions.create.call_args[1]
             messages = call_args["messages"]
-            assert messages[0]["role"] == "system"
-            assert "Anki cards" in messages[0]["content"]
+            assert_that(messages[0]["role"]).is_equal_to("system")
+            assert_that(messages[0]["content"]).contains("Anki cards")
 
 
 # =============================================================================
@@ -757,7 +915,11 @@ class TestCombineCards:
 
     @pytest.mark.asyncio
     async def test_success(self):
-        """Test successful card combining."""
+        """
+        Given a successful API response
+        When combine_cards is called
+        Then the response content is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -773,11 +935,15 @@ class TestCombineCards:
                 json_schema={"type": "object"},
                 combine_prompt_template="Combine: {inputs}",
             )
-            assert result == SAMPLE_CARD_RESPONSE
+            assert_that(result).is_equal_to(SAMPLE_CARD_RESPONSE)
 
     @pytest.mark.asyncio
     async def test_uses_custom_combine_template(self):
-        """Test that custom combine template is used."""
+        """
+        Given a custom combine template
+        When combine_cards is called
+        Then the template is used in the message
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -797,11 +963,15 @@ class TestCombineCards:
 
             call_args = mock_client.chat.completions.create.call_args[1]
             messages = call_args["messages"]
-            assert "Custom combine:" in messages[1]["content"]
+            assert_that(messages[1]["content"]).contains("Custom combine:")
 
     @pytest.mark.asyncio
     async def test_returns_none_on_failure(self):
-        """Test returns None on failure."""
+        """
+        Given an API error
+        When combine_cards is called
+        Then None is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -818,7 +988,7 @@ class TestCombineCards:
                 combined_inputs="inputs",
                 json_schema={},
             )
-            assert result is None
+            assert_that(result).is_none()
 
 
 # =============================================================================
@@ -831,7 +1001,11 @@ class TestFormatJSON:
 
     @pytest.mark.asyncio
     async def test_success(self):
-        """Test successful JSON formatting."""
+        """
+        Given a successful API response with valid JSON
+        When format_json is called
+        Then parsed JSON dict is returned
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -845,11 +1019,15 @@ class TestFormatJSON:
                 raw_content="Some raw content to format",
                 json_schema={"type": "object"},
             )
-            assert result == SAMPLE_CARD_RESPONSE_DICT
+            assert_that(result).is_equal_to(SAMPLE_CARD_RESPONSE_DICT)
 
     @pytest.mark.asyncio
     async def test_retries_on_invalid_json(self):
-        """Test that format_json retries on invalid JSON."""
+        """
+        Given invalid JSON responses followed by valid JSON
+        When format_json is called
+        Then retries and returns valid parsed JSON
+        """
         call_count = 0
 
         async def create_response(*args, **kwargs):
@@ -874,12 +1052,16 @@ class TestFormatJSON:
                 raw_content="Content",
                 json_schema={},
             )
-            assert result == SAMPLE_CARD_RESPONSE_DICT
-            assert call_count == 3
+            assert_that(result).is_equal_to(SAMPLE_CARD_RESPONSE_DICT)
+            assert_that(call_count).is_equal_to(3)
 
     @pytest.mark.asyncio
     async def test_returns_none_after_max_retries(self):
-        """Test returns None after max retries exhausted."""
+        """
+        Given always invalid JSON responses
+        When format_json is called
+        Then None is returned after max retries
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -894,14 +1076,14 @@ class TestFormatJSON:
                 raw_content="Content",
                 json_schema={},
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_raises_retryable_error_on_empty_response(self):
-        """Test raises RetryableError when response is empty after retries.
-
-        Note: With reraise=True in the retry decorator, the original
-        RetryableError is raised rather than being caught and returning None.
+        """
+        Given an empty response after retries
+        When format_json is called
+        Then RetryableError is raised
         """
         provider = ConcreteOpenAIProvider(
             model="test-model",
@@ -940,7 +1122,11 @@ class TestUnicodeHandling:
         '{"title": "한국어", "cards": []}',  # Korean
     ])
     async def test_unicode_response_handling(self, content):
-        """Test handling of various Unicode content."""
+        """
+        Given a response with Unicode content
+        When _make_request is called
+        Then Unicode is preserved in the response
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -953,11 +1139,15 @@ class TestUnicodeHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == content
+            assert_that(result).is_equal_to(content)
 
     @pytest.mark.asyncio
     async def test_mixed_unicode_and_code(self):
-        """Test content with mixed Unicode and code."""
+        """
+        Given content with mixed Unicode and code
+        When _make_request is called
+        Then all content is preserved correctly
+        """
         content = '{"title": "算法 Algorithm", "code": "def foo():\\n    pass"}'
         provider = ConcreteOpenAIProvider(
             model="test-model",
@@ -971,7 +1161,7 @@ class TestUnicodeHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == content
+            assert_that(result).is_equal_to(content)
 
 
 # =============================================================================
@@ -984,7 +1174,11 @@ class TestErrorStatusCodes:
 
     @pytest.mark.asyncio
     async def test_handles_400_bad_request(self):
-        """Test handling of 400 Bad Request."""
+        """
+        Given a 400 Bad Request error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import BadRequestError
 
         provider = ConcreteOpenAIProvider(
@@ -1007,11 +1201,15 @@ class TestErrorStatusCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_401_unauthorized(self):
-        """Test handling of 401 Unauthorized."""
+        """
+        Given a 401 Unauthorized error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import AuthenticationError
 
         provider = ConcreteOpenAIProvider(
@@ -1034,11 +1232,15 @@ class TestErrorStatusCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_429_rate_limit(self):
-        """Test handling of 429 Rate Limit."""
+        """
+        Given a 429 Rate Limit error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import RateLimitError as OpenAIRateLimitError
 
         provider = ConcreteOpenAIProvider(
@@ -1061,11 +1263,15 @@ class TestErrorStatusCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_500_server_error(self):
-        """Test handling of 500 Internal Server Error."""
+        """
+        Given a 500 Internal Server Error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import InternalServerError
 
         provider = ConcreteOpenAIProvider(
@@ -1088,7 +1294,7 @@ class TestErrorStatusCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
 
 # =============================================================================
@@ -1111,16 +1317,24 @@ class TestOpenAICompatibleProviderIntegration:
         )
 
     def test_full_initialization(self, provider):
-        """Test complete provider initialization."""
-        assert provider.model == "test-model"
-        assert provider.base_url == "https://api.test.com/v1"
-        assert provider.timeout == 60.0
-        assert provider.temperature == 0.5
-        assert provider.name == "test_provider"
+        """
+        Given a fully configured provider
+        When checking its properties
+        Then all values are correctly set
+        """
+        assert_that(provider.model).is_equal_to("test-model")
+        assert_that(provider.base_url).is_equal_to("https://api.test.com/v1")
+        assert_that(provider.timeout).is_equal_to(60.0)
+        assert_that(provider.temperature).is_equal_to(0.5)
+        assert_that(provider.name).is_equal_to("test_provider")
 
     @pytest.mark.asyncio
     async def test_full_generate_flow(self, provider):
-        """Test complete generation flow."""
+        """
+        Given a mocked provider
+        When running the full generate flow
+        Then all steps complete successfully
+        """
         mock_response = create_mock_response(SAMPLE_CARD_RESPONSE)
 
         with patch.object(provider, "_get_client") as mock_get_client:
@@ -1131,7 +1345,7 @@ class TestOpenAICompatibleProviderIntegration:
                 question="Test Question",
                 json_schema={"type": "object"},
             )
-            assert initial == SAMPLE_CARD_RESPONSE
+            assert_that(initial).is_equal_to(SAMPLE_CARD_RESPONSE)
 
             # Combine cards
             combined = await provider.combine_cards(
@@ -1139,14 +1353,14 @@ class TestOpenAICompatibleProviderIntegration:
                 combined_inputs=initial,
                 json_schema={"type": "object"},
             )
-            assert combined == SAMPLE_CARD_RESPONSE
+            assert_that(combined).is_equal_to(SAMPLE_CARD_RESPONSE)
 
             # Format JSON
             formatted = await provider.format_json(
                 raw_content=combined,
                 json_schema={"type": "object"},
             )
-            assert formatted == SAMPLE_CARD_RESPONSE_DICT
+            assert_that(formatted).is_equal_to(SAMPLE_CARD_RESPONSE_DICT)
 
 
 # =============================================================================
@@ -1159,7 +1373,11 @@ class TestAdditionalErrorCodes:
 
     @pytest.mark.asyncio
     async def test_handles_502_bad_gateway(self):
-        """Test handling of 502 Bad Gateway."""
+        """
+        Given a 502 Bad Gateway error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import InternalServerError
 
         provider = ConcreteOpenAIProvider(
@@ -1182,11 +1400,15 @@ class TestAdditionalErrorCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_503_service_unavailable(self):
-        """Test handling of 503 Service Unavailable."""
+        """
+        Given a 503 Service Unavailable error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import InternalServerError
 
         provider = ConcreteOpenAIProvider(
@@ -1209,11 +1431,15 @@ class TestAdditionalErrorCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_403_forbidden(self):
-        """Test handling of 403 Forbidden."""
+        """
+        Given a 403 Forbidden error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import PermissionDeniedError
 
         provider = ConcreteOpenAIProvider(
@@ -1236,11 +1462,15 @@ class TestAdditionalErrorCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_404_not_found(self):
-        """Test handling of 404 Not Found."""
+        """
+        Given a 404 Not Found error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import NotFoundError
 
         provider = ConcreteOpenAIProvider(
@@ -1263,11 +1493,15 @@ class TestAdditionalErrorCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_handles_422_unprocessable_entity(self):
-        """Test handling of 422 Unprocessable Entity."""
+        """
+        Given a 422 Unprocessable Entity error
+        When _make_request is called
+        Then None is returned
+        """
         from openai import UnprocessableEntityError
 
         provider = ConcreteOpenAIProvider(
@@ -1290,7 +1524,7 @@ class TestAdditionalErrorCodes:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
 
 # =============================================================================
@@ -1303,7 +1537,11 @@ class TestMessageFormatting:
 
     @pytest.mark.asyncio
     async def test_system_message_is_first(self):
-        """Test that system message comes first in chat messages."""
+        """
+        Given generate_initial_cards is called
+        When checking the chat messages
+        Then the system message is first
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1325,11 +1563,15 @@ class TestMessageFormatting:
                 json_schema={},
             )
 
-            assert captured_messages[0]["role"] == "system"
+            assert_that(captured_messages[0]["role"]).is_equal_to("system")
 
     @pytest.mark.asyncio
     async def test_user_message_contains_question(self):
-        """Test that user message contains the question."""
+        """
+        Given a question for card generation
+        When generate_initial_cards is called
+        Then the question appears in the user message
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1352,12 +1594,16 @@ class TestMessageFormatting:
             )
 
             user_messages = [m for m in captured_messages if m["role"] == "user"]
-            assert len(user_messages) >= 1
-            assert "What is binary search?" in user_messages[-1]["content"]
+            assert_that(len(user_messages)).is_greater_than_or_equal_to(1)
+            assert_that(user_messages[-1]["content"]).contains("What is binary search?")
 
     @pytest.mark.asyncio
     async def test_combine_cards_includes_inputs(self):
-        """Test that combine_cards includes all inputs in message."""
+        """
+        Given combined inputs for card combination
+        When combine_cards is called
+        Then the inputs appear in the message content
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1382,8 +1628,8 @@ class TestMessageFormatting:
             )
 
             all_content = " ".join(m["content"] for m in captured_messages)
-            assert "Card 1 content" in all_content
-            assert "Card 2 content" in all_content
+            assert_that(all_content).contains("Card 1 content")
+            assert_that(all_content).contains("Card 2 content")
 
 
 # =============================================================================
@@ -1396,47 +1642,67 @@ class TestBoundaryConditions:
 
     @pytest.mark.asyncio
     async def test_zero_temperature(self):
-        """Test with temperature = 0."""
+        """
+        Given temperature = 0
+        When provider is created
+        Then temperature is set to 0
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
             temperature=0.0,
         )
-        assert provider.temperature == 0.0
+        assert_that(provider.temperature).is_equal_to(0.0)
 
     @pytest.mark.asyncio
     async def test_max_temperature(self):
-        """Test with temperature = 2.0 (max typical value)."""
+        """
+        Given temperature = 2.0 (max typical value)
+        When provider is created
+        Then temperature is set correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
             temperature=2.0,
         )
-        assert provider.temperature == 2.0
+        assert_that(provider.temperature).is_equal_to(2.0)
 
     @pytest.mark.asyncio
     async def test_minimum_timeout(self):
-        """Test with very short timeout."""
+        """
+        Given a very short timeout
+        When provider is created
+        Then timeout is set correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
             timeout=1.0,
         )
-        assert provider.timeout == 1.0
+        assert_that(provider.timeout).is_equal_to(1.0)
 
     @pytest.mark.asyncio
     async def test_very_long_timeout(self):
-        """Test with very long timeout."""
+        """
+        Given a very long timeout
+        When provider is created
+        Then timeout is set correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
             timeout=600.0,
         )
-        assert provider.timeout == 600.0
+        assert_that(provider.timeout).is_equal_to(600.0)
 
     @pytest.mark.asyncio
     async def test_empty_question(self):
-        """Test with empty question string."""
+        """
+        Given an empty question string
+        When generate_initial_cards is called
+        Then the request still succeeds
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1450,11 +1716,15 @@ class TestBoundaryConditions:
                 question="",
                 json_schema={},
             )
-            assert result == SAMPLE_CARD_RESPONSE
+            assert_that(result).is_equal_to(SAMPLE_CARD_RESPONSE)
 
     @pytest.mark.asyncio
     async def test_very_long_question(self):
-        """Test with very long question string."""
+        """
+        Given a very long question string
+        When generate_initial_cards is called
+        Then the request still succeeds
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1469,15 +1739,14 @@ class TestBoundaryConditions:
                 question=long_question,
                 json_schema={},
             )
-            assert result == SAMPLE_CARD_RESPONSE
+            assert_that(result).is_equal_to(SAMPLE_CARD_RESPONSE)
 
     @pytest.mark.asyncio
     async def test_whitespace_only_response_is_returned(self):
-        """Test handling of whitespace-only response.
-
-        Note: The implementation doesn't treat whitespace-only as empty,
-        it returns the content as-is. Only truly empty/None content
-        raises EmptyResponseError.
+        """
+        Given a whitespace-only response
+        When _make_request is called
+        Then the whitespace content is returned (not treated as empty)
         """
         provider = ConcreteOpenAIProvider(
             model="test-model",
@@ -1494,27 +1763,35 @@ class TestBoundaryConditions:
                 chat_messages=[{"role": "user", "content": "test"}],
             )
             # Whitespace content is returned as-is, not treated as empty
-            assert result == whitespace_content
+            assert_that(result).is_equal_to(whitespace_content)
 
     @pytest.mark.asyncio
     async def test_single_max_retry(self):
-        """Test with max_retries = 1."""
+        """
+        Given max_retries = 1
+        When provider is created
+        Then max_retries is set correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
             max_retries=1,
         )
-        assert provider.max_retries == 1
+        assert_that(provider.max_retries).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_high_max_retries(self):
-        """Test with high max_retries value."""
+        """
+        Given a high max_retries value
+        When provider is created
+        Then max_retries is set correctly
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
             max_retries=10,
         )
-        assert provider.max_retries == 10
+        assert_that(provider.max_retries).is_equal_to(10)
 
 
 # =============================================================================
@@ -1527,7 +1804,11 @@ class TestAPIRequestParameters:
 
     @pytest.mark.asyncio
     async def test_model_passed_to_api(self):
-        """Test that model name is passed to API call."""
+        """
+        Given a configured model name
+        When _make_request is called
+        Then the model is passed to the API
+        """
         provider = ConcreteOpenAIProvider(
             model="custom-model-v2",
             base_url="https://api.test.com/v1",
@@ -1548,11 +1829,15 @@ class TestAPIRequestParameters:
                 chat_messages=[{"role": "user", "content": "test"}],
             )
 
-            assert captured_kwargs.get("model") == "custom-model-v2"
+            assert_that(captured_kwargs.get("model")).is_equal_to("custom-model-v2")
 
     @pytest.mark.asyncio
     async def test_temperature_passed_to_api(self):
-        """Test that temperature is passed to API call."""
+        """
+        Given a configured temperature
+        When _make_request is called
+        Then the temperature is passed to the API
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1574,11 +1859,15 @@ class TestAPIRequestParameters:
                 chat_messages=[{"role": "user", "content": "test"}],
             )
 
-            assert captured_kwargs.get("temperature") == 0.8
+            assert_that(captured_kwargs.get("temperature")).is_equal_to(0.8)
 
     @pytest.mark.asyncio
     async def test_max_tokens_passed_to_api(self):
-        """Test that max_tokens is passed to API call when set on provider."""
+        """
+        Given a configured max_tokens
+        When _make_request is called
+        Then max_tokens is passed to the API
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1600,15 +1889,14 @@ class TestAPIRequestParameters:
                 chat_messages=[{"role": "user", "content": "test"}],
             )
 
-            assert captured_kwargs.get("max_tokens") == 2000
+            assert_that(captured_kwargs.get("max_tokens")).is_equal_to(2000)
 
     @pytest.mark.asyncio
     async def test_json_schema_triggers_strip_json_block(self):
-        """Test that json_schema parameter triggers JSON block stripping.
-
-        Note: The base _make_request uses json_schema only to decide whether
-        to strip JSON markdown markers. Response format is not automatically
-        set from the json_schema parameter in _make_request.
+        """
+        Given strip_json_markers=True and json_schema
+        When _make_request is called with wrapped JSON content
+        Then JSON markers are stripped from the response
         """
         provider = ConcreteOpenAIProvider(
             model="test-model",
@@ -1628,7 +1916,7 @@ class TestAPIRequestParameters:
             )
 
             # Markers should be stripped when json_schema is provided
-            assert result == '{"cards": []}'
+            assert_that(result).is_equal_to('{"cards": []}')
 
 
 # =============================================================================
@@ -1641,7 +1929,11 @@ class TestConcurrentBehavior:
 
     @pytest.mark.asyncio
     async def test_multiple_sequential_requests(self):
-        """Test multiple sequential requests work correctly."""
+        """
+        Given a provider
+        When multiple sequential requests are made
+        Then each request returns the correct response
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1673,11 +1965,15 @@ class TestConcurrentBehavior:
                 )
                 results.append(result)
 
-            assert results == ['{"card": 1}', '{"card": 2}', '{"card": 3}']
+            assert_that(results).is_equal_to(['{"card": 1}', '{"card": 2}', '{"card": 3}'])
 
     @pytest.mark.asyncio
     async def test_key_rotation_on_sequential_requests(self):
-        """Test that API keys rotate across sequential requests."""
+        """
+        Given a provider with multiple API keys
+        When sequential requests are made
+        Then API keys are rotated
+        """
         keys = ["key1", "key2", "key3"]
         provider = ConcreteOpenAIProvider(
             model="test-model",
@@ -1703,11 +1999,15 @@ class TestConcurrentBehavior:
                     chat_messages=[{"role": "user", "content": "test"}],
                 )
 
-            assert used_keys == ["key1", "key2", "key3"]
+            assert_that(used_keys).is_equal_to(["key1", "key2", "key3"])
 
     @pytest.mark.asyncio
     async def test_parallel_requests_share_key_iterator(self):
-        """Test that parallel requests draw from the same key iterator."""
+        """
+        Given a provider with multiple API keys
+        When parallel requests are made
+        Then keys are drawn from the shared iterator
+        """
         import asyncio
 
         keys = ["key1", "key2", "key3", "key4"]
@@ -1744,7 +2044,7 @@ class TestConcurrentBehavior:
             await asyncio.gather(*tasks)
 
             # All keys should have been used
-            assert set(used_keys) == set(keys)
+            assert_that(set(used_keys)).is_equal_to(set(keys))
 
 
 # =============================================================================
@@ -1757,12 +2057,16 @@ class TestResponseContentValidation:
 
     @pytest.mark.asyncio
     async def test_strips_leading_trailing_whitespace(self):
-        """Test that leading/trailing whitespace is handled."""
+        """
+        Given a response with leading/trailing whitespace
+        When _make_request is called
+        Then the content is returned with whitespace preserved (but can be stripped)
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
         )
-        mock_response = create_mock_response("  \n  {\"cards\": []}  \n  ")
+        mock_response = create_mock_response('  \n  {"cards": []}  \n  ')
 
         with patch.object(provider, "_get_client") as mock_get_client:
             mock_get_client.return_value = create_mock_client(response=mock_response)
@@ -1772,11 +2076,15 @@ class TestResponseContentValidation:
                 json_schema={"type": "object"},
             )
             # Content should be stripped
-            assert result.strip() == '{"cards": []}'
+            assert_that(result.strip()).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_preserves_internal_whitespace(self):
-        """Test that internal whitespace in content is preserved."""
+        """
+        Given content with internal whitespace
+        When _make_request is called
+        Then internal whitespace is preserved
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1790,11 +2098,15 @@ class TestResponseContentValidation:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == content_with_whitespace
+            assert_that(result).is_equal_to(content_with_whitespace)
 
     @pytest.mark.asyncio
     async def test_handles_nested_json_markers(self):
-        """Test handling of nested JSON code markers."""
+        """
+        Given content with nested JSON code markers
+        When _make_request is called with json_schema
+        Then outer markers are stripped appropriately
+        """
         provider = ConcreteOpenAIProvider(
             model="test-model",
             base_url="https://api.test.com/v1",
@@ -1810,4 +2122,4 @@ class TestResponseContentValidation:
                 json_schema={"type": "object"},
             )
             # Should strip outer markers
-            assert "```" not in result or result.count("```") < nested_content.count("```")
+            assert_that(result.count("```")).is_less_than(nested_content.count("```"))

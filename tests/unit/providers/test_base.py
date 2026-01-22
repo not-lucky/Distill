@@ -10,6 +10,8 @@ import asyncio
 from unittest.mock import MagicMock, AsyncMock, patch
 from typing import Dict, Any, Optional
 
+from assertpy import assert_that
+
 from src.providers.base import (
     LLMProvider,
     create_retry_decorator,
@@ -29,66 +31,110 @@ class TestRetryableError:
     """Tests for RetryableError base exception."""
 
     def test_creation_with_message(self):
-        """Test RetryableError can be created with a message."""
+        """
+        Given a message string
+        When RetryableError is created
+        Then the message is stored correctly
+        """
         error = RetryableError("test error")
-        assert str(error) == "test error"
+        assert_that(str(error)).is_equal_to("test error")
 
     def test_creation_without_message(self):
-        """Test RetryableError can be created without a message."""
+        """
+        Given no message
+        When RetryableError is created
+        Then empty string is stored
+        """
         error = RetryableError()
-        assert str(error) == ""
+        assert_that(str(error)).is_equal_to("")
 
     def test_is_instance_of_exception(self):
-        """Test RetryableError inherits from Exception."""
+        """
+        Given a RetryableError
+        When checking its inheritance
+        Then it is an Exception
+        """
         error = RetryableError("test")
-        assert isinstance(error, Exception)
+        assert_that(error).is_instance_of(Exception)
 
     def test_can_be_raised_and_caught(self):
-        """Test RetryableError can be raised and caught."""
+        """
+        Given a RetryableError
+        When it is raised
+        Then it can be caught and message preserved
+        """
         with pytest.raises(RetryableError) as exc_info:
             raise RetryableError("raised")
-        assert str(exc_info.value) == "raised"
+        assert_that(str(exc_info.value)).is_equal_to("raised")
 
     def test_can_be_caught_as_exception(self):
-        """Test RetryableError can be caught as generic Exception."""
+        """
+        Given a RetryableError
+        When it is raised
+        Then it can be caught as generic Exception
+        """
         with pytest.raises(Exception):
             raise RetryableError("generic catch")
 
     def test_with_cause(self):
-        """Test RetryableError can chain exceptions."""
+        """
+        Given a RetryableError with a cause
+        When chaining exceptions
+        Then the cause is preserved
+        """
         original = ValueError("original")
         error = RetryableError("wrapper")
         error.__cause__ = original
-        assert error.__cause__ is original
+        assert_that(error.__cause__).is_same_as(original)
 
 
 class TestRateLimitError:
     """Tests for RateLimitError exception."""
 
     def test_creation(self):
-        """Test RateLimitError can be created."""
+        """
+        Given a message
+        When RateLimitError is created
+        Then the message is stored correctly
+        """
         error = RateLimitError("rate limit hit")
-        assert str(error) == "rate limit hit"
+        assert_that(str(error)).is_equal_to("rate limit hit")
 
     def test_inherits_from_retryable_error(self):
-        """Test RateLimitError inherits from RetryableError."""
+        """
+        Given a RateLimitError
+        When checking its inheritance
+        Then it is a RetryableError
+        """
         error = RateLimitError("rate limit")
-        assert isinstance(error, RetryableError)
+        assert_that(error).is_instance_of(RetryableError)
 
     def test_inherits_from_exception(self):
-        """Test RateLimitError inherits from Exception."""
+        """
+        Given a RateLimitError
+        When checking its inheritance
+        Then it is an Exception
+        """
         error = RateLimitError("rate limit")
-        assert isinstance(error, Exception)
+        assert_that(error).is_instance_of(Exception)
 
     def test_can_be_caught_as_retryable(self):
-        """Test RateLimitError can be caught as RetryableError."""
+        """
+        Given a RateLimitError
+        When it is raised
+        Then it can be caught as RetryableError
+        """
         with pytest.raises(RetryableError):
             raise RateLimitError("limit exceeded")
 
     def test_with_retry_after_info(self):
-        """Test RateLimitError can include retry-after information."""
+        """
+        Given a RateLimitError with retry-after info
+        When checking the message
+        Then the retry-after info is preserved
+        """
         error = RateLimitError("Rate limit exceeded. Retry after 60 seconds.")
-        assert "60 seconds" in str(error)
+        assert_that(str(error)).contains("60 seconds")
 
     @pytest.mark.parametrize("message", [
         "429 Too Many Requests",
@@ -97,51 +143,83 @@ class TestRateLimitError:
         "",
     ])
     def test_various_messages(self, message):
-        """Test RateLimitError with various messages."""
+        """
+        Given various rate limit messages
+        When RateLimitError is created
+        Then the message is stored correctly
+        """
         error = RateLimitError(message)
-        assert str(error) == message
+        assert_that(str(error)).is_equal_to(message)
 
 
 class TestTimeoutError:
     """Tests for TimeoutError exception."""
 
     def test_creation(self):
-        """Test TimeoutError can be created."""
+        """
+        Given a timeout message
+        When TimeoutError is created
+        Then the message is stored correctly
+        """
         error = TimeoutError("request timed out")
-        assert str(error) == "request timed out"
+        assert_that(str(error)).is_equal_to("request timed out")
 
     def test_inherits_from_retryable_error(self):
-        """Test TimeoutError inherits from RetryableError."""
+        """
+        Given a TimeoutError
+        When checking its inheritance
+        Then it is a RetryableError
+        """
         error = TimeoutError("timeout")
-        assert isinstance(error, RetryableError)
+        assert_that(error).is_instance_of(RetryableError)
 
     def test_can_be_caught_as_retryable(self):
-        """Test TimeoutError can be caught as RetryableError."""
+        """
+        Given a TimeoutError
+        When it is raised
+        Then it can be caught as RetryableError
+        """
         with pytest.raises(RetryableError):
             raise TimeoutError("timed out")
 
     @pytest.mark.parametrize("timeout_seconds", [1, 5, 30, 60, 120])
     def test_with_timeout_duration(self, timeout_seconds):
-        """Test TimeoutError with various timeout durations."""
+        """
+        Given various timeout durations
+        When TimeoutError is created
+        Then the duration is preserved in message
+        """
         error = TimeoutError(f"Request timed out after {timeout_seconds}s")
-        assert str(timeout_seconds) in str(error)
+        assert_that(str(error)).contains(str(timeout_seconds))
 
 
 class TestEmptyResponseError:
     """Tests for EmptyResponseError exception."""
 
     def test_creation(self):
-        """Test EmptyResponseError can be created."""
+        """
+        Given an empty response message
+        When EmptyResponseError is created
+        Then the message is stored correctly
+        """
         error = EmptyResponseError("empty response")
-        assert str(error) == "empty response"
+        assert_that(str(error)).is_equal_to("empty response")
 
     def test_inherits_from_retryable_error(self):
-        """Test EmptyResponseError inherits from RetryableError."""
+        """
+        Given an EmptyResponseError
+        When checking its inheritance
+        Then it is a RetryableError
+        """
         error = EmptyResponseError("empty")
-        assert isinstance(error, RetryableError)
+        assert_that(error).is_instance_of(RetryableError)
 
     def test_can_be_caught_as_retryable(self):
-        """Test EmptyResponseError can be caught as RetryableError."""
+        """
+        Given an EmptyResponseError
+        When it is raised
+        Then it can be caught as RetryableError
+        """
         with pytest.raises(RetryableError):
             raise EmptyResponseError("no content")
 
@@ -152,36 +230,52 @@ class TestEmptyResponseError:
         "API returned null content",
     ])
     def test_various_empty_scenarios(self, scenario):
-        """Test EmptyResponseError with various empty response scenarios."""
+        """
+        Given various empty response scenarios
+        When EmptyResponseError is created
+        Then the scenario description is preserved
+        """
         error = EmptyResponseError(scenario)
-        assert str(error) == scenario
+        assert_that(str(error)).is_equal_to(scenario)
 
 
 class TestExceptionHierarchy:
     """Tests for exception class hierarchy."""
 
     def test_all_retryable_errors_share_base(self):
-        """Test all retryable errors share common base."""
+        """
+        Given all retryable error types
+        When checking their inheritance
+        Then they all inherit from RetryableError
+        """
         errors = [
             RateLimitError("rate"),
             TimeoutError("timeout"),
             EmptyResponseError("empty"),
         ]
         for error in errors:
-            assert isinstance(error, RetryableError)
+            assert_that(error).is_instance_of(RetryableError)
 
     def test_exception_types_are_distinct(self):
-        """Test each exception type is distinct."""
+        """
+        Given different error types
+        When checking their types
+        Then each has its own distinct type
+        """
         rate_limit = RateLimitError("rate")
         timeout = TimeoutError("timeout")
         empty = EmptyResponseError("empty")
 
-        assert type(rate_limit) is RateLimitError
-        assert type(timeout) is TimeoutError
-        assert type(empty) is EmptyResponseError
+        assert_that(type(rate_limit)).is_equal_to(RateLimitError)
+        assert_that(type(timeout)).is_equal_to(TimeoutError)
+        assert_that(type(empty)).is_equal_to(EmptyResponseError)
 
     def test_can_distinguish_error_types(self):
-        """Test can distinguish between error types when catching."""
+        """
+        Given different error types
+        When catching them
+        Then each type can be distinguished
+        """
         errors_caught = []
 
         for ErrorClass in [RateLimitError, TimeoutError, EmptyResponseError]:
@@ -194,7 +288,7 @@ class TestExceptionHierarchy:
             except EmptyResponseError:
                 errors_caught.append("empty")
 
-        assert errors_caught == ["rate_limit", "timeout", "empty"]
+        assert_that(errors_caught).is_equal_to(["rate_limit", "timeout", "empty"])
 
 
 # =============================================================================
@@ -206,21 +300,33 @@ class TestCreateRetryDecoratorBasic:
     """Basic tests for create_retry_decorator function."""
 
     def test_returns_decorator(self):
-        """Test create_retry_decorator returns a callable decorator."""
+        """
+        Given no parameters
+        When create_retry_decorator is called
+        Then a callable decorator is returned
+        """
         decorator = create_retry_decorator()
-        assert callable(decorator)
+        assert_that(decorator).is_not_none()
+        assert_that(callable(decorator)).is_true()
 
     def test_default_parameters(self):
-        """Test decorator uses default parameters when none specified."""
+        """
+        Given no parameters
+        When create_retry_decorator is called
+        Then it succeeds with default parameters
+        """
         decorator = create_retry_decorator()
-        # Just verify it doesn't raise
-        assert decorator is not None
+        assert_that(decorator).is_not_none()
 
     @pytest.mark.parametrize("max_retries", [1, 2, 3, 5, 10])
     def test_accepts_various_max_retries(self, max_retries):
-        """Test decorator accepts various max_retries values."""
+        """
+        Given various max_retries values
+        When create_retry_decorator is called
+        Then it accepts them all
+        """
         decorator = create_retry_decorator(max_retries=max_retries)
-        assert decorator is not None
+        assert_that(decorator).is_not_none()
 
     @pytest.mark.parametrize("min_wait,max_wait", [
         (0.01, 0.1),
@@ -229,15 +335,23 @@ class TestCreateRetryDecoratorBasic:
         (1.0, 10.0),
     ])
     def test_accepts_various_wait_times(self, min_wait, max_wait):
-        """Test decorator accepts various wait time configurations."""
+        """
+        Given various wait time configurations
+        When create_retry_decorator is called
+        Then it accepts them all
+        """
         decorator = create_retry_decorator(min_wait=min_wait, max_wait=max_wait)
-        assert decorator is not None
+        assert_that(decorator).is_not_none()
 
     def test_custom_logger(self):
-        """Test decorator accepts custom logger."""
+        """
+        Given a custom logger
+        When create_retry_decorator is called
+        Then it accepts the custom logger
+        """
         custom_logger = logging.getLogger("test_custom")
         decorator = create_retry_decorator(retry_logger=custom_logger)
-        assert decorator is not None
+        assert_that(decorator).is_not_none()
 
 
 class TestCreateRetryDecoratorBehavior:
@@ -245,7 +359,11 @@ class TestCreateRetryDecoratorBehavior:
 
     @pytest.mark.asyncio
     async def test_retries_on_retryable_error(self):
-        """Test decorator retries on RetryableError."""
+        """
+        Given a function that fails then succeeds
+        When decorated with retry decorator
+        Then it retries until success
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=3, min_wait=0.01, max_wait=0.01)
@@ -257,12 +375,16 @@ class TestCreateRetryDecoratorBehavior:
             return "success"
 
         result = await failing_then_success()
-        assert result == "success"
-        assert call_count == 3
+        assert_that(result).is_equal_to("success")
+        assert_that(call_count).is_equal_to(3)
 
     @pytest.mark.asyncio
     async def test_retries_on_rate_limit_error(self):
-        """Test decorator retries on RateLimitError."""
+        """
+        Given a function that hits rate limit then succeeds
+        When decorated with retry decorator
+        Then it retries until success
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=3, min_wait=0.01, max_wait=0.01)
@@ -274,12 +396,16 @@ class TestCreateRetryDecoratorBehavior:
             return "ok"
 
         result = await rate_limited()
-        assert result == "ok"
-        assert call_count == 2
+        assert_that(result).is_equal_to("ok")
+        assert_that(call_count).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_retries_on_timeout_error(self):
-        """Test decorator retries on TimeoutError."""
+        """
+        Given a function that times out then succeeds
+        When decorated with retry decorator
+        Then it retries until success
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=3, min_wait=0.01, max_wait=0.01)
@@ -291,12 +417,16 @@ class TestCreateRetryDecoratorBehavior:
             return "completed"
 
         result = await timeout_then_success()
-        assert result == "completed"
-        assert call_count == 2
+        assert_that(result).is_equal_to("completed")
+        assert_that(call_count).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_retries_on_empty_response_error(self):
-        """Test decorator retries on EmptyResponseError."""
+        """
+        Given a function that returns empty then content
+        When decorated with retry decorator
+        Then it retries until success
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=3, min_wait=0.01, max_wait=0.01)
@@ -308,12 +438,16 @@ class TestCreateRetryDecoratorBehavior:
             return "content"
 
         result = await empty_then_content()
-        assert result == "content"
-        assert call_count == 2
+        assert_that(result).is_equal_to("content")
+        assert_that(call_count).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_max_retries_exceeded(self):
-        """Test decorator stops after max retries."""
+        """
+        Given a function that always fails
+        When decorated with retry decorator
+        Then it stops after max retries
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=2, min_wait=0.01, max_wait=0.01)
@@ -325,11 +459,15 @@ class TestCreateRetryDecoratorBehavior:
         with pytest.raises(RetryableError):
             await always_fails()
 
-        assert call_count == 2
+        assert_that(call_count).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_no_retry_on_value_error(self):
-        """Test ValueError is not retried."""
+        """
+        Given a function that raises ValueError
+        When decorated with retry decorator
+        Then ValueError is not retried
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=3, min_wait=0.01, max_wait=0.01)
@@ -341,11 +479,15 @@ class TestCreateRetryDecoratorBehavior:
         with pytest.raises(ValueError):
             await value_error()
 
-        assert call_count == 1
+        assert_that(call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_no_retry_on_type_error(self):
-        """Test TypeError is not retried."""
+        """
+        Given a function that raises TypeError
+        When decorated with retry decorator
+        Then TypeError is not retried
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=3, min_wait=0.01, max_wait=0.01)
@@ -357,11 +499,15 @@ class TestCreateRetryDecoratorBehavior:
         with pytest.raises(TypeError):
             await type_error()
 
-        assert call_count == 1
+        assert_that(call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_no_retry_on_key_error(self):
-        """Test KeyError is not retried."""
+        """
+        Given a function that raises KeyError
+        When decorated with retry decorator
+        Then KeyError is not retried
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=3, min_wait=0.01, max_wait=0.01)
@@ -373,11 +519,15 @@ class TestCreateRetryDecoratorBehavior:
         with pytest.raises(KeyError):
             await key_error()
 
-        assert call_count == 1
+        assert_that(call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_success_without_retry(self):
-        """Test successful call without any retries."""
+        """
+        Given a function that succeeds immediately
+        When decorated with retry decorator
+        Then it is called only once
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=3)
@@ -387,28 +537,36 @@ class TestCreateRetryDecoratorBehavior:
             return "done"
 
         result = await immediate_success()
-        assert result == "done"
-        assert call_count == 1
+        assert_that(result).is_equal_to("done")
+        assert_that(call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_preserves_return_value(self):
-        """Test decorator preserves return value."""
+        """
+        Given a function that returns a dict
+        When decorated with retry decorator
+        Then the return value is preserved
+        """
         @create_retry_decorator(max_retries=2)
         async def returns_dict():
             return {"key": "value", "count": 42}
 
         result = await returns_dict()
-        assert result == {"key": "value", "count": 42}
+        assert_that(result).is_equal_to({"key": "value", "count": 42})
 
     @pytest.mark.asyncio
     async def test_preserves_none_return(self):
-        """Test decorator preserves None return value."""
+        """
+        Given a function that returns None
+        When decorated with retry decorator
+        Then None is preserved
+        """
         @create_retry_decorator(max_retries=2)
         async def returns_none():
             return None
 
         result = await returns_none()
-        assert result is None
+        assert_that(result).is_none()
 
 
 class TestRetryDecoratorEdgeCases:
@@ -416,7 +574,11 @@ class TestRetryDecoratorEdgeCases:
 
     @pytest.mark.asyncio
     async def test_single_retry_allowed(self):
-        """Test with max_retries=1 (no retries, just one attempt)."""
+        """
+        Given max_retries=1
+        When function fails
+        Then only one attempt is made
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=1, min_wait=0.01, max_wait=0.01)
@@ -428,11 +590,15 @@ class TestRetryDecoratorEdgeCases:
         with pytest.raises(RetryableError):
             await fails_once()
 
-        assert call_count == 1
+        assert_that(call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_success_on_last_retry(self):
-        """Test success on the very last retry attempt."""
+        """
+        Given success on the last retry attempt
+        When function retries
+        Then success is returned
+        """
         call_count = 0
 
         @create_retry_decorator(max_retries=5, min_wait=0.01, max_wait=0.01)
@@ -444,12 +610,16 @@ class TestRetryDecoratorEdgeCases:
             return "finally"
 
         result = await success_on_fifth()
-        assert result == "finally"
-        assert call_count == 5
+        assert_that(result).is_equal_to("finally")
+        assert_that(call_count).is_equal_to(5)
 
     @pytest.mark.asyncio
     async def test_alternating_error_types(self):
-        """Test retrying with alternating retryable error types."""
+        """
+        Given alternating retryable error types
+        When function retries
+        Then all error types are retried
+        """
         call_count = 0
         error_sequence = [
             RateLimitError("rate"),
@@ -468,8 +638,8 @@ class TestRetryDecoratorEdgeCases:
             return "success"
 
         result = await alternating_errors()
-        assert result == "success"
-        assert call_count == 4
+        assert_that(result).is_equal_to("success")
+        assert_that(call_count).is_equal_to(4)
 
 
 # =============================================================================
@@ -481,62 +651,109 @@ class TestLLMProviderAbstract:
     """Tests for LLMProvider abstract base class."""
 
     def test_cannot_instantiate_directly(self):
-        """Test LLMProvider cannot be instantiated directly."""
+        """
+        Given the abstract LLMProvider class
+        When attempting to instantiate directly
+        Then TypeError is raised
+        """
         with pytest.raises(TypeError):
             LLMProvider()
 
     def test_is_abstract(self):
-        """Test LLMProvider is an abstract class."""
+        """
+        Given LLMProvider
+        When checking if abstract
+        Then it is an ABC subclass
+        """
         from abc import ABC
-        assert issubclass(LLMProvider, ABC)
+        assert_that(issubclass(LLMProvider, ABC)).is_true()
 
     def test_has_abstract_name_property(self):
-        """Test LLMProvider has abstract name property."""
-        # Check that name is marked as abstract
-        assert hasattr(LLMProvider, 'name')
+        """
+        Given LLMProvider
+        When checking for name property
+        Then it exists
+        """
+        assert_that(hasattr(LLMProvider, 'name')).is_true()
 
     def test_has_abstract_model_property(self):
-        """Test LLMProvider has abstract model property."""
-        assert hasattr(LLMProvider, 'model')
+        """
+        Given LLMProvider
+        When checking for model property
+        Then it exists
+        """
+        assert_that(hasattr(LLMProvider, 'model')).is_true()
 
     def test_has_abstract_generate_initial_cards(self):
-        """Test LLMProvider has abstract generate_initial_cards method."""
-        assert hasattr(LLMProvider, 'generate_initial_cards')
+        """
+        Given LLMProvider
+        When checking for generate_initial_cards
+        Then it exists
+        """
+        assert_that(hasattr(LLMProvider, 'generate_initial_cards')).is_true()
 
     def test_has_abstract_combine_cards(self):
-        """Test LLMProvider has abstract combine_cards method."""
-        assert hasattr(LLMProvider, 'combine_cards')
+        """
+        Given LLMProvider
+        When checking for combine_cards
+        Then it exists
+        """
+        assert_that(hasattr(LLMProvider, 'combine_cards')).is_true()
 
     def test_has_abstract_format_json(self):
-        """Test LLMProvider has abstract format_json method."""
-        assert hasattr(LLMProvider, 'format_json')
+        """
+        Given LLMProvider
+        When checking for format_json
+        Then it exists
+        """
+        assert_that(hasattr(LLMProvider, 'format_json')).is_true()
 
 
 class TestLLMProviderDefaults:
     """Tests for LLMProvider default configuration values."""
 
     def test_default_max_retries(self):
-        """Test DEFAULT_MAX_RETRIES is 5."""
-        assert LLMProvider.DEFAULT_MAX_RETRIES == 5
+        """
+        Given LLMProvider
+        When checking DEFAULT_MAX_RETRIES
+        Then it is 5
+        """
+        assert_that(LLMProvider.DEFAULT_MAX_RETRIES).is_equal_to(5)
 
     def test_default_json_parse_retries(self):
-        """Test DEFAULT_JSON_PARSE_RETRIES is 5."""
-        assert LLMProvider.DEFAULT_JSON_PARSE_RETRIES == 5
+        """
+        Given LLMProvider
+        When checking DEFAULT_JSON_PARSE_RETRIES
+        Then it is 5
+        """
+        assert_that(LLMProvider.DEFAULT_JSON_PARSE_RETRIES).is_equal_to(5)
 
     def test_default_retry_delay(self):
-        """Test DEFAULT_RETRY_DELAY is 1.0 seconds."""
-        assert LLMProvider.DEFAULT_RETRY_DELAY == 1.0
+        """
+        Given LLMProvider
+        When checking DEFAULT_RETRY_DELAY
+        Then it is 1.0 seconds
+        """
+        assert_that(LLMProvider.DEFAULT_RETRY_DELAY).is_equal_to(1.0)
 
     def test_default_retry_delay_is_float(self):
-        """Test DEFAULT_RETRY_DELAY is a float."""
-        assert isinstance(LLMProvider.DEFAULT_RETRY_DELAY, float)
+        """
+        Given LLMProvider
+        When checking DEFAULT_RETRY_DELAY type
+        Then it is a float
+        """
+        assert_that(LLMProvider.DEFAULT_RETRY_DELAY).is_instance_of(float)
 
 
 class TestLLMProviderContractEnforcement:
     """Tests for LLMProvider contract enforcement."""
 
     def test_missing_name_property(self):
-        """Test that missing name property raises TypeError."""
+        """
+        Given a class missing name property
+        When instantiating
+        Then TypeError is raised
+        """
         with pytest.raises(TypeError):
             class MissingName(LLMProvider):
                 @property
@@ -555,7 +772,11 @@ class TestLLMProviderContractEnforcement:
             MissingName()
 
     def test_missing_model_property(self):
-        """Test that missing model property raises TypeError."""
+        """
+        Given a class missing model property
+        When instantiating
+        Then TypeError is raised
+        """
         with pytest.raises(TypeError):
             class MissingModel(LLMProvider):
                 @property
@@ -574,7 +795,11 @@ class TestLLMProviderContractEnforcement:
             MissingModel()
 
     def test_missing_generate_initial_cards(self):
-        """Test that missing generate_initial_cards raises TypeError."""
+        """
+        Given a class missing generate_initial_cards
+        When instantiating
+        Then TypeError is raised
+        """
         with pytest.raises(TypeError):
             class MissingGenerate(LLMProvider):
                 @property
@@ -594,7 +819,11 @@ class TestLLMProviderContractEnforcement:
             MissingGenerate()
 
     def test_missing_combine_cards(self):
-        """Test that missing combine_cards raises TypeError."""
+        """
+        Given a class missing combine_cards
+        When instantiating
+        Then TypeError is raised
+        """
         with pytest.raises(TypeError):
             class MissingCombine(LLMProvider):
                 @property
@@ -614,7 +843,11 @@ class TestLLMProviderContractEnforcement:
             MissingCombine()
 
     def test_missing_format_json(self):
-        """Test that missing format_json raises TypeError."""
+        """
+        Given a class missing format_json
+        When instantiating
+        Then TypeError is raised
+        """
         with pytest.raises(TypeError):
             class MissingFormat(LLMProvider):
                 @property
@@ -675,48 +908,76 @@ class TestConcreteProviderImplementation:
         return ConcreteProvider()
 
     def test_can_instantiate_concrete_provider(self):
-        """Test concrete provider can be instantiated."""
+        """
+        Given a complete concrete provider
+        When instantiating
+        Then it succeeds
+        """
         provider = self.create_concrete_provider()
-        assert provider is not None
+        assert_that(provider).is_not_none()
 
     def test_name_property_works(self):
-        """Test name property returns correct value."""
+        """
+        Given a concrete provider
+        When accessing name property
+        Then correct value is returned
+        """
         provider = self.create_concrete_provider()
-        assert provider.name == "test_provider"
+        assert_that(provider.name).is_equal_to("test_provider")
 
     def test_model_property_works(self):
-        """Test model property returns correct value."""
+        """
+        Given a concrete provider
+        When accessing model property
+        Then correct value is returned
+        """
         provider = self.create_concrete_provider()
-        assert provider.model == "test-model-v1"
+        assert_that(provider.model).is_equal_to("test-model-v1")
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_works(self):
-        """Test generate_initial_cards method works."""
+        """
+        Given a concrete provider
+        When calling generate_initial_cards
+        Then it returns expected result
+        """
         provider = self.create_concrete_provider()
         result = await provider.generate_initial_cards("test", {})
-        assert result == '{"cards": []}'
+        assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_generate_initial_cards_with_all_params(self):
-        """Test generate_initial_cards with all parameters."""
+        """
+        Given a concrete provider
+        When calling generate_initial_cards with all parameters
+        Then it works correctly
+        """
         provider = self.create_concrete_provider()
         result = await provider.generate_initial_cards(
             question="What is X?",
             json_schema={"type": "object"},
             prompt_template="Generate: {question}",
         )
-        assert result == '{"cards": []}'
+        assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_combine_cards_works(self):
-        """Test combine_cards method works."""
+        """
+        Given a concrete provider
+        When calling combine_cards
+        Then it returns expected result
+        """
         provider = self.create_concrete_provider()
         result = await provider.combine_cards("test", "inputs", {})
-        assert result == '{"cards": []}'
+        assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_combine_cards_with_all_params(self):
-        """Test combine_cards with all parameters."""
+        """
+        Given a concrete provider
+        When calling combine_cards with all parameters
+        Then it works correctly
+        """
         provider = self.create_concrete_provider()
         result = await provider.combine_cards(
             question="What is X?",
@@ -724,21 +985,29 @@ class TestConcreteProviderImplementation:
             json_schema={"type": "object"},
             combine_prompt_template="Combine: {inputs}",
         )
-        assert result == '{"cards": []}'
+        assert_that(result).is_equal_to('{"cards": []}')
 
     @pytest.mark.asyncio
     async def test_format_json_works(self):
-        """Test format_json method works."""
+        """
+        Given a concrete provider
+        When calling format_json
+        Then it returns expected result
+        """
         provider = self.create_concrete_provider()
         result = await provider.format_json('{"raw": true}', {})
-        assert result == {"cards": []}
+        assert_that(result).is_equal_to({"cards": []})
 
     def test_inherits_default_config(self):
-        """Test concrete provider inherits default config."""
+        """
+        Given a concrete provider
+        When checking default config
+        Then it inherits from LLMProvider
+        """
         provider = self.create_concrete_provider()
-        assert provider.DEFAULT_MAX_RETRIES == 5
-        assert provider.DEFAULT_JSON_PARSE_RETRIES == 5
-        assert provider.DEFAULT_RETRY_DELAY == 1.0
+        assert_that(provider.DEFAULT_MAX_RETRIES).is_equal_to(5)
+        assert_that(provider.DEFAULT_JSON_PARSE_RETRIES).is_equal_to(5)
+        assert_that(provider.DEFAULT_RETRY_DELAY).is_equal_to(1.0)
 
 
 class TestProviderNamingConventions:
@@ -752,7 +1021,11 @@ class TestProviderNamingConventions:
         ("", False),
     ])
     def test_provider_name_formats(self, name, expected_valid):
-        """Test various provider name formats."""
+        """
+        Given various provider name formats
+        When creating a provider
+        Then the name format is validated
+        """
         class TestProvider(LLMProvider):
             def __init__(self, provider_name):
                 self._name = provider_name
@@ -776,9 +1049,9 @@ class TestProviderNamingConventions:
 
         provider = TestProvider(name)
         if expected_valid:
-            assert len(provider.name) > 0
+            assert_that(len(provider.name)).is_greater_than(0)
         else:
-            assert provider.name == ""
+            assert_that(provider.name).is_equal_to("")
 
     @pytest.mark.parametrize("model", [
         "llama3.1-70b",
@@ -788,7 +1061,11 @@ class TestProviderNamingConventions:
         "model-v1.2.3",
     ])
     def test_model_name_formats(self, model):
-        """Test various model name formats."""
+        """
+        Given various model name formats
+        When creating a provider
+        Then the model name is accepted
+        """
         class TestProvider(LLMProvider):
             def __init__(self, model_name):
                 self._model = model_name
@@ -811,4 +1088,4 @@ class TestProviderNamingConventions:
                 return {}
 
         provider = TestProvider(model)
-        assert provider.model == model
+        assert_that(provider.model).is_equal_to(model)
