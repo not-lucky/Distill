@@ -21,6 +21,7 @@ anki_cards_markdown
 *apkg
 app.log
 !src/data/questions.json
+!tests/fixtures/*.json
 
 # Database
 llm2deck.db
