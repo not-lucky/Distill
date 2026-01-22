@@ -4,6 +4,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
+from assertpy import assert_that
+
 from src.config.loader import (
     load_config,
     get_enabled_providers,
@@ -26,27 +28,39 @@ class TestLoadConfig:
     """Tests for load_config function."""
 
     def test_load_config_missing_file_returns_default(self, tmp_path):
-        """Test that missing config file returns default config."""
+        """
+        Given a path to a nonexistent config file
+        When load_config is called
+        Then a default AppConfig is returned
+        """
         config = load_config(tmp_path / "nonexistent.yaml")
 
-        assert config is not None
-        assert isinstance(config, AppConfig)
+        assert_that(config).is_not_none()
+        assert_that(config).is_instance_of(AppConfig)
         # Should have default providers
-        assert "cerebras" in config.providers
-        assert "google_antigravity" in config.providers
+        assert_that(config.providers).contains_key("cerebras")
+        assert_that(config.providers).contains_key("google_antigravity")
 
     def test_load_config_valid_yaml(self, sample_config_yaml):
-        """Test loading valid YAML config."""
+        """
+        Given a valid YAML config file
+        When load_config is called
+        Then the configuration values are loaded correctly
+        """
         config = load_config(sample_config_yaml)
 
-        assert config.defaults.timeout == 60.0
-        assert config.defaults.temperature == 0.5
-        assert config.defaults.max_retries == 3
-        assert config.providers["cerebras"].enabled is True
-        assert config.providers["openrouter"].enabled is False
+        assert_that(config.defaults.timeout).is_equal_to(60.0)
+        assert_that(config.defaults.temperature).is_equal_to(0.5)
+        assert_that(config.defaults.max_retries).is_equal_to(3)
+        assert_that(config.providers["cerebras"].enabled).is_true()
+        assert_that(config.providers["openrouter"].enabled).is_false()
 
     def test_load_config_invalid_yaml_raises(self, tmp_path):
-        """Test that invalid YAML raises ConfigurationError."""
+        """
+        Given an invalid YAML file
+        When load_config is called
+        Then a ConfigurationError is raised
+        """
         invalid_file = tmp_path / "invalid.yaml"
         invalid_file.write_text("invalid: yaml: content: [")
 
@@ -54,7 +68,11 @@ class TestLoadConfig:
             load_config(invalid_file)
 
     def test_load_config_validation_error(self, tmp_path):
-        """Test that invalid config values raise ConfigurationError."""
+        """
+        Given a YAML file with invalid config values
+        When load_config is called
+        Then validation may coerce or handle the values
+        """
         invalid_file = tmp_path / "bad_config.yaml"
         # Use invalid type for enabled (should be bool)
         invalid_file.write_text("""
@@ -71,18 +89,26 @@ class TestDefaultsConfig:
     """Tests for DefaultsConfig model."""
 
     def test_defaults_default_values(self):
-        """Test DefaultsConfig has correct defaults."""
+        """
+        Given no initialization parameters
+        When DefaultsConfig is created
+        Then default values are set correctly
+        """
         defaults = DefaultsConfig()
 
-        assert defaults.timeout == 120.0
-        assert defaults.temperature == 0.4
-        assert defaults.max_tokens is None
-        assert defaults.max_retries == 5
-        assert defaults.json_parse_retries == 5
-        assert defaults.retry_delay == 1.0
+        assert_that(defaults.timeout).is_equal_to(120.0)
+        assert_that(defaults.temperature).is_equal_to(0.4)
+        assert_that(defaults.max_tokens).is_none()
+        assert_that(defaults.max_retries).is_equal_to(5)
+        assert_that(defaults.json_parse_retries).is_equal_to(5)
+        assert_that(defaults.retry_delay).is_equal_to(1.0)
 
     def test_defaults_custom_values(self):
-        """Test DefaultsConfig with custom values."""
+        """
+        Given custom initialization parameters
+        When DefaultsConfig is created
+        Then custom values are stored
+        """
         defaults = DefaultsConfig(
             timeout=60.0,
             temperature=0.7,
@@ -90,63 +116,83 @@ class TestDefaultsConfig:
             max_retries=3,
         )
 
-        assert defaults.timeout == 60.0
-        assert defaults.temperature == 0.7
-        assert defaults.max_tokens == 4096
-        assert defaults.max_retries == 3
+        assert_that(defaults.timeout).is_equal_to(60.0)
+        assert_that(defaults.temperature).is_equal_to(0.7)
+        assert_that(defaults.max_tokens).is_equal_to(4096)
+        assert_that(defaults.max_retries).is_equal_to(3)
 
 
 class TestProviderConfig:
     """Tests for ProviderConfig model."""
 
     def test_provider_config_defaults(self):
-        """Test ProviderConfig default values."""
+        """
+        Given no initialization parameters
+        When ProviderConfig is created
+        Then default values are set
+        """
         config = ProviderConfig()
 
-        assert config.enabled is False
-        assert config.model == ""
-        assert config.models == []
-        assert config.base_url is None
-        assert config.timeout is None
+        assert_that(config.enabled).is_false()
+        assert_that(config.model).is_equal_to("")
+        assert_that(config.models).is_empty()
+        assert_that(config.base_url).is_none()
+        assert_that(config.timeout).is_none()
 
     def test_get_effective_timeout(self):
-        """Test get_effective_timeout method."""
+        """
+        Given provider configs with and without timeout
+        When get_effective_timeout is called
+        Then provider timeout overrides default or falls back to default
+        """
         defaults = DefaultsConfig(timeout=120.0)
 
         # Provider without timeout uses default
         config1 = ProviderConfig()
-        assert config1.get_effective_timeout(defaults) == 120.0
+        assert_that(config1.get_effective_timeout(defaults)).is_equal_to(120.0)
 
         # Provider with timeout uses its own
         config2 = ProviderConfig(timeout=60.0)
-        assert config2.get_effective_timeout(defaults) == 60.0
+        assert_that(config2.get_effective_timeout(defaults)).is_equal_to(60.0)
 
     def test_get_effective_temperature(self):
-        """Test get_effective_temperature method."""
+        """
+        Given provider configs with and without temperature
+        When get_effective_temperature is called
+        Then provider temperature overrides default or falls back to default
+        """
         defaults = DefaultsConfig(temperature=0.4)
 
         config1 = ProviderConfig()
-        assert config1.get_effective_temperature(defaults) == 0.4
+        assert_that(config1.get_effective_temperature(defaults)).is_equal_to(0.4)
 
         config2 = ProviderConfig(temperature=0.8)
-        assert config2.get_effective_temperature(defaults) == 0.8
+        assert_that(config2.get_effective_temperature(defaults)).is_equal_to(0.8)
 
     def test_get_effective_max_tokens(self):
-        """Test get_effective_max_tokens method."""
+        """
+        Given provider configs with and without max_tokens
+        When get_effective_max_tokens is called
+        Then provider max_tokens overrides default or falls back to default
+        """
         defaults = DefaultsConfig(max_tokens=4096)
 
         config1 = ProviderConfig()
-        assert config1.get_effective_max_tokens(defaults) == 4096
+        assert_that(config1.get_effective_max_tokens(defaults)).is_equal_to(4096)
 
         config2 = ProviderConfig(max_tokens=2048)
-        assert config2.get_effective_max_tokens(defaults) == 2048
+        assert_that(config2.get_effective_max_tokens(defaults)).is_equal_to(2048)
 
 
 class TestGetEnabledProviders:
     """Tests for get_enabled_providers function."""
 
     def test_filters_disabled_providers(self):
-        """Test that disabled providers are filtered out."""
+        """
+        Given a config with mixed enabled/disabled providers
+        When get_enabled_providers is called
+        Then only enabled providers are returned
+        """
         config = AppConfig(
             providers={
                 "enabled1": ProviderConfig(enabled=True, model="m1"),
@@ -157,39 +203,55 @@ class TestGetEnabledProviders:
 
         enabled = get_enabled_providers(config)
 
-        assert "enabled1" in enabled
-        assert "enabled2" in enabled
-        assert "disabled" not in enabled
-        assert len(enabled) == 2
+        assert_that(enabled).contains_key("enabled1")
+        assert_that(enabled).contains_key("enabled2")
+        assert_that(enabled).does_not_contain_key("disabled")
+        assert_that(enabled).is_length(2)
 
     def test_empty_providers(self):
-        """Test with no providers configured."""
+        """
+        Given a config with no providers
+        When get_enabled_providers is called
+        Then an empty dict is returned
+        """
         config = AppConfig(providers={})
         enabled = get_enabled_providers(config)
-        assert enabled == {}
+        assert_that(enabled).is_equal_to({})
 
 
 class TestGetCombinerConfig:
     """Tests for get_combiner_config function."""
 
     def test_no_combiner_configured(self):
-        """Test when no combiner is configured."""
+        """
+        Given a config with no combiner
+        When get_combiner_config is called
+        Then None is returned
+        """
         config = AppConfig()
         result = get_combiner_config(config)
-        assert result is None
+        assert_that(result).is_none()
 
     def test_combiner_with_empty_provider(self):
-        """Test combiner with empty provider string."""
+        """
+        Given a combiner config with empty provider string
+        When get_combiner_config is called
+        Then None is returned
+        """
         config = AppConfig(
             generation=GenerationConfig(
                 combiner=CombinerConfig(provider="", model="")
             )
         )
         result = get_combiner_config(config)
-        assert result is None
+        assert_that(result).is_none()
 
     def test_combiner_references_unknown_provider(self):
-        """Test combiner referencing unknown provider raises error."""
+        """
+        Given a combiner referencing an unknown provider
+        When get_combiner_config is called
+        Then a ConfigurationError is raised
+        """
         config = AppConfig(
             providers={},
             generation=GenerationConfig(
@@ -201,7 +263,11 @@ class TestGetCombinerConfig:
             get_combiner_config(config)
 
     def test_combiner_references_disabled_provider(self):
-        """Test combiner referencing disabled provider raises error."""
+        """
+        Given a combiner referencing a disabled provider
+        When get_combiner_config is called
+        Then a ConfigurationError is raised
+        """
         config = AppConfig(
             providers={
                 "cerebras": ProviderConfig(enabled=False, model="m1")
@@ -215,7 +281,11 @@ class TestGetCombinerConfig:
             get_combiner_config(config)
 
     def test_valid_combiner_config(self):
-        """Test valid combiner configuration."""
+        """
+        Given a valid combiner configuration
+        When get_combiner_config is called
+        Then the combiner config is returned
+        """
         config = AppConfig(
             providers={
                 "cerebras": ProviderConfig(enabled=True, model="llama")
@@ -226,22 +296,30 @@ class TestGetCombinerConfig:
         )
 
         result = get_combiner_config(config)
-        assert result is not None
-        assert result.provider == "cerebras"
-        assert result.model == "llama"
+        assert_that(result).is_not_none()
+        assert_that(result.provider).is_equal_to("cerebras")
+        assert_that(result.model).is_equal_to("llama")
 
 
 class TestGetFormatterConfig:
     """Tests for get_formatter_config function."""
 
     def test_no_formatter_configured(self):
-        """Test when no formatter is configured."""
+        """
+        Given a config with no formatter
+        When get_formatter_config is called
+        Then None is returned
+        """
         config = AppConfig()
         result = get_formatter_config(config)
-        assert result is None
+        assert_that(result).is_none()
 
     def test_formatter_references_unknown_provider(self):
-        """Test formatter referencing unknown provider raises error."""
+        """
+        Given a formatter referencing an unknown provider
+        When get_formatter_config is called
+        Then a ConfigurationError is raised
+        """
         config = AppConfig(
             providers={},
             generation=GenerationConfig(
@@ -253,7 +331,11 @@ class TestGetFormatterConfig:
             get_formatter_config(config)
 
     def test_valid_formatter_config(self):
-        """Test valid formatter configuration."""
+        """
+        Given a valid formatter configuration
+        When get_formatter_config is called
+        Then the formatter config is returned
+        """
         config = AppConfig(
             providers={
                 "openrouter": ProviderConfig(enabled=True, model="gpt-4")
@@ -264,15 +346,19 @@ class TestGetFormatterConfig:
         )
 
         result = get_formatter_config(config)
-        assert result is not None
-        assert result.provider == "openrouter"
+        assert_that(result).is_not_none()
+        assert_that(result.provider).is_equal_to("openrouter")
 
 
 class TestGetEnabledSubjects:
     """Tests for get_enabled_subjects function."""
 
     def test_filters_disabled_subjects(self):
-        """Test that disabled subjects are filtered out."""
+        """
+        Given a config with mixed enabled/disabled subjects
+        When get_enabled_subjects is called
+        Then only enabled subjects are returned
+        """
         config = AppConfig(
             subjects={
                 "leetcode": SubjectSettings(enabled=True),
@@ -283,196 +369,276 @@ class TestGetEnabledSubjects:
 
         enabled = get_enabled_subjects(config)
 
-        assert "leetcode" in enabled
-        assert "physics" in enabled
-        assert "cs" not in enabled
+        assert_that(enabled).contains_key("leetcode")
+        assert_that(enabled).contains_key("physics")
+        assert_that(enabled).does_not_contain_key("cs")
 
     def test_empty_subjects(self):
-        """Test with no subjects configured."""
+        """
+        Given a config with no subjects
+        When get_enabled_subjects is called
+        Then an empty dict is returned
+        """
         config = AppConfig(subjects={})
         enabled = get_enabled_subjects(config)
-        assert enabled == {}
+        assert_that(enabled).is_equal_to({})
 
 
 class TestSubjectSettings:
     """Tests for SubjectSettings model."""
 
     def test_default_values(self):
-        """Test SubjectSettings default values."""
+        """
+        Given no initialization parameters
+        When SubjectSettings is created
+        Then default values are set
+        """
         settings = SubjectSettings()
 
-        assert settings.enabled is True
-        assert settings.deck_prefix is None
-        assert settings.prompts_dir is None
-        assert settings.questions_file is None
+        assert_that(settings.enabled).is_true()
+        assert_that(settings.deck_prefix).is_none()
+        assert_that(settings.prompts_dir).is_none()
+        assert_that(settings.questions_file).is_none()
 
     def test_is_custom_false_for_builtin(self):
-        """Test is_custom returns False for built-in subjects."""
+        """
+        Given default SubjectSettings
+        When is_custom is called
+        Then False is returned
+        """
         settings = SubjectSettings()
-        assert settings.is_custom() is False
+        assert_that(settings.is_custom()).is_false()
 
     def test_is_custom_true_with_prompts_dir(self):
-        """Test is_custom returns True when prompts_dir is set."""
+        """
+        Given SubjectSettings with prompts_dir set
+        When is_custom is called
+        Then True is returned
+        """
         settings = SubjectSettings(prompts_dir="/path/to/prompts")
-        assert settings.is_custom() is True
+        assert_that(settings.is_custom()).is_true()
 
     def test_is_custom_true_with_questions_file(self):
-        """Test is_custom returns True when questions_file is set."""
+        """
+        Given SubjectSettings with questions_file set
+        When is_custom is called
+        Then True is returned
+        """
         settings = SubjectSettings(questions_file="/path/to/questions.json")
-        assert settings.is_custom() is True
+        assert_that(settings.is_custom()).is_true()
 
 
 class TestAppConfig:
     """Tests for AppConfig model."""
 
     def test_default_factory(self):
-        """Test AppConfig.default() factory method."""
+        """
+        Given the AppConfig.default() factory method
+        When called
+        Then a config with default providers and subjects is returned
+        """
         config = AppConfig.default()
 
-        assert "cerebras" in config.providers
-        assert "google_antigravity" in config.providers
-        assert config.providers["cerebras"].enabled is True
-        assert "leetcode" in config.subjects
-        assert "cs" in config.subjects
-        assert "physics" in config.subjects
+        assert_that(config.providers).contains_key("cerebras")
+        assert_that(config.providers).contains_key("google_antigravity")
+        assert_that(config.providers["cerebras"].enabled).is_true()
+        assert_that(config.subjects).contains_key("leetcode")
+        assert_that(config.subjects).contains_key("cs")
+        assert_that(config.subjects).contains_key("physics")
 
     def test_generation_config_defaults(self):
-        """Test GenerationConfig defaults."""
+        """
+        Given a default AppConfig
+        When accessing generation config
+        Then default values are present
+        """
         config = AppConfig()
 
-        assert config.generation.concurrent_requests == 8
-        assert config.generation.request_delay == 0.0
+        assert_that(config.generation.concurrent_requests).is_equal_to(8)
+        assert_that(config.generation.request_delay).is_equal_to(0.0)
 
 
 class TestPathsConfig:
     """Tests for PathsConfig model."""
 
     def test_paths_config_defaults(self):
-        """Test PathsConfig default values."""
+        """
+        Given no initialization parameters
+        When PathsConfig is created
+        Then default paths are set
+        """
         paths = PathsConfig()
 
-        assert paths.archival_dir == "anki_cards_archival"
-        assert paths.markdown_dir == "anki_cards_markdown"
-        assert paths.timestamp_format == "%Y%m%dT%H%M%S"
-        assert paths.key_paths is not None
+        assert_that(paths.archival_dir).is_equal_to("anki_cards_archival")
+        assert_that(paths.markdown_dir).is_equal_to("anki_cards_markdown")
+        assert_that(paths.timestamp_format).is_equal_to("%Y%m%dT%H%M%S")
+        assert_that(paths.key_paths).is_not_none()
 
     def test_paths_config_custom_values(self):
-        """Test PathsConfig with custom values."""
+        """
+        Given custom initialization parameters
+        When PathsConfig is created
+        Then custom paths are stored
+        """
         paths = PathsConfig(
             archival_dir="/custom/archive",
             markdown_dir="/custom/markdown",
             timestamp_format="%Y-%m-%d",
         )
 
-        assert paths.archival_dir == "/custom/archive"
-        assert paths.markdown_dir == "/custom/markdown"
-        assert paths.timestamp_format == "%Y-%m-%d"
+        assert_that(paths.archival_dir).is_equal_to("/custom/archive")
+        assert_that(paths.markdown_dir).is_equal_to("/custom/markdown")
+        assert_that(paths.timestamp_format).is_equal_to("%Y-%m-%d")
 
 
 class TestConfigValidation:
     """Tests for configuration validation."""
 
     def test_temperature_bounds(self):
-        """Test temperature is within bounds."""
+        """
+        Given various temperature values
+        When DefaultsConfig is created
+        Then valid temperatures are accepted
+        """
         # Pydantic should accept valid temperatures
         defaults = DefaultsConfig(temperature=0.0)
-        assert defaults.temperature == 0.0
+        assert_that(defaults.temperature).is_equal_to(0.0)
 
         defaults = DefaultsConfig(temperature=1.0)
-        assert defaults.temperature == 1.0
+        assert_that(defaults.temperature).is_equal_to(1.0)
 
         defaults = DefaultsConfig(temperature=0.5)
-        assert defaults.temperature == 0.5
+        assert_that(defaults.temperature).is_equal_to(0.5)
 
     def test_negative_timeout_handling(self):
-        """Test handling of negative timeout."""
+        """
+        Given a zero timeout value
+        When DefaultsConfig is created
+        Then the value is accepted
+        """
         # Depending on model validation, this should work or raise
         defaults = DefaultsConfig(timeout=0.0)
-        assert defaults.timeout == 0.0
+        assert_that(defaults.timeout).is_equal_to(0.0)
 
     def test_max_retries_zero(self):
-        """Test max_retries can be zero."""
+        """
+        Given zero max_retries
+        When DefaultsConfig is created
+        Then zero is accepted
+        """
         defaults = DefaultsConfig(max_retries=0)
-        assert defaults.max_retries == 0
+        assert_that(defaults.max_retries).is_equal_to(0)
 
     def test_provider_with_multiple_models(self):
-        """Test provider config with multiple models."""
+        """
+        Given a provider config with multiple models
+        When ProviderConfig is created
+        Then both model and models list are stored
+        """
         config = ProviderConfig(
             enabled=True,
             model="primary-model",
             models=["model1", "model2", "model3"],
         )
 
-        assert config.model == "primary-model"
-        assert len(config.models) == 3
-        assert "model1" in config.models
+        assert_that(config.model).is_equal_to("primary-model")
+        assert_that(config.models).is_length(3)
+        assert_that(config.models).contains("model1")
 
     def test_extra_params_passthrough(self):
-        """Test that extra_params are preserved."""
+        """
+        Given a provider config with extra_params
+        When ProviderConfig is created
+        Then extra_params are preserved
+        """
         config = ProviderConfig(
             enabled=True,
             model="test",
             extra_params={"top_p": 0.9, "frequency_penalty": 0.5},
         )
 
-        assert config.extra_params["top_p"] == 0.9
-        assert config.extra_params["frequency_penalty"] == 0.5
+        assert_that(config.extra_params["top_p"]).is_equal_to(0.9)
+        assert_that(config.extra_params["frequency_penalty"]).is_equal_to(0.5)
 
 
 class TestCombinerConfigDetails:
     """Detailed tests for CombinerConfig."""
 
     def test_combiner_config_creation(self):
-        """Test CombinerConfig creation."""
+        """
+        Given provider and model values
+        When CombinerConfig is created
+        Then values are stored correctly
+        """
         combiner = CombinerConfig(provider="cerebras", model="llama")
 
-        assert combiner.provider == "cerebras"
-        assert combiner.model == "llama"
+        assert_that(combiner.provider).is_equal_to("cerebras")
+        assert_that(combiner.model).is_equal_to("llama")
 
     def test_combiner_with_empty_values(self):
-        """Test CombinerConfig with empty string values."""
+        """
+        Given empty string values
+        When CombinerConfig is created
+        Then empty strings are stored
+        """
         combiner = CombinerConfig(provider="", model="")
 
-        assert combiner.provider == ""
-        assert combiner.model == ""
+        assert_that(combiner.provider).is_equal_to("")
+        assert_that(combiner.model).is_equal_to("")
 
     def test_combiner_with_also_generate(self):
-        """Test CombinerConfig with also_generate flag."""
+        """
+        Given also_generate=False
+        When CombinerConfig is created
+        Then the flag is stored
+        """
         combiner = CombinerConfig(
             provider="test",
             model="model",
             also_generate=False,
         )
 
-        assert combiner.also_generate is False
+        assert_that(combiner.also_generate).is_false()
 
 
 class TestFormatterConfigDetails:
     """Detailed tests for FormatterConfig."""
 
     def test_formatter_config_creation(self):
-        """Test FormatterConfig creation."""
+        """
+        Given provider and model values
+        When FormatterConfig is created
+        Then values are stored correctly
+        """
         formatter = FormatterConfig(provider="openrouter", model="gpt-4")
 
-        assert formatter.provider == "openrouter"
-        assert formatter.model == "gpt-4"
+        assert_that(formatter.provider).is_equal_to("openrouter")
+        assert_that(formatter.model).is_equal_to("gpt-4")
 
     def test_formatter_with_also_generate(self):
-        """Test FormatterConfig with also_generate flag."""
+        """
+        Given also_generate=False
+        When FormatterConfig is created
+        Then the flag is stored
+        """
         formatter = FormatterConfig(
             provider="test",
             model="model",
             also_generate=False,
         )
 
-        assert formatter.also_generate is False
+        assert_that(formatter.also_generate).is_false()
 
 
 class TestConfigMerging:
     """Tests for configuration merging and defaults."""
 
     def test_provider_inherits_defaults(self):
-        """Test that providers correctly inherit from defaults."""
+        """
+        Given a provider config without overrides
+        When get_effective_* methods are called
+        Then default values are used
+        """
         defaults = DefaultsConfig(
             timeout=120.0,
             temperature=0.4,
@@ -481,12 +647,16 @@ class TestConfigMerging:
 
         provider = ProviderConfig(enabled=True, model="test")
 
-        assert provider.get_effective_timeout(defaults) == 120.0
-        assert provider.get_effective_temperature(defaults) == 0.4
-        assert provider.get_effective_max_tokens(defaults) == 4096
+        assert_that(provider.get_effective_timeout(defaults)).is_equal_to(120.0)
+        assert_that(provider.get_effective_temperature(defaults)).is_equal_to(0.4)
+        assert_that(provider.get_effective_max_tokens(defaults)).is_equal_to(4096)
 
     def test_provider_overrides_defaults(self):
-        """Test that provider-specific values override defaults."""
+        """
+        Given a provider config with explicit values
+        When get_effective_* methods are called
+        Then provider values override defaults
+        """
         defaults = DefaultsConfig(
             timeout=120.0,
             temperature=0.4,
@@ -501,25 +671,33 @@ class TestConfigMerging:
             max_tokens=2048,
         )
 
-        assert provider.get_effective_timeout(defaults) == 60.0
-        assert provider.get_effective_temperature(defaults) == 0.8
-        assert provider.get_effective_max_tokens(defaults) == 2048
+        assert_that(provider.get_effective_timeout(defaults)).is_equal_to(60.0)
+        assert_that(provider.get_effective_temperature(defaults)).is_equal_to(0.8)
+        assert_that(provider.get_effective_max_tokens(defaults)).is_equal_to(2048)
 
 
 class TestEdgeCasesLoader:
     """Edge case tests for config loading."""
 
     def test_load_empty_yaml(self, tmp_path):
-        """Test loading empty YAML file."""
+        """
+        Given an empty YAML file
+        When load_config is called
+        Then a default config is returned
+        """
         empty_file = tmp_path / "empty.yaml"
         empty_file.write_text("")
 
         config = load_config(empty_file)
-        assert config is not None
-        assert isinstance(config, AppConfig)
+        assert_that(config).is_not_none()
+        assert_that(config).is_instance_of(AppConfig)
 
     def test_load_yaml_with_unknown_keys(self, tmp_path):
-        """Test loading YAML with extra unknown keys."""
+        """
+        Given a YAML file with extra unknown keys
+        When load_config is called
+        Then unknown keys are ignored and valid config is loaded
+        """
         yaml_file = tmp_path / "extra.yaml"
         yaml_file.write_text("""
 defaults:
@@ -529,10 +707,14 @@ unknown_section:
 """)
         # Should not fail, extra keys should be ignored
         config = load_config(yaml_file)
-        assert config.defaults.timeout == 60.0
+        assert_that(config.defaults.timeout).is_equal_to(60.0)
 
     def test_load_yaml_with_null_values(self, tmp_path):
-        """Test loading YAML with null values for optional fields."""
+        """
+        Given a YAML file with null values for optional fields
+        When load_config is called
+        Then null is treated as None
+        """
         yaml_file = tmp_path / "nulls.yaml"
         yaml_file.write_text("""
 defaults:
@@ -541,11 +723,15 @@ defaults:
 """)
         config = load_config(yaml_file)
         # null should be treated as None for optional field
-        assert config.defaults.max_tokens is None
-        assert config.defaults.temperature == 0.5
+        assert_that(config.defaults.max_tokens).is_none()
+        assert_that(config.defaults.temperature).is_equal_to(0.5)
 
     def test_enabled_providers_with_models_list(self):
-        """Test providers with both model and models list."""
+        """
+        Given a provider with both model and models list
+        When get_enabled_providers is called
+        Then both are preserved
+        """
         config = AppConfig(
             providers={
                 "multi": ProviderConfig(
@@ -557,12 +743,16 @@ defaults:
         )
 
         enabled = get_enabled_providers(config)
-        assert "multi" in enabled
-        assert enabled["multi"].model == "primary"
-        assert len(enabled["multi"].models) == 2
+        assert_that(enabled).contains_key("multi")
+        assert_that(enabled["multi"].model).is_equal_to("primary")
+        assert_that(enabled["multi"].models).is_length(2)
 
     def test_all_providers_disabled(self):
-        """Test when all providers are disabled."""
+        """
+        Given all providers disabled
+        When get_enabled_providers is called
+        Then an empty dict is returned
+        """
         config = AppConfig(
             providers={
                 "p1": ProviderConfig(enabled=False),
@@ -571,10 +761,14 @@ defaults:
         )
 
         enabled = get_enabled_providers(config)
-        assert enabled == {}
+        assert_that(enabled).is_equal_to({})
 
     def test_formatter_with_disabled_provider_raises(self):
-        """Test formatter referencing disabled provider raises error."""
+        """
+        Given a formatter referencing a disabled provider
+        When get_formatter_config is called
+        Then a ConfigurationError is raised
+        """
         config = AppConfig(
             providers={
                 "test": ProviderConfig(enabled=False, model="m")
@@ -620,19 +814,23 @@ subjects:
         return config_file
 
     def test_complete_config_loading(self, sample_config_yaml):
-        """Test loading a complete configuration file."""
+        """
+        Given a complete configuration YAML file
+        When load_config is called
+        Then all sections are loaded correctly
+        """
         config = load_config(sample_config_yaml)
 
         # Check defaults
-        assert config.defaults.timeout == 60.0
-        assert config.defaults.temperature == 0.5
-        assert config.defaults.max_retries == 3
+        assert_that(config.defaults.timeout).is_equal_to(60.0)
+        assert_that(config.defaults.temperature).is_equal_to(0.5)
+        assert_that(config.defaults.max_retries).is_equal_to(3)
 
         # Check providers
-        assert config.providers["cerebras"].enabled is True
-        assert config.providers["cerebras"].model == "llama-3.1-8b"
-        assert config.providers["openrouter"].enabled is False
+        assert_that(config.providers["cerebras"].enabled).is_true()
+        assert_that(config.providers["cerebras"].model).is_equal_to("llama-3.1-8b")
+        assert_that(config.providers["openrouter"].enabled).is_false()
 
         # Check subjects
-        assert config.subjects["leetcode"].enabled is True
-        assert config.subjects["physics"].enabled is False
+        assert_that(config.subjects["leetcode"].enabled).is_true()
+        assert_that(config.subjects["physics"].enabled).is_false()

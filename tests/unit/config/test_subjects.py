@@ -5,6 +5,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+from assertpy import assert_that
+
 from src.config.subjects import (
     SubjectRegistry,
     SubjectConfig,
@@ -39,37 +41,57 @@ class TestSubjectRegistry:
             yield mock_load
 
     def test_get_available_subjects(self, mock_config):
-        """Test getting available subjects."""
+        """
+        Given a registry with mixed enabled/disabled subjects
+        When get_available_subjects is called
+        Then only enabled subjects are returned
+        """
         registry = SubjectRegistry()
         available = registry.get_available_subjects()
 
-        assert "leetcode" in available
-        assert "cs" in available
-        assert "custom" in available
-        assert "physics" not in available  # Disabled
+        assert_that(available).contains("leetcode")
+        assert_that(available).contains("cs")
+        assert_that(available).contains("custom")
+        assert_that(available).does_not_contain("physics")  # Disabled
 
     def test_is_valid_subject_enabled(self, mock_config):
-        """Test is_valid_subject for enabled subjects."""
+        """
+        Given enabled subjects
+        When is_valid_subject is called
+        Then True is returned
+        """
         registry = SubjectRegistry()
 
-        assert registry.is_valid_subject("leetcode") is True
-        assert registry.is_valid_subject("cs") is True
-        assert registry.is_valid_subject("custom") is True
+        assert_that(registry.is_valid_subject("leetcode")).is_true()
+        assert_that(registry.is_valid_subject("cs")).is_true()
+        assert_that(registry.is_valid_subject("custom")).is_true()
 
     def test_is_valid_subject_disabled(self, mock_config):
-        """Test is_valid_subject for disabled subjects."""
+        """
+        Given a disabled subject
+        When is_valid_subject is called
+        Then False is returned
+        """
         registry = SubjectRegistry()
 
-        assert registry.is_valid_subject("physics") is False
+        assert_that(registry.is_valid_subject("physics")).is_false()
 
     def test_is_valid_subject_unknown(self, mock_config):
-        """Test is_valid_subject for unknown subjects."""
+        """
+        Given an unknown subject name
+        When is_valid_subject is called
+        Then False is returned
+        """
         registry = SubjectRegistry()
 
-        assert registry.is_valid_subject("nonexistent") is False
+        assert_that(registry.is_valid_subject("nonexistent")).is_false()
 
     def test_is_valid_subject_builtin_not_in_config(self):
-        """Test that built-in subjects are valid even if not in config."""
+        """
+        Given an empty config
+        When is_valid_subject is called for builtin subjects
+        Then they are still considered valid
+        """
         with patch("src.config.subjects.load_config") as mock_load:
             mock_cfg = MagicMock()
             mock_cfg.subjects = {}  # Empty config
@@ -78,9 +100,9 @@ class TestSubjectRegistry:
             registry = SubjectRegistry()
 
             # Built-in subjects should still be valid
-            assert registry.is_valid_subject("leetcode") is True
-            assert registry.is_valid_subject("cs") is True
-            assert registry.is_valid_subject("physics") is True
+            assert_that(registry.is_valid_subject("leetcode")).is_true()
+            assert_that(registry.is_valid_subject("cs")).is_true()
+            assert_that(registry.is_valid_subject("physics")).is_true()
 
 
 class TestGetBuiltinConfig:
@@ -102,40 +124,60 @@ class TestGetBuiltinConfig:
             return SubjectRegistry()
 
     def test_get_leetcode_config(self, registry):
-        """Test getting LeetCode configuration."""
+        """
+        Given a SubjectRegistry
+        When get_config is called for leetcode
+        Then LeetCode configuration is returned
+        """
         config = registry.get_config("leetcode", is_multiple_choice=False)
 
-        assert config.name == "leetcode"
-        assert config.target_model == LeetCodeProblem
-        assert config.deck_prefix == "LeetCode"
-        assert config.deck_prefix_mcq == "LeetCode_MCQ"
-        assert config.target_questions is not None
+        assert_that(config.name).is_equal_to("leetcode")
+        assert_that(config.target_model).is_equal_to(LeetCodeProblem)
+        assert_that(config.deck_prefix).is_equal_to("LeetCode")
+        assert_that(config.deck_prefix_mcq).is_equal_to("LeetCode_MCQ")
+        assert_that(config.target_questions).is_not_none()
 
     def test_get_cs_config(self, registry):
-        """Test getting CS configuration."""
+        """
+        Given a SubjectRegistry
+        When get_config is called for cs
+        Then CS configuration is returned
+        """
         config = registry.get_config("cs", is_multiple_choice=False)
 
-        assert config.name == "cs"
-        assert config.target_model == CSProblem
-        assert config.deck_prefix == "CS"
+        assert_that(config.name).is_equal_to("cs")
+        assert_that(config.target_model).is_equal_to(CSProblem)
+        assert_that(config.deck_prefix).is_equal_to("CS")
 
     def test_get_physics_config(self, registry):
-        """Test getting Physics configuration."""
+        """
+        Given a SubjectRegistry
+        When get_config is called for physics
+        Then Physics configuration is returned
+        """
         config = registry.get_config("physics", is_multiple_choice=False)
 
-        assert config.name == "physics"
-        assert config.target_model == PhysicsProblem
-        assert config.deck_prefix == "Physics"
+        assert_that(config.name).is_equal_to("physics")
+        assert_that(config.target_model).is_equal_to(PhysicsProblem)
+        assert_that(config.deck_prefix).is_equal_to("Physics")
 
     def test_get_mcq_config(self, registry):
-        """Test getting MCQ configuration."""
+        """
+        Given a SubjectRegistry
+        When get_config is called with is_multiple_choice=True
+        Then MCQ model is used
+        """
         config = registry.get_config("leetcode", is_multiple_choice=True)
 
-        assert config.target_model == MCQProblem
-        assert config.initial_prompt is not None  # MCQ prompt
+        assert_that(config.target_model).is_equal_to(MCQProblem)
+        assert_that(config.initial_prompt).is_not_none()  # MCQ prompt
 
     def test_get_unknown_subject_raises(self, registry):
-        """Test getting unknown subject raises ValueError."""
+        """
+        Given a SubjectRegistry
+        When get_config is called for unknown subject
+        Then ValueError is raised
+        """
         with pytest.raises(ValueError, match="Unknown subject"):
             registry.get_config("nonexistent")
 
@@ -144,7 +186,11 @@ class TestGetCustomConfig:
     """Tests for getting custom subject configurations."""
 
     def test_get_custom_subject_config(self, tmp_path):
-        """Test getting custom subject configuration."""
+        """
+        Given a custom subject with prompts and questions
+        When get_config is called
+        Then custom configuration is returned
+        """
         # Create prompts directory
         prompts_dir = tmp_path / "prompts"
         prompts_dir.mkdir()
@@ -176,15 +222,19 @@ class TestGetCustomConfig:
             registry = SubjectRegistry()
             config = registry.get_config("biology")
 
-            assert config.name == "biology"
-            assert config.target_model == GenericProblem
-            assert config.deck_prefix == "Biology"
-            assert config.deck_prefix_mcq == "Biology_MCQ"
-            assert "Category1" in config.target_questions
-            assert len(config.target_questions["Category1"]) == 2
+            assert_that(config.name).is_equal_to("biology")
+            assert_that(config.target_model).is_equal_to(GenericProblem)
+            assert_that(config.deck_prefix).is_equal_to("Biology")
+            assert_that(config.deck_prefix_mcq).is_equal_to("Biology_MCQ")
+            assert_that(config.target_questions).contains_key("Category1")
+            assert_that(config.target_questions["Category1"]).is_length(2)
 
     def test_custom_subject_default_deck_prefix(self, tmp_path):
-        """Test custom subject uses title case name as default prefix."""
+        """
+        Given a custom subject without explicit deck_prefix
+        When get_config is called
+        Then title case name is used as prefix
+        """
         questions_file = tmp_path / "questions.json"
         questions_file.write_text('{"General": ["Q1"]}')
 
@@ -203,14 +253,18 @@ class TestGetCustomConfig:
             registry = SubjectRegistry()
             config = registry.get_config("my_subject")
 
-            assert config.deck_prefix == "My_Subject"
+            assert_that(config.deck_prefix).is_equal_to("My_Subject")
 
 
 class TestLoadQuestionsFile:
     """Tests for _load_questions_file method."""
 
     def test_load_categorized_format(self, tmp_path):
-        """Test loading categorized questions format."""
+        """
+        Given a categorized questions JSON file
+        When _load_questions_file is called
+        Then categories are loaded correctly
+        """
         questions_file = tmp_path / "questions.json"
         questions_file.write_text(json.dumps({
             "Arrays": ["Two Sum", "Binary Search"],
@@ -232,12 +286,16 @@ class TestLoadQuestionsFile:
             registry = SubjectRegistry()
             questions = registry._load_questions_file(str(questions_file))
 
-            assert "Arrays" in questions
-            assert "Strings" in questions
-            assert questions["Arrays"] == ["Two Sum", "Binary Search"]
+            assert_that(questions).contains_key("Arrays")
+            assert_that(questions).contains_key("Strings")
+            assert_that(questions["Arrays"]).is_equal_to(["Two Sum", "Binary Search"])
 
     def test_load_flat_list_format(self, tmp_path):
-        """Test loading flat list format (wrapped in General category)."""
+        """
+        Given a flat list of questions
+        When _load_questions_file is called
+        Then questions are wrapped in General category
+        """
         questions_file = tmp_path / "questions.json"
         questions_file.write_text(json.dumps(["Q1", "Q2", "Q3"]))
 
@@ -249,11 +307,15 @@ class TestLoadQuestionsFile:
             registry = SubjectRegistry()
             questions = registry._load_questions_file(str(questions_file))
 
-            assert "General" in questions
-            assert questions["General"] == ["Q1", "Q2", "Q3"]
+            assert_that(questions).contains_key("General")
+            assert_that(questions["General"]).is_equal_to(["Q1", "Q2", "Q3"])
 
     def test_load_missing_file_raises(self, tmp_path):
-        """Test loading non-existent file raises FileNotFoundError."""
+        """
+        Given a non-existent questions file
+        When _load_questions_file is called
+        Then FileNotFoundError is raised
+        """
         with patch("src.config.subjects.load_config") as mock_load:
             mock_cfg = MagicMock()
             mock_cfg.subjects = {}
@@ -265,7 +327,11 @@ class TestLoadQuestionsFile:
                 registry._load_questions_file(str(tmp_path / "missing.json"))
 
     def test_load_invalid_format_raises(self, tmp_path):
-        """Test loading invalid format raises ValueError."""
+        """
+        Given an invalid questions format
+        When _load_questions_file is called
+        Then ValueError is raised
+        """
         questions_file = tmp_path / "invalid.json"
         questions_file.write_text('"just a string"')
 
@@ -284,7 +350,11 @@ class TestSubjectConfig:
     """Tests for SubjectConfig dataclass."""
 
     def test_subject_config_creation(self):
-        """Test creating SubjectConfig."""
+        """
+        Given valid parameters
+        When SubjectConfig is created
+        Then all fields are stored correctly
+        """
         config = SubjectConfig(
             name="test",
             target_questions={"Cat": ["Q1"]},
@@ -295,16 +365,20 @@ class TestSubjectConfig:
             deck_prefix_mcq="Test_MCQ",
         )
 
-        assert config.name == "test"
-        assert config.target_questions == {"Cat": ["Q1"]}
-        assert config.initial_prompt == "Initial"
-        assert config.combine_prompt == "Combine"
-        assert config.target_model == LeetCodeProblem
-        assert config.deck_prefix == "Test"
-        assert config.deck_prefix_mcq == "Test_MCQ"
+        assert_that(config.name).is_equal_to("test")
+        assert_that(config.target_questions).is_equal_to({"Cat": ["Q1"]})
+        assert_that(config.initial_prompt).is_equal_to("Initial")
+        assert_that(config.combine_prompt).is_equal_to("Combine")
+        assert_that(config.target_model).is_equal_to(LeetCodeProblem)
+        assert_that(config.deck_prefix).is_equal_to("Test")
+        assert_that(config.deck_prefix_mcq).is_equal_to("Test_MCQ")
 
     def test_subject_config_none_prompts(self):
-        """Test SubjectConfig with None prompts."""
+        """
+        Given None for prompts
+        When SubjectConfig is created
+        Then None values are stored
+        """
         config = SubjectConfig(
             name="test",
             target_questions={},
@@ -315,15 +389,19 @@ class TestSubjectConfig:
             deck_prefix_mcq="Test_MCQ",
         )
 
-        assert config.initial_prompt is None
-        assert config.combine_prompt is None
+        assert_that(config.initial_prompt).is_none()
+        assert_that(config.combine_prompt).is_none()
 
 
 class TestGetSubjectConfigFunction:
     """Tests for get_subject_config convenience function."""
 
     def test_get_subject_config_leetcode(self):
-        """Test getting leetcode config via convenience function."""
+        """
+        Given leetcode subject
+        When get_subject_config is called
+        Then leetcode configuration is returned
+        """
         with patch("src.config.subjects.load_config") as mock_load:
             from src.config.loader import SubjectSettings
 
@@ -335,11 +413,15 @@ class TestGetSubjectConfigFunction:
 
             config = get_subject_config("leetcode")
 
-            assert config.name == "leetcode"
-            assert config.target_model == LeetCodeProblem
+            assert_that(config.name).is_equal_to("leetcode")
+            assert_that(config.target_model).is_equal_to(LeetCodeProblem)
 
     def test_get_subject_config_mcq(self):
-        """Test getting MCQ config via convenience function."""
+        """
+        Given a subject with is_multiple_choice=True
+        When get_subject_config is called
+        Then MCQ model is used
+        """
         with patch("src.config.subjects.load_config") as mock_load:
             from src.config.loader import SubjectSettings
 
@@ -351,18 +433,26 @@ class TestGetSubjectConfigFunction:
 
             config = get_subject_config("cs", is_multiple_choice=True)
 
-            assert config.target_model == MCQProblem
+            assert_that(config.target_model).is_equal_to(MCQProblem)
 
 
 class TestBuiltinSubjects:
     """Tests for BUILTIN_SUBJECTS constant."""
 
     def test_builtin_subjects_contains_expected(self):
-        """Test that BUILTIN_SUBJECTS contains expected subjects."""
-        assert "leetcode" in BUILTIN_SUBJECTS
-        assert "cs" in BUILTIN_SUBJECTS
-        assert "physics" in BUILTIN_SUBJECTS
+        """
+        Given the BUILTIN_SUBJECTS constant
+        When checking its contents
+        Then all expected subjects are present
+        """
+        assert_that(BUILTIN_SUBJECTS).contains("leetcode")
+        assert_that(BUILTIN_SUBJECTS).contains("cs")
+        assert_that(BUILTIN_SUBJECTS).contains("physics")
 
     def test_builtin_subjects_is_set(self):
-        """Test that BUILTIN_SUBJECTS is a set."""
-        assert isinstance(BUILTIN_SUBJECTS, set)
+        """
+        Given the BUILTIN_SUBJECTS constant
+        When checking its type
+        Then it is a set
+        """
+        assert_that(BUILTIN_SUBJECTS).is_instance_of(set)

@@ -2,6 +2,8 @@
 
 import pytest
 
+from assertpy import assert_that
+
 from src.config.modes import (
     detect_mode_from_filename,
     parse_mode,
@@ -16,198 +18,333 @@ class TestDetectModeFromFilename:
     """Tests for detect_mode_from_filename function."""
 
     def test_detect_leetcode(self):
-        """Test detecting leetcode mode."""
-        assert detect_mode_from_filename("leetcode_deck.json") == "leetcode"
-        assert detect_mode_from_filename("leetcode_anki_20231201.json") == "leetcode"
-        assert detect_mode_from_filename("/path/to/leetcode_cards.json") == "leetcode"
+        """
+        Given filenames containing 'leetcode'
+        When detect_mode_from_filename is called
+        Then 'leetcode' mode is returned
+        """
+        assert_that(detect_mode_from_filename("leetcode_deck.json")).is_equal_to("leetcode")
+        assert_that(detect_mode_from_filename("leetcode_anki_20231201.json")).is_equal_to("leetcode")
+        assert_that(detect_mode_from_filename("/path/to/leetcode_cards.json")).is_equal_to("leetcode")
 
     def test_detect_cs(self):
-        """Test detecting cs mode."""
-        assert detect_mode_from_filename("cs_deck.json") == "cs"
-        assert detect_mode_from_filename("cs_anki_cards.json") == "cs"
+        """
+        Given filenames containing 'cs'
+        When detect_mode_from_filename is called
+        Then 'cs' mode is returned
+        """
+        assert_that(detect_mode_from_filename("cs_deck.json")).is_equal_to("cs")
+        assert_that(detect_mode_from_filename("cs_anki_cards.json")).is_equal_to("cs")
 
     def test_detect_physics(self):
-        """Test detecting physics mode."""
-        assert detect_mode_from_filename("physics_deck.json") == "physics"
-        assert detect_mode_from_filename("physics_anki.json") == "physics"
+        """
+        Given filenames containing 'physics'
+        When detect_mode_from_filename is called
+        Then 'physics' mode is returned
+        """
+        assert_that(detect_mode_from_filename("physics_deck.json")).is_equal_to("physics")
+        assert_that(detect_mode_from_filename("physics_anki.json")).is_equal_to("physics")
 
     def test_detect_leetcode_mcq(self):
-        """Test detecting leetcode_mcq mode."""
-        assert detect_mode_from_filename("leetcode_mcq_deck.json") == "leetcode_mcq"
-        assert detect_mode_from_filename("leetcode_mcq.json") == "leetcode_mcq"
+        """
+        Given filenames containing 'leetcode_mcq'
+        When detect_mode_from_filename is called
+        Then 'leetcode_mcq' mode is returned
+        """
+        assert_that(detect_mode_from_filename("leetcode_mcq_deck.json")).is_equal_to("leetcode_mcq")
+        assert_that(detect_mode_from_filename("leetcode_mcq.json")).is_equal_to("leetcode_mcq")
 
     def test_detect_cs_mcq(self):
-        """Test detecting cs_mcq mode."""
-        assert detect_mode_from_filename("cs_mcq_deck.json") == "cs_mcq"
+        """
+        Given filenames containing 'cs_mcq'
+        When detect_mode_from_filename is called
+        Then 'cs_mcq' mode is returned
+        """
+        assert_that(detect_mode_from_filename("cs_mcq_deck.json")).is_equal_to("cs_mcq")
 
     def test_detect_physics_mcq(self):
-        """Test detecting physics_mcq mode."""
-        assert detect_mode_from_filename("physics_mcq_deck.json") == "physics_mcq"
+        """
+        Given filenames containing 'physics_mcq'
+        When detect_mode_from_filename is called
+        Then 'physics_mcq' mode is returned
+        """
+        assert_that(detect_mode_from_filename("physics_mcq_deck.json")).is_equal_to("physics_mcq")
 
     def test_detect_generic_mcq(self):
-        """Test detecting generic mcq mode."""
-        assert detect_mode_from_filename("my_mcq_cards.json") == "mcq"
-        assert detect_mode_from_filename("custom_mcq.json") == "mcq"
+        """
+        Given filenames containing 'mcq' without subject prefix
+        When detect_mode_from_filename is called
+        Then 'mcq' mode is returned
+        """
+        assert_that(detect_mode_from_filename("my_mcq_cards.json")).is_equal_to("mcq")
+        assert_that(detect_mode_from_filename("custom_mcq.json")).is_equal_to("mcq")
 
     def test_detect_default_to_leetcode(self):
-        """Test that unknown patterns default to leetcode."""
-        assert detect_mode_from_filename("unknown.json") == "leetcode"
-        assert detect_mode_from_filename("random_file.json") == "leetcode"
+        """
+        Given filenames without recognizable patterns
+        When detect_mode_from_filename is called
+        Then 'leetcode' mode is returned as default
+        """
+        assert_that(detect_mode_from_filename("unknown.json")).is_equal_to("leetcode")
+        assert_that(detect_mode_from_filename("random_file.json")).is_equal_to("leetcode")
 
     def test_detect_case_insensitive(self):
-        """Test that detection is case insensitive."""
-        assert detect_mode_from_filename("LEETCODE_DECK.json") == "leetcode"
-        assert detect_mode_from_filename("CS_MCQ_Cards.json") == "cs_mcq"
+        """
+        Given filenames with mixed case
+        When detect_mode_from_filename is called
+        Then detection is case insensitive
+        """
+        assert_that(detect_mode_from_filename("LEETCODE_DECK.json")).is_equal_to("leetcode")
+        assert_that(detect_mode_from_filename("CS_MCQ_Cards.json")).is_equal_to("cs_mcq")
 
     def test_mcq_takes_precedence(self):
-        """Test that MCQ modes are detected before base modes."""
-        # cs_mcq should be detected as cs_mcq, not cs
-        assert detect_mode_from_filename("cs_mcq_test.json") == "cs_mcq"
+        """
+        Given filenames with both subject and mcq
+        When detect_mode_from_filename is called
+        Then MCQ mode takes precedence over base mode
+        """
+        assert_that(detect_mode_from_filename("cs_mcq_test.json")).is_equal_to("cs_mcq")
 
 
 class TestParseMode:
     """Tests for parse_mode function."""
 
     def test_parse_leetcode(self):
-        """Test parsing leetcode mode."""
+        """
+        Given 'leetcode' mode string
+        When parse_mode is called
+        Then subject is 'leetcode' and is_mcq is False
+        """
         subject, is_mcq = parse_mode("leetcode")
-        assert subject == "leetcode"
-        assert is_mcq is False
+        assert_that(subject).is_equal_to("leetcode")
+        assert_that(is_mcq).is_false()
 
     def test_parse_cs(self):
-        """Test parsing cs mode."""
+        """
+        Given 'cs' mode string
+        When parse_mode is called
+        Then subject is 'cs' and is_mcq is False
+        """
         subject, is_mcq = parse_mode("cs")
-        assert subject == "cs"
-        assert is_mcq is False
+        assert_that(subject).is_equal_to("cs")
+        assert_that(is_mcq).is_false()
 
     def test_parse_physics(self):
-        """Test parsing physics mode."""
+        """
+        Given 'physics' mode string
+        When parse_mode is called
+        Then subject is 'physics' and is_mcq is False
+        """
         subject, is_mcq = parse_mode("physics")
-        assert subject == "physics"
-        assert is_mcq is False
+        assert_that(subject).is_equal_to("physics")
+        assert_that(is_mcq).is_false()
 
     def test_parse_leetcode_mcq(self):
-        """Test parsing leetcode_mcq mode."""
+        """
+        Given 'leetcode_mcq' mode string
+        When parse_mode is called
+        Then subject is 'leetcode' and is_mcq is True
+        """
         subject, is_mcq = parse_mode("leetcode_mcq")
-        assert subject == "leetcode"
-        assert is_mcq is True
+        assert_that(subject).is_equal_to("leetcode")
+        assert_that(is_mcq).is_true()
 
     def test_parse_cs_mcq(self):
-        """Test parsing cs_mcq mode."""
+        """
+        Given 'cs_mcq' mode string
+        When parse_mode is called
+        Then subject is 'cs' and is_mcq is True
+        """
         subject, is_mcq = parse_mode("cs_mcq")
-        assert subject == "cs"
-        assert is_mcq is True
+        assert_that(subject).is_equal_to("cs")
+        assert_that(is_mcq).is_true()
 
     def test_parse_physics_mcq(self):
-        """Test parsing physics_mcq mode."""
+        """
+        Given 'physics_mcq' mode string
+        When parse_mode is called
+        Then subject is 'physics' and is_mcq is True
+        """
         subject, is_mcq = parse_mode("physics_mcq")
-        assert subject == "physics"
-        assert is_mcq is True
+        assert_that(subject).is_equal_to("physics")
+        assert_that(is_mcq).is_true()
 
     def test_parse_mcq_only(self):
-        """Test parsing 'mcq' mode defaults to leetcode."""
+        """
+        Given 'mcq' mode string
+        When parse_mode is called
+        Then subject defaults to 'leetcode' and is_mcq is True
+        """
         subject, is_mcq = parse_mode("mcq")
-        assert subject == "leetcode"
-        assert is_mcq is True
+        assert_that(subject).is_equal_to("leetcode")
+        assert_that(is_mcq).is_true()
 
 
 class TestGetDeckPrefix:
     """Tests for get_deck_prefix function."""
 
     def test_get_leetcode_prefix(self):
-        """Test getting LeetCode prefix."""
-        assert get_deck_prefix("leetcode") == "LeetCode"
+        """
+        Given 'leetcode' mode
+        When get_deck_prefix is called
+        Then 'LeetCode' is returned
+        """
+        assert_that(get_deck_prefix("leetcode")).is_equal_to("LeetCode")
 
     def test_get_leetcode_mcq_prefix(self):
-        """Test getting LeetCode_MCQ prefix."""
-        assert get_deck_prefix("leetcode_mcq") == "LeetCode_MCQ"
+        """
+        Given 'leetcode_mcq' mode
+        When get_deck_prefix is called
+        Then 'LeetCode_MCQ' is returned
+        """
+        assert_that(get_deck_prefix("leetcode_mcq")).is_equal_to("LeetCode_MCQ")
 
     def test_get_cs_prefix(self):
-        """Test getting CS prefix."""
-        assert get_deck_prefix("cs") == "CS"
+        """
+        Given 'cs' mode
+        When get_deck_prefix is called
+        Then 'CS' is returned
+        """
+        assert_that(get_deck_prefix("cs")).is_equal_to("CS")
 
     def test_get_cs_mcq_prefix(self):
-        """Test getting CS_MCQ prefix."""
-        assert get_deck_prefix("cs_mcq") == "CS_MCQ"
+        """
+        Given 'cs_mcq' mode
+        When get_deck_prefix is called
+        Then 'CS_MCQ' is returned
+        """
+        assert_that(get_deck_prefix("cs_mcq")).is_equal_to("CS_MCQ")
 
     def test_get_physics_prefix(self):
-        """Test getting Physics prefix."""
-        assert get_deck_prefix("physics") == "Physics"
+        """
+        Given 'physics' mode
+        When get_deck_prefix is called
+        Then 'Physics' is returned
+        """
+        assert_that(get_deck_prefix("physics")).is_equal_to("Physics")
 
     def test_get_physics_mcq_prefix(self):
-        """Test getting Physics_MCQ prefix."""
-        assert get_deck_prefix("physics_mcq") == "Physics_MCQ"
+        """
+        Given 'physics_mcq' mode
+        When get_deck_prefix is called
+        Then 'Physics_MCQ' is returned
+        """
+        assert_that(get_deck_prefix("physics_mcq")).is_equal_to("Physics_MCQ")
 
     def test_get_mcq_prefix(self):
-        """Test getting prefix for 'mcq' mode."""
-        assert get_deck_prefix("mcq") == "LeetCode_MCQ"
+        """
+        Given 'mcq' mode
+        When get_deck_prefix is called
+        Then 'LeetCode_MCQ' is returned
+        """
+        assert_that(get_deck_prefix("mcq")).is_equal_to("LeetCode_MCQ")
 
     def test_get_unknown_defaults_to_leetcode(self):
-        """Test that unknown mode defaults to LeetCode."""
-        assert get_deck_prefix("unknown") == "LeetCode"
+        """
+        Given an unknown mode
+        When get_deck_prefix is called
+        Then 'LeetCode' is returned as default
+        """
+        assert_that(get_deck_prefix("unknown")).is_equal_to("LeetCode")
 
 
 class TestIsValidMode:
     """Tests for is_valid_mode function."""
 
     def test_valid_standard_modes(self):
-        """Test that standard modes are valid."""
-        assert is_valid_mode("leetcode") is True
-        assert is_valid_mode("cs") is True
-        assert is_valid_mode("physics") is True
+        """
+        Given standard mode strings
+        When is_valid_mode is called
+        Then True is returned
+        """
+        assert_that(is_valid_mode("leetcode")).is_true()
+        assert_that(is_valid_mode("cs")).is_true()
+        assert_that(is_valid_mode("physics")).is_true()
 
     def test_valid_mcq_modes(self):
-        """Test that MCQ modes are valid."""
-        assert is_valid_mode("leetcode_mcq") is True
-        assert is_valid_mode("cs_mcq") is True
-        assert is_valid_mode("physics_mcq") is True
-        assert is_valid_mode("mcq") is True
+        """
+        Given MCQ mode strings
+        When is_valid_mode is called
+        Then True is returned
+        """
+        assert_that(is_valid_mode("leetcode_mcq")).is_true()
+        assert_that(is_valid_mode("cs_mcq")).is_true()
+        assert_that(is_valid_mode("physics_mcq")).is_true()
+        assert_that(is_valid_mode("mcq")).is_true()
 
     def test_invalid_modes(self):
-        """Test that invalid modes return False."""
-        assert is_valid_mode("invalid") is False
-        assert is_valid_mode("unknown") is False
-        assert is_valid_mode("") is False
+        """
+        Given invalid mode strings
+        When is_valid_mode is called
+        Then False is returned
+        """
+        assert_that(is_valid_mode("invalid")).is_false()
+        assert_that(is_valid_mode("unknown")).is_false()
+        assert_that(is_valid_mode("")).is_false()
 
 
 class TestValidModes:
     """Tests for VALID_MODES constant."""
 
     def test_contains_standard_modes(self):
-        """Test that VALID_MODES contains standard modes."""
-        assert "leetcode" in VALID_MODES
-        assert "cs" in VALID_MODES
-        assert "physics" in VALID_MODES
+        """
+        Given the VALID_MODES constant
+        When checking for standard modes
+        Then all standard modes are present
+        """
+        assert_that("leetcode" in VALID_MODES).is_true()
+        assert_that("cs" in VALID_MODES).is_true()
+        assert_that("physics" in VALID_MODES).is_true()
 
     def test_contains_mcq_modes(self):
-        """Test that VALID_MODES contains MCQ modes."""
-        assert "leetcode_mcq" in VALID_MODES
-        assert "cs_mcq" in VALID_MODES
-        assert "physics_mcq" in VALID_MODES
-        assert "mcq" in VALID_MODES
+        """
+        Given the VALID_MODES constant
+        When checking for MCQ modes
+        Then all MCQ modes are present
+        """
+        assert_that("leetcode_mcq" in VALID_MODES).is_true()
+        assert_that("cs_mcq" in VALID_MODES).is_true()
+        assert_that("physics_mcq" in VALID_MODES).is_true()
+        assert_that("mcq" in VALID_MODES).is_true()
 
     def test_is_frozenset(self):
-        """Test that VALID_MODES is a frozenset."""
-        assert isinstance(VALID_MODES, frozenset)
+        """
+        Given the VALID_MODES constant
+        When checking its type
+        Then it is a frozenset
+        """
+        assert_that(VALID_MODES).is_instance_of(frozenset)
 
 
 class TestDeckPrefixes:
     """Tests for DECK_PREFIXES constant."""
 
     def test_contains_all_subjects(self):
-        """Test that DECK_PREFIXES contains all subjects."""
-        assert "leetcode" in DECK_PREFIXES
-        assert "cs" in DECK_PREFIXES
-        assert "physics" in DECK_PREFIXES
+        """
+        Given the DECK_PREFIXES constant
+        When checking for subjects
+        Then all subjects are present
+        """
+        assert_that("leetcode" in DECK_PREFIXES).is_true()
+        assert_that("cs" in DECK_PREFIXES).is_true()
+        assert_that("physics" in DECK_PREFIXES).is_true()
 
     def test_prefixes_are_tuples(self):
-        """Test that prefix values are tuples."""
+        """
+        Given the DECK_PREFIXES constant
+        When checking value types
+        Then all values are 2-element tuples
+        """
         for subject, prefixes in DECK_PREFIXES.items():
-            assert isinstance(prefixes, tuple)
-            assert len(prefixes) == 2
+            assert_that(prefixes).is_instance_of(tuple)
+            assert_that(prefixes).is_length(2)
 
     def test_prefix_values(self):
-        """Test specific prefix values."""
-        assert DECK_PREFIXES["leetcode"] == ("LeetCode", "LeetCode_MCQ")
-        assert DECK_PREFIXES["cs"] == ("CS", "CS_MCQ")
-        assert DECK_PREFIXES["physics"] == ("Physics", "Physics_MCQ")
+        """
+        Given the DECK_PREFIXES constant
+        When checking specific prefix values
+        Then correct tuple values are returned
+        """
+        assert_that(DECK_PREFIXES["leetcode"]).is_equal_to(("LeetCode", "LeetCode_MCQ"))
+        assert_that(DECK_PREFIXES["cs"]).is_equal_to(("CS", "CS_MCQ"))
+        assert_that(DECK_PREFIXES["physics"]).is_equal_to(("Physics", "Physics_MCQ"))
