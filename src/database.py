@@ -3,7 +3,7 @@
 import json
 import logging
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
@@ -137,7 +137,7 @@ class Run(Base):
     __tablename__ = "runs"
 
     id = Column(String, primary_key=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     user_label = Column(String, nullable=True)
     mode = Column(String, nullable=False)  # "leetcode", "cs_mcq", etc.
     subject = Column(String, nullable=False)  # "leetcode", "cs", "physics"
@@ -178,7 +178,7 @@ class Problem(Base):
     category_index = Column(Integer, nullable=True)
     problem_index = Column(Integer, nullable=True)
     status = Column(String, nullable=False)  # "success", "failed", "partial", "running"
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     processing_time_seconds = Column(Float, nullable=True)
     final_card_count = Column(Integer, nullable=True)
     final_result = Column(Text, nullable=True)  # JSON blob
@@ -208,7 +208,7 @@ class ProviderResult(Base):
     run_id = Column(String, ForeignKey("runs.id"), nullable=False)
     provider_name = Column(String, nullable=False)  # "llm2deck_cerebras", etc.
     provider_model = Column(String, nullable=False)  # "llama3.1-70b", etc.
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     success = Column(Boolean, nullable=False)
     raw_output = Column(Text, nullable=True)  # Raw JSON string
     card_count = Column(Integer, nullable=True)
@@ -240,7 +240,7 @@ class Card(Base):
     front = Column(Text, nullable=False)
     back = Column(Text, nullable=False)
     tags = Column(Text, nullable=True)  # JSON array
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     problem = relationship("Problem", back_populates="cards")
@@ -337,7 +337,7 @@ def update_run(session: Session, run_id: str, **kwargs) -> Run:
 
     # Update completed_at if status is being set to completed
     if kwargs.get("status") == "completed" and "completed_at" not in kwargs:
-        kwargs["completed_at"] = datetime.utcnow()
+        kwargs["completed_at"] = datetime.now(timezone.utc)
 
     for key, value in kwargs.items():
         if hasattr(run, key):

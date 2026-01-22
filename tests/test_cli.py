@@ -416,12 +416,16 @@ class TestMain:
                     mock_registry.get_config.return_value = MagicMock()
                     MockRegistry.return_value = mock_registry
 
-                    with patch("src.cli.asyncio.run") as mock_run:
-                        mock_run.return_value = 0
+                    # Patch handle_generate to return a regular value (not a coroutine)
+                    with patch("src.cli.handle_generate") as mock_handle:
+                        mock_handle.return_value = 0
 
-                        result = main(["generate", "leetcode"])
+                        with patch("src.cli.asyncio.run") as mock_run:
+                            mock_run.return_value = 0
 
-                        assert mock_run.called
+                            result = main(["generate", "leetcode"])
+
+                            assert mock_run.called
 
     def test_main_convert_command(self, tmp_path):
         """Test main with convert command."""

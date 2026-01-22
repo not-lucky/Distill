@@ -39,3 +39,7 @@ markers = [
 # Exclude experiments directory (contains runnable scripts, not tests)
 norecursedirs = ["tests/experiments"]
 pythonpath = ["."]
+filterwarnings = [
+    # Ignore unawaited coroutine warnings from unittest.mock internals (Python 3.12+ issue)
+    "ignore:coroutine 'AsyncMockMixin._execute_mock_call' was never awaited:RuntimeWarning",
+]
