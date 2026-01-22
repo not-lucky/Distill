@@ -9,6 +9,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from assertpy import assert_that
+
 from src.anki.generator import DeckGenerator
 from src.services.merge import MergeService
 from src.services.export import ExportService
@@ -28,7 +30,11 @@ class TestE2EAnkiGeneration:
     """End-to-end tests for Anki deck generation."""
 
     def test_json_to_anki_workflow(self, tmp_path, sample_card_data):
-        """Test converting JSON cards to Anki package."""
+        """
+        Given sample card data written to JSON
+        When DeckGenerator processes and saves it
+        Then an Anki package file is created
+        """
         # Write sample data to JSON file
         json_path = tmp_path / "cards.json"
         json_path.write_text(json.dumps(sample_card_data))
@@ -41,21 +47,29 @@ class TestE2EAnkiGeneration:
         generator.save_package(str(output_path))
 
         # Verify output exists
-        assert output_path.exists()
-        assert output_path.stat().st_size > 0
+        assert_that(output_path.exists()).is_true()
+        assert_that(output_path.stat().st_size > 0).is_true()
 
     def test_mcq_json_to_anki_workflow(self, tmp_path, sample_mcq_card_data):
-        """Test converting MCQ JSON cards to Anki package."""
+        """
+        Given MCQ card data
+        When DeckGenerator processes and saves it
+        Then an Anki package file is created
+        """
         output_path = tmp_path / "mcq_output.apkg"
 
         generator = DeckGenerator(sample_mcq_card_data, deck_prefix="Test_MCQ")
         generator.process()
         generator.save_package(str(output_path))
 
-        assert output_path.exists()
+        assert_that(output_path.exists()).is_true()
 
     def test_multiple_problems_to_deck(self, tmp_path):
-        """Test converting multiple problems to a single deck."""
+        """
+        Given multiple problems with different categories
+        When DeckGenerator processes them
+        Then multiple deck entries are created
+        """
         card_data = [
             {
                 "title": "Problem 1",
@@ -87,16 +101,20 @@ class TestE2EAnkiGeneration:
         generator.process()
         generator.save_package(str(output_path))
 
-        assert output_path.exists()
+        assert_that(output_path.exists()).is_true()
         # Should have created 2 deck entries
-        assert len(generator.deck_collection) == 2
+        assert_that(generator.deck_collection).is_length(2)
 
 
 class TestE2EMergeWorkflow:
     """End-to-end tests for merge workflow."""
 
     def test_merge_archived_files_workflow(self, tmp_path):
-        """Test merging multiple archived JSON files."""
+        """
+        Given multiple archived JSON files
+        When MergeService merges them
+        Then all files are combined into one output file
+        """
         # Create archival structure
         archival_dir = tmp_path / "archival"
         cs_dir = archival_dir / "cs"
@@ -117,20 +135,24 @@ class TestE2EMergeWorkflow:
         result = service.merge_subject("cs")
 
         # Verify merge result
-        assert result.success is True
-        assert result.merged_count == 5
-        assert result.output_path.exists()
+        assert_that(result.success).is_true()
+        assert_that(result.merged_count).is_equal_to(5)
+        assert_that(result.output_path.exists()).is_true()
 
         # Verify merged content
         with open(result.output_path) as f:
             merged = json.load(f)
-        assert len(merged) == 5
+        assert_that(merged).is_length(5)
 
         # Cleanup
         result.output_path.unlink()
 
     def test_merge_and_convert_to_anki(self, tmp_path):
-        """Test full workflow: merge JSON files and convert to Anki."""
+        """
+        Given archived JSON files
+        When merged and converted to Anki
+        Then an Anki package is created successfully
+        """
         # Create archival structure
         archival_dir = tmp_path / "archival"
         leetcode_dir = archival_dir / "leetcode"
@@ -151,7 +173,7 @@ class TestE2EMergeWorkflow:
         # Merge
         merge_service = MergeService(archival_dir=archival_dir)
         merge_result = merge_service.merge_subject("leetcode")
-        assert merge_result.success
+        assert_that(merge_result.success).is_true()
 
         # Load merged data
         with open(merge_result.output_path) as f:
@@ -164,7 +186,7 @@ class TestE2EMergeWorkflow:
         output_path = tmp_path / "merged.apkg"
         generator.save_package(str(output_path))
 
-        assert output_path.exists()
+        assert_that(output_path.exists()).is_true()
 
         # Cleanup
         merge_result.output_path.unlink()
@@ -174,7 +196,11 @@ class TestE2EExportWorkflow:
     """End-to-end tests for export workflow."""
 
     def test_export_to_markdown_workflow(self, tmp_path):
-        """Test exporting JSON files to Markdown."""
+        """
+        Given JSON files in source directory
+        When ExportService exports to markdown
+        Then markdown files are created with correct content
+        """
         source = tmp_path / "source"
         target = tmp_path / "target"
         source.mkdir()
@@ -192,23 +218,27 @@ class TestE2EExportWorkflow:
         service = ExportService(source_dir=source, target_dir=target)
         result = service.export_to_markdown()
 
-        assert result.success is True
-        assert result.exported_count == 3
+        assert_that(result.success).is_true()
+        assert_that(result.exported_count).is_equal_to(3)
 
         # Verify markdown files
         for i in range(3):
             md_path = target / f"file_{i}.md"
-            assert md_path.exists()
+            assert_that(md_path.exists()).is_true()
             content = md_path.read_text()
-            assert f"Question {i}" in content
-            assert f"Answer {i}" in content
+            assert_that(content).contains(f"Question {i}")
+            assert_that(content).contains(f"Answer {i}")
 
 
 class TestE2EErrorHandling:
     """End-to-end tests for error handling scenarios."""
 
     def test_handles_invalid_json_in_merge(self, tmp_path):
-        """Test that merge handles invalid JSON files gracefully."""
+        """
+        Given a mix of valid and invalid JSON files
+        When merge is performed
+        Then it succeeds with only valid files
+        """
         archival = tmp_path / "archival"
         subject_dir = archival / "test"
         subject_dir.mkdir(parents=True)
@@ -222,14 +252,18 @@ class TestE2EErrorHandling:
         result = service.merge_subject("test")
 
         # Should still succeed with valid files
-        assert result.success is True
-        assert result.merged_count == 2
+        assert_that(result.success).is_true()
+        assert_that(result.merged_count).is_equal_to(2)
 
         # Cleanup
         result.output_path.unlink()
 
     def test_handles_empty_deck_generation(self, tmp_path):
-        """Test handling of empty card data."""
+        """
+        Given empty card data
+        When DeckGenerator processes it
+        Then no output file is created
+        """
         empty_data = []
 
         generator = DeckGenerator(empty_data, deck_prefix="Empty")
@@ -239,18 +273,26 @@ class TestE2EErrorHandling:
         generator.save_package(str(output_path))
 
         # Should not create file for empty deck
-        assert not output_path.exists()
+        assert_that(output_path.exists()).is_false()
 
     def test_handles_merge_nonexistent_directory(self, tmp_path):
-        """Test handling of non-existent archival directory."""
+        """
+        Given a non-existent archival directory
+        When merge is attempted
+        Then it fails with appropriate error
+        """
         service = MergeService(archival_dir=tmp_path / "nonexistent")
         result = service.merge_subject("test")
 
-        assert result.success is False
-        assert "does not exist" in result.error
+        assert_that(result.success).is_false()
+        assert_that(result.error).contains("does not exist")
 
     def test_handles_export_empty_source(self, tmp_path):
-        """Test handling of empty source directory."""
+        """
+        Given an empty source directory
+        When export is attempted
+        Then it fails with appropriate error
+        """
         source = tmp_path / "empty_source"
         source.mkdir()
         target = tmp_path / "target"
@@ -258,15 +300,19 @@ class TestE2EErrorHandling:
         service = ExportService(source_dir=source, target_dir=target)
         result = service.export_to_markdown()
 
-        assert result.success is False
-        assert "No JSON files" in result.error
+        assert_that(result.success).is_false()
+        assert_that(result.error).contains("No JSON files")
 
 
 class TestE2ECompleteWorkflow:
     """Complete workflow tests with mocked providers."""
 
     def test_generate_and_convert_workflow(self, tmp_path, sample_card_data):
-        """Test generating cards and converting to Anki."""
+        """
+        Given generated card data
+        When saved to JSON and converted to Anki
+        Then an Anki package is created
+        """
         # Simulate generated cards
         generated_problems = sample_card_data
 
@@ -285,11 +331,15 @@ class TestE2ECompleteWorkflow:
         output_path = tmp_path / "final.apkg"
         generator.save_package(str(output_path))
 
-        assert output_path.exists()
-        assert output_path.stat().st_size > 0
+        assert_that(output_path.exists()).is_true()
+        assert_that(output_path.stat().st_size > 0).is_true()
 
     def test_workflow_with_mcq_cards(self, tmp_path, sample_mcq_card_data):
-        """Test workflow with MCQ card type."""
+        """
+        Given MCQ card data
+        When saved and converted to Anki
+        Then an Anki package is created
+        """
         # Save MCQ data
         json_path = tmp_path / "mcq_generated.json"
         with open(json_path, "w") as f:
@@ -305,10 +355,14 @@ class TestE2ECompleteWorkflow:
         output_path = tmp_path / "mcq_final.apkg"
         generator.save_package(str(output_path))
 
-        assert output_path.exists()
+        assert_that(output_path.exists()).is_true()
 
     def test_full_pipeline_merge_and_export(self, tmp_path):
-        """Test complete pipeline: generate, merge, export to markdown."""
+        """
+        Given generated JSON files
+        When merged and exported to markdown
+        Then markdown files contain correct content
+        """
         # Step 1: Create "generated" JSON files
         output_dir = tmp_path / "archival" / "test"
         output_dir.mkdir(parents=True)
@@ -327,7 +381,7 @@ class TestE2ECompleteWorkflow:
         # Step 2: Merge
         merge_service = MergeService(archival_dir=tmp_path / "archival")
         merge_result = merge_service.merge_subject("test")
-        assert merge_result.success
+        assert_that(merge_result.success).is_true()
 
         # Step 3: Export to Markdown
         md_source = output_dir
@@ -336,15 +390,15 @@ class TestE2ECompleteWorkflow:
         export_service = ExportService(source_dir=md_source, target_dir=md_target)
         export_result = export_service.export_to_markdown()
 
-        assert export_result.success
-        assert export_result.exported_count == 3
+        assert_that(export_result.success).is_true()
+        assert_that(export_result.exported_count).is_equal_to(3)
 
         # Verify markdown files contain correct content
         for i in range(3):
             md_path = md_target / f"problem_{i}.md"
             content = md_path.read_text()
-            assert f"Q{i}" in content
-            assert f"A{i}" in content
+            assert_that(content).contains(f"Q{i}")
+            assert_that(content).contains(f"A{i}")
 
         # Cleanup merged file
         merge_result.output_path.unlink()
