@@ -13,6 +13,8 @@ import asyncio
 import json
 import time
 import pytest
+
+from assertpy import assert_that
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Dict, Any, Optional
 import itertools
@@ -138,8 +140,8 @@ class TestRateLimitRetryWithBackoff:
             return "success"
 
         result = await rate_limited_func()
-        assert result == "success"
-        assert len(call_times) == 4
+        assert_that(result).is_equal_to("success")
+        assert_that(call_times).is_length(4)
 
         # Verify delays are increasing (exponential backoff)
         delays = [
@@ -183,8 +185,8 @@ class TestRateLimitRetryWithBackoff:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == '{"cards": []}'
-            assert call_count == 3
+            assert_that(result).is_equal_to('{"cards": []}')
+            assert_that(call_count).is_equal_to(3)
 
     @pytest.mark.asyncio
     async def test_rate_limit_all_retries_exhausted(self):
@@ -218,8 +220,8 @@ class TestRateLimitRetryWithBackoff:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
-            assert call_count == 2
+            assert_that(result).is_none()
+            assert_that(call_count).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_backoff_respects_max_wait(self):
@@ -257,12 +259,12 @@ class TestRateLimitRetryWithBackoff:
             return f"success_{call_count}"
 
         result1 = await rate_limited_then_ok()
-        assert result1 == "success_2"
+        assert_that(result1).is_equal_to("success_2")
 
         # Reset and try again - should work first time
         call_count = 10
         result2 = await rate_limited_then_ok()
-        assert result2 == "success_11"
+        assert_that(result2).is_equal_to("success_11")
 
 
 class TestMaxRetriesExceeded:
@@ -288,7 +290,7 @@ class TestMaxRetriesExceeded:
             with pytest.raises(ErrorClass):
                 await always_fails()
 
-            assert call_count == max_retries
+            assert_that(call_count).is_equal_to(max_retries)
 
     @pytest.mark.asyncio
     async def test_retries_stop_immediately_on_non_retryable_error(self):
@@ -305,7 +307,7 @@ class TestMaxRetriesExceeded:
             with pytest.raises(ErrorClass):
                 await fails_with_non_retryable()
 
-            assert call_count == 1
+            assert_that(call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_max_retries_zero_or_one(self):
@@ -322,7 +324,7 @@ class TestMaxRetriesExceeded:
             with pytest.raises(RetryableError):
                 await fails()
 
-            assert call_count == max_retries
+            assert_that(call_count).is_equal_to(max_retries)
 
     @pytest.mark.asyncio
     async def test_provider_returns_none_after_max_retries(self):
@@ -348,8 +350,8 @@ class TestMaxRetriesExceeded:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
-            assert call_count == 2
+            assert_that(result).is_none()
+            assert_that(call_count).is_equal_to(2)
 
 
 # =============================================================================
@@ -394,7 +396,7 @@ class TestProviderServerErrors:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_intermittent_500_returns_none_without_retry(self):
@@ -433,8 +435,8 @@ class TestProviderServerErrors:
                 chat_messages=[{"role": "user", "content": "test"}],
             )
             # 500 errors are not RetryableError, so they return None immediately
-            assert result is None
-            assert call_count == 1
+            assert_that(result).is_none()
+            assert_that(call_count).is_equal_to(1)
 
 
 class TestTimeoutErrors:
@@ -469,8 +471,8 @@ class TestTimeoutErrors:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == '{"success": true}'
-            assert call_count == 2
+            assert_that(result).is_equal_to('{"success": true}')
+            assert_that(call_count).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_persistent_timeout_returns_none(self):
@@ -498,8 +500,8 @@ class TestTimeoutErrors:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
-            assert call_count == 2
+            assert_that(result).is_none()
+            assert_that(call_count).is_equal_to(2)
 
 
 class TestAuthenticationErrors:
@@ -537,7 +539,7 @@ class TestAuthenticationErrors:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
             # Auth errors should not be retried (or very limited retries)
             assert call_count <= 3
 
@@ -566,7 +568,7 @@ class TestAuthenticationErrors:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_key_rotation_occurs_on_requests(self):
@@ -598,7 +600,7 @@ class TestAuthenticationErrors:
                 )
 
             # Keys should rotate
-            assert used_keys == ["key1", "key2", "key3"]
+            assert_that(used_keys).is_equal_to(["key1", "key2", "key3"])
 
 
 # =============================================================================
@@ -634,7 +636,7 @@ class TestMalformedJSON:
                     raw_content="some content",
                     json_schema={},
                 )
-                assert result is None
+                assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_truncated_json(self):
@@ -661,7 +663,7 @@ class TestMalformedJSON:
                     raw_content="content",
                     json_schema={},
                 )
-                assert result is None
+                assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_json_missing_required_fields(self):
@@ -683,7 +685,7 @@ class TestMalformedJSON:
                 json_schema={},
             )
             # format_json returns the parsed dict, validation happens elsewhere
-            assert result == {"other_field": "value"}
+            assert_that(result).is_equal_to({"other_field": "value"})
 
     @pytest.mark.asyncio
     async def test_json_with_markdown_blocks_stripped(self):
@@ -702,10 +704,10 @@ class TestMalformedJSON:
 
         for wrapped, expected_stripped in wrapped_responses:
             stripped = strip_json_block(wrapped)
-            assert stripped == expected_stripped
+            assert_that(stripped).is_equal_to(expected_stripped)
             # Verify it parses as valid JSON
             parsed = json.loads(stripped)
-            assert parsed == {"cards": []}
+            assert_that(parsed).is_equal_to({"cards": []})
 
     @pytest.mark.asyncio
     async def test_json_with_extra_text_before_block_fails(self):
@@ -729,7 +731,7 @@ class TestMalformedJSON:
                 json_schema={},
             )
             # This should fail because strip_json_block only handles markdown fences at the start
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_empty_json_structures(self):
@@ -756,7 +758,7 @@ class TestMalformedJSON:
                     raw_content="content",
                     json_schema={},
                 )
-                assert result == expected
+                assert_that(result).is_equal_to(expected)
 
     @pytest.mark.asyncio
     async def test_json_with_null_values(self):
@@ -776,7 +778,7 @@ class TestMalformedJSON:
                 raw_content="content",
                 json_schema={},
             )
-            assert result == {"cards": None, "title": None, "count": 0}
+            assert_that(result).is_equal_to({"cards": None, "title": None, "count": 0})
 
 
 class TestMalformedResponses:
@@ -807,7 +809,7 @@ class TestMalformedResponses:
                 raw_content="content",
                 json_schema={},
             )
-            assert result is None
+            assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_binary_garbage(self):
@@ -834,7 +836,7 @@ class TestMalformedResponses:
                     raw_content="content",
                     json_schema={},
                 )
-                assert result is None
+                assert_that(result).is_none()
 
 
 # =============================================================================
@@ -854,7 +856,7 @@ class TestZeroQuestions:
             repository=None,
             combine_prompt="Combine: {inputs}",
         )
-        assert len(generator.llm_providers) == 0
+        assert_that(generator.llm_providers).is_length(0)
 
     def test_subject_config_with_empty_questions(self):
         """Test SubjectConfig accepts empty questions dict."""
@@ -867,17 +869,17 @@ class TestZeroQuestions:
             deck_prefix="Test",
             deck_prefix_mcq="Test_MCQ",
         )
-        assert config.target_questions == {}
+        assert_that(config.target_questions).is_equal_to({})
 
     @pytest.mark.asyncio
     async def test_task_runner_with_no_tasks(self):
         """Test ConcurrentTaskRunner with empty task list."""
         runner = ConcurrentTaskRunner(max_concurrent=4)
         results = await runner.run_all([])
-        assert results == []
+        assert_that(results).is_equal_to([])
 
         ordered_results = await runner.run_all_ordered([])
-        assert ordered_results == []
+        assert_that(ordered_results).is_equal_to([])
 
 
 class TestSingleQuestion:
@@ -894,7 +896,7 @@ class TestSingleQuestion:
             combine_prompt="",
         )
 
-        assert len(generator.llm_providers) == 1
+        assert_that(generator.llm_providers).is_length(1)
 
     @pytest.mark.asyncio
     async def test_task_runner_single_task(self):
@@ -905,7 +907,7 @@ class TestSingleQuestion:
             return "result"
 
         results = await runner.run_all([single_task])
-        assert len(results) == 1
+        assert_that(results).is_length(1)
         assert isinstance(results[0], Success)
         assert results[0].value == "result"
 
@@ -920,7 +922,7 @@ class TestSingleQuestion:
             deck_prefix="Test",
             deck_prefix_mcq="Test_MCQ",
         )
-        assert len(config.target_questions) == 1
+        assert_that(config.target_questions).is_length(1)
         assert len(config.target_questions["Category"]) == 1
 
 
@@ -938,9 +940,9 @@ class TestLargeScaleBoundary:
         tasks = [lambda i=i: quick_task(i) for i in range(100)]
         results = await runner.run_all(tasks)
 
-        assert len(results) == 100
+        assert_that(results).is_length(100)
         successes = [r for r in results if isinstance(r, Success)]
-        assert len(successes) == 100
+        assert_that(successes).is_length(100)
 
     @pytest.mark.asyncio
     async def test_concurrency_limit_with_many_tasks(self):
@@ -975,7 +977,7 @@ class TestLargeScaleBoundary:
             combine_prompt="Combine",
         )
 
-        assert len(generator.llm_providers) == 20
+        assert_that(generator.llm_providers).is_length(20)
 
     def test_large_question_dict(self):
         """Test SubjectConfig with large questions dict."""
@@ -995,7 +997,7 @@ class TestLargeScaleBoundary:
         )
 
         total_questions = sum(len(q) for q in config.target_questions.values())
-        assert total_questions == 1000
+        assert_that(total_questions).is_equal_to(1000)
 
 
 class TestEmptyProviders:
@@ -1010,7 +1012,7 @@ class TestEmptyProviders:
             repository=None,
             combine_prompt="Combine",
         )
-        assert len(generator.llm_providers) == 0
+        assert_that(generator.llm_providers).is_length(0)
 
     def test_generator_with_none_formatter(self):
         """Test CardGenerator accepts None formatter."""
@@ -1021,7 +1023,7 @@ class TestEmptyProviders:
             repository=None,
             combine_prompt="Combine",
         )
-        assert generator.formatter is None
+        assert_that(generator.formatter).is_none()
 
     def test_generator_with_none_repository(self):
         """Test CardGenerator accepts None repository."""
@@ -1032,7 +1034,7 @@ class TestEmptyProviders:
             repository=None,
             combine_prompt="Combine",
         )
-        assert generator.repository is None
+        assert_that(generator.repository).is_none()
 
 
 # =============================================================================
@@ -1072,7 +1074,7 @@ class TestUnicodeHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == content
+            assert_that(result).is_equal_to(content)
 
     @pytest.mark.asyncio
     async def test_emoji_content(self):
@@ -1099,7 +1101,7 @@ class TestUnicodeHandling:
                 result = await provider._make_request(
                     chat_messages=[{"role": "user", "content": "test"}],
                 )
-                assert result == content
+                assert_that(result).is_equal_to(content)
 
     @pytest.mark.asyncio
     async def test_mixed_script_content(self):
@@ -1118,7 +1120,7 @@ class TestUnicodeHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == mixed_content
+            assert_that(result).is_equal_to(mixed_content)
 
     @pytest.mark.asyncio
     async def test_rtl_and_ltr_mixed(self):
@@ -1137,7 +1139,7 @@ class TestUnicodeHandling:
             result = await provider._make_request(
                 chat_messages=[{"role": "user", "content": "test"}],
             )
-            assert result == rtl_ltr_content
+            assert_that(result).is_equal_to(rtl_ltr_content)
 
     @pytest.mark.asyncio
     async def test_unicode_escape_sequences(self):
@@ -1159,7 +1161,7 @@ class TestUnicodeHandling:
                 json_schema={},
             )
             # When parsed, should decode to actual characters
-            assert result == {"title": "中文", "cards": []}
+            assert_that(result).is_equal_to({"title": "中文", "cards": []})
 
     @pytest.mark.asyncio
     async def test_code_with_unicode_comments(self):
@@ -1295,8 +1297,8 @@ class TestCombinedStressScenarios:
             return unicode_content
 
         result = await unicode_with_failures()
-        assert result == unicode_content
-        assert call_count == 2
+        assert_that(result).is_equal_to(unicode_content)
+        assert_that(call_count).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_concurrent_unicode_tasks(self):
@@ -1318,7 +1320,7 @@ class TestCombinedStressScenarios:
         tasks = [lambda c=c: unicode_task(c) for c in contents]
         results = await runner.run_all(tasks)
 
-        assert len(results) == 5
+        assert_that(results).is_length(5)
         result_values = [r.value for r in results if isinstance(r, Success)]
         assert set(result_values) == set(contents)
 
@@ -1338,13 +1340,13 @@ class TestCombinedStressScenarios:
         tasks = [lambda i=i: flaky_task(i) for i in range(30)]
         results = await runner.run_all(tasks)
 
-        assert len(results) == 30
+        assert_that(results).is_length(30)
         successes = [r for r in results if isinstance(r, Success)]
         failures = [r for r in results if isinstance(r, Failure)]
 
         # Every 3rd task (0, 3, 6, ..., 27) = 10 failures
-        assert len(failures) == 10
-        assert len(successes) == 20
+        assert_that(failures).is_length(10)
+        assert_that(successes).is_length(20)
 
     @pytest.mark.asyncio
     async def test_mixed_error_types_concurrent(self):
@@ -1366,9 +1368,9 @@ class TestCombinedStressScenarios:
         tasks = [rate_limit_task, timeout_task, success_task, value_error_task]
         results = await runner.run_all(tasks)
 
-        assert len(results) == 4
+        assert_that(results).is_length(4)
         successes = [r for r in results if isinstance(r, Success)]
         failures = [r for r in results if isinstance(r, Failure)]
 
-        assert len(successes) == 1
-        assert len(failures) == 3
+        assert_that(successes).is_length(1)
+        assert_that(failures).is_length(3)

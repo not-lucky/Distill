@@ -8,6 +8,8 @@ Task fn-2.8: Property-based tests for:
 
 import json
 import pytest
+
+from assertpy import assert_that
 from hypothesis import given, strategies as st, settings, assume, HealthCheck
 from hypothesis.strategies import composite
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -155,7 +157,7 @@ class TestJSONParsingProperties:
         """Property: valid JSON data should roundtrip through serialization."""
         json_str = json.dumps(data)
         parsed = json.loads(json_str)
-        assert parsed == data
+        assert_that(parsed).is_equal_to(data)
 
     @given(st.text(min_size=1, max_size=1000))
     @settings(max_examples=50)
@@ -166,7 +168,7 @@ class TestJSONParsingProperties:
 
         # If content doesn't have markers, it should remain unchanged (except whitespace)
         result = strip_json_block(content)
-        assert result == content.strip()
+        assert_that(result).is_equal_to(content.strip())
 
     @given(json_objects())
     @settings(max_examples=50)
@@ -177,7 +179,7 @@ class TestJSONParsingProperties:
 
         stripped = strip_json_block(wrapped)
         parsed = json.loads(stripped)
-        assert parsed == obj
+        assert_that(parsed).is_equal_to(obj)
 
     @given(json_objects())
     @settings(max_examples=50)
@@ -188,7 +190,7 @@ class TestJSONParsingProperties:
 
         stripped = strip_json_block(wrapped)
         parsed = json.loads(stripped)
-        assert parsed == obj
+        assert_that(parsed).is_equal_to(obj)
 
     @given(st.text())
     @settings(max_examples=100)
@@ -227,7 +229,7 @@ class TestFilenameSanitizationProperties:
         """Property: alphanumeric content should be mostly preserved."""
         result = sanitize_filename(input_str)
         # Result should be lowercase version
-        assert result == input_str.lower()
+        assert_that(result).is_equal_to(input_str.lower())
 
     @given(st.text(max_size=100))
     @settings(max_examples=100)
@@ -243,7 +245,7 @@ class TestFilenameSanitizationProperties:
     def test_result_is_lowercase(self, input_str):
         """Property: result should be lowercase."""
         result = sanitize_filename(input_str)
-        assert result == result.lower()
+        assert_that(result).is_equal_to(result.lower())
 
 
 # =============================================================================
@@ -274,10 +276,10 @@ class TestProviderInitializationProperties:
             temperature=temperature,
         )
 
-        assert provider.model == model
-        assert provider.base_url == base_url
-        assert provider.timeout == timeout
-        assert provider.temperature == temperature
+        assert_that(provider.model).is_equal_to(model)
+        assert_that(provider.base_url).is_equal_to(base_url)
+        assert_that(provider.timeout).is_equal_to(timeout)
+        assert_that(provider.temperature).is_equal_to(temperature)
 
     @given(max_retries=st.integers(min_value=1, max_value=20))
     @settings(max_examples=20)
@@ -288,7 +290,7 @@ class TestProviderInitializationProperties:
             base_url="https://api.test.com",
             max_retries=max_retries,
         )
-        assert provider.max_retries == max_retries
+        assert_that(provider.max_retries).is_equal_to(max_retries)
 
     @given(json_parse_retries=st.integers(min_value=1, max_value=20))
     @settings(max_examples=20)
@@ -299,7 +301,7 @@ class TestProviderInitializationProperties:
             base_url="https://api.test.com",
             json_parse_retries=json_parse_retries,
         )
-        assert provider.json_parse_retries == json_parse_retries
+        assert_that(provider.json_parse_retries).is_equal_to(json_parse_retries)
 
 
 # =============================================================================
@@ -332,8 +334,8 @@ class TestSubjectConfigProperties:
             deck_prefix_mcq=f"{deck_prefix}_MCQ",
         )
 
-        assert config.name == name
-        assert config.deck_prefix == deck_prefix
+        assert_that(config.name).is_equal_to(name)
+        assert_that(config.deck_prefix).is_equal_to(deck_prefix)
 
     @given(st.dictionaries(
         keys=st.text(min_size=1, max_size=30, alphabet=st.characters(
@@ -361,7 +363,7 @@ class TestSubjectConfigProperties:
             deck_prefix_mcq="Test_MCQ",
         )
 
-        assert config.target_questions == questions
+        assert_that(config.target_questions).is_equal_to(questions)
 
 
 # =============================================================================
@@ -388,7 +390,7 @@ class TestRetryDecoratorProperties:
         with pytest.raises(RetryableError):
             await always_fails()
 
-        assert call_count == max_retries
+        assert_that(call_count).is_equal_to(max_retries)
 
     @given(success_at=st.integers(min_value=1, max_value=5))
     @settings(max_examples=20)
@@ -407,8 +409,8 @@ class TestRetryDecoratorProperties:
             return "success"
 
         result = await fails_then_succeeds()
-        assert result == "success"
-        assert call_count == success_at
+        assert_that(result).is_equal_to("success")
+        assert_that(call_count).is_equal_to(success_at)
 
 
 # =============================================================================
@@ -482,8 +484,8 @@ class TestTaskRunnerProperties:
         actual_successes = len([r for r in results if isinstance(r, Success)])
         actual_failures = len([r for r in results if isinstance(r, Failure)])
 
-        assert actual_successes == expected_successes
-        assert actual_failures == expected_failures
+        assert_that(actual_successes).is_equal_to(expected_successes)
+        assert_that(actual_failures).is_equal_to(expected_failures)
 
 
 # =============================================================================
@@ -510,7 +512,7 @@ class TestResultTypeProperties:
     def test_success_stores_any_value(self, value):
         """Property: Success should store any value correctly."""
         result = Success(value=value)
-        assert result.value == value
+        assert_that(result.value).is_equal_to(value)
         assert result.is_success() is True
         assert result.is_failure() is False
 
@@ -589,7 +591,7 @@ class TestUnicodeProperties:
         data = {"content": text}
         json_str = json.dumps(data, ensure_ascii=False)
         parsed = json.loads(json_str)
-        assert parsed == data
+        assert_that(parsed).is_equal_to(data)
 
     @given(st.text(alphabet=st.characters(
         whitelist_categories=("Lo",),  # Other letters (CJK, etc.)
@@ -599,7 +601,7 @@ class TestUnicodeProperties:
         """Property: CJK characters should be preserved in JSON."""
         data = {"text": text}
         json_str = json.dumps(data, ensure_ascii=False)
-        assert text in json_str
+        assert_that(json_str).contains(text)
         parsed = json.loads(json_str)
         assert parsed["text"] == text
 
@@ -611,7 +613,7 @@ class TestUnicodeProperties:
         # Force ASCII escaping
         json_str = json.dumps(data, ensure_ascii=True)
         parsed = json.loads(json_str)
-        assert parsed == data
+        assert_that(parsed).is_equal_to(data)
 
 
 # =============================================================================

@@ -13,6 +13,8 @@ Comprehensive tests covering:
 import asyncio
 import json
 import pytest
+
+from assertpy import assert_that
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch, call
 
@@ -124,8 +126,8 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert generator.llm_providers == providers
-        assert len(generator.llm_providers) == 2
+        assert_that(generator.llm_providers).is_equal_to(providers)
+        assert_that(generator.llm_providers).is_length(2)
 
     def test_init_stores_combiner(self, card_repo):
         """Test that combiner is stored correctly."""
@@ -138,8 +140,8 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert generator.card_combiner == combiner
-        assert generator.card_combiner.name == "combiner"
+        assert_that(generator.card_combiner).is_equal_to(combiner)
+        assert_that(generator.card_combiner.name).is_equal_to("combiner")
 
     def test_init_stores_formatter(self, card_repo):
         """Test that formatter is stored correctly."""
@@ -152,8 +154,8 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert generator.formatter == formatter
-        assert generator.formatter.name == "formatter"
+        assert_that(generator.formatter).is_equal_to(formatter)
+        assert_that(generator.formatter.name).is_equal_to("formatter")
 
     def test_init_stores_repository(self, card_repo):
         """Test that repository is stored correctly."""
@@ -164,7 +166,7 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert generator.repository == card_repo
+        assert_that(generator.repository).is_equal_to(card_repo)
 
     def test_init_stores_combine_prompt(self, card_repo):
         """Test that combine_prompt is stored correctly."""
@@ -176,7 +178,7 @@ class TestCardGenerator:
             combine_prompt="Custom combine prompt",
         )
 
-        assert generator.combine_prompt == "Custom combine prompt"
+        assert_that(generator.combine_prompt).is_equal_to("Custom combine prompt")
 
     def test_init_default_dry_run_is_false(self, card_repo):
         """Test that dry_run defaults to False."""
@@ -187,7 +189,7 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert generator.dry_run is False
+        assert_that(generator.dry_run).is_false()
 
     def test_init_dry_run_true(self):
         """Test CardGenerator in dry run mode."""
@@ -199,8 +201,8 @@ class TestCardGenerator:
             dry_run=True,
         )
 
-        assert generator.dry_run is True
-        assert generator.repository is None
+        assert_that(generator.dry_run).is_true()
+        assert_that(generator.repository).is_none()
 
     def test_init_with_empty_providers(self, card_repo):
         """Test initialization with empty provider list."""
@@ -211,7 +213,7 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert generator.llm_providers == []
+        assert_that(generator.llm_providers).is_equal_to([])
 
     def test_init_with_single_provider(self, card_repo):
         """Test initialization with single provider."""
@@ -224,7 +226,7 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert len(generator.llm_providers) == 1
+        assert_that(generator.llm_providers).is_length(1)
         assert generator.llm_providers[0].name == "single"
 
     def test_init_with_many_providers(self, card_repo):
@@ -241,7 +243,7 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert len(generator.llm_providers) == 10
+        assert_that(generator.llm_providers).is_length(10)
 
     def test_init_with_none_combine_prompt(self, card_repo):
         """Test initialization with None combine_prompt."""
@@ -253,7 +255,7 @@ class TestCardGenerator:
             combine_prompt=None,
         )
 
-        assert generator.combine_prompt is None
+        assert_that(generator.combine_prompt).is_none()
 
     def test_init_without_formatter(self, card_repo):
         """Test initialization without formatter."""
@@ -264,7 +266,7 @@ class TestCardGenerator:
             repository=card_repo,
         )
 
-        assert generator.formatter is None
+        assert_that(generator.formatter).is_none()
 
     def test_init_with_same_combiner_and_formatter(self, card_repo):
         """Test initialization where combiner and formatter are same provider."""
@@ -295,8 +297,8 @@ class TestCardGenerator:
             problem_index=1,
         )
 
-        assert result is not None
-        assert "cards" in result
+        assert_that(result).is_not_none()
+        assert_that(result).contains("cards")
         assert result.get("category_index") == 1
         assert result.get("category_name") == "Arrays"
         assert result.get("problem_index") == 1
@@ -308,8 +310,8 @@ class TestCardGenerator:
             question="Test Question",
         )
 
-        assert result is not None
-        assert "cards" in result
+        assert_that(result).is_not_none()
+        assert_that(result).contains("cards")
         # Default model is LeetCodeProblem
         # No category metadata when not provided
 
@@ -322,7 +324,7 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("model_class", [
@@ -340,8 +342,8 @@ class TestCardGenerator:
             model_class=model_class,
         )
 
-        assert result is not None
-        assert "cards" in result
+        assert_that(result).is_not_none()
+        assert_that(result).contains("cards")
 
     @pytest.mark.asyncio
     async def test_process_question_all_providers_fail(self, card_repo):
@@ -364,7 +366,7 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is None
+        assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_process_question_some_providers_fail(self, card_repo):
@@ -389,8 +391,8 @@ class TestCardGenerator:
         )
 
         # Should succeed because at least one provider worked
-        assert result is not None
-        assert "cards" in result
+        assert_that(result).is_not_none()
+        assert_that(result).contains("cards")
 
     @pytest.mark.asyncio
     async def test_process_question_combiner_fails(self, card_repo):
@@ -414,7 +416,7 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is None
+        assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_process_question_with_formatter(self, card_repo):
@@ -439,9 +441,9 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
         # Formatter should have been called since combiner != formatter
-        assert formatter.format_call_count == 1
+        assert_that(formatter.format_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_process_question_formatter_same_as_combiner(self, card_repo):
@@ -461,9 +463,9 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
         # Formatter should NOT be called when same as combiner
-        assert same_provider.format_call_count == 0
+        assert_that(same_provider.format_call_count).is_equal_to(0)
 
     @pytest.mark.asyncio
     async def test_process_question_with_category_metadata(self, generator_with_mocks):
@@ -476,7 +478,7 @@ class TestCardGenerator:
             problem_index=3,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
         assert result["category_index"] == 5
         assert result["category_name"] == "Hash Table"
         assert result["problem_index"] == 3
@@ -489,7 +491,7 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
         assert "category_index" not in result
         assert "category_name" not in result
         assert "problem_index" not in result
@@ -512,7 +514,7 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
 
     @pytest.mark.asyncio
     async def test_process_question_handles_unicode(self, generator_with_mocks):
@@ -523,7 +525,7 @@ class TestCardGenerator:
             category_name="算法",
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
 
     @pytest.mark.asyncio
     async def test_process_question_with_long_question(self, generator_with_mocks):
@@ -535,7 +537,7 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
 
     @pytest.mark.asyncio
     async def test_process_question_with_special_characters(self, generator_with_mocks):
@@ -545,7 +547,7 @@ class TestCardGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
 
 
 class TestPostProcessCards:
@@ -902,8 +904,8 @@ class TestSaveProviderResults:
 
         valid = generator._save_provider_results(problem_id, provider_results)
 
-        assert len(valid) == 1
-        assert valid[0] == SAMPLE_CARD_RESPONSE
+        assert_that(valid).is_length(1)
+        assert_that(valid[0]).is_equal_to(SAMPLE_CARD_RESPONSE)
 
     def test_filters_none_results(self, generator_with_repo):
         """Test that None results are filtered out."""
@@ -920,8 +922,8 @@ class TestSaveProviderResults:
 
         valid = generator._save_provider_results(problem_id, provider_results)
 
-        assert len(valid) == 1
-        assert valid[0] == SAMPLE_CARD_RESPONSE
+        assert_that(valid).is_length(1)
+        assert_that(valid[0]).is_equal_to(SAMPLE_CARD_RESPONSE)
 
     def test_filters_all_empty_results(self, generator_with_repo):
         """Test when all results are empty."""
@@ -935,7 +937,7 @@ class TestSaveProviderResults:
 
         valid = generator._save_provider_results(problem_id, provider_results)
 
-        assert len(valid) == 0
+        assert_that(valid).is_length(0)
 
     # -------------------------------------------------------------------------
     # Saving Tests
@@ -956,7 +958,7 @@ class TestSaveProviderResults:
 
         valid = generator._save_provider_results(problem_id, provider_results)
 
-        assert len(valid) == 2
+        assert_that(valid).is_length(2)
 
     def test_handles_invalid_json_gracefully(self, generator_with_repo):
         """Test handling of invalid JSON in results."""
@@ -974,7 +976,7 @@ class TestSaveProviderResults:
         valid = generator._save_provider_results(problem_id, provider_results)
 
         # Both should be saved (invalid JSON is still saved, just without card_count)
-        assert len(valid) == 2
+        assert_that(valid).is_length(2)
 
     def test_counts_cards_in_valid_json(self, generator_with_repo):
         """Test that cards are counted for valid JSON."""
@@ -995,7 +997,7 @@ class TestSaveProviderResults:
 
         valid = generator._save_provider_results(problem_id, provider_results)
 
-        assert len(valid) == 2
+        assert_that(valid).is_length(2)
 
     def test_handles_missing_cards_key(self, generator_with_repo):
         """Test handling JSON without cards key."""
@@ -1012,7 +1014,7 @@ class TestSaveProviderResults:
         valid = generator._save_provider_results(problem_id, provider_results)
 
         # Still saved, just card_count = None or 0
-        assert len(valid) == 2
+        assert_that(valid).is_length(2)
 
     def test_returns_valid_results_in_order(self, generator_with_repo):
         """Test that valid results maintain order."""
@@ -1032,9 +1034,9 @@ class TestSaveProviderResults:
 
         valid = generator._save_provider_results(problem_id, provider_results)
 
-        assert len(valid) == 2
-        assert valid[0] == response_a
-        assert valid[1] == response_b
+        assert_that(valid).is_length(2)
+        assert_that(valid[0]).is_equal_to(response_a)
+        assert_that(valid[1]).is_equal_to(response_b)
 
     def test_handles_empty_provider_list(self, in_memory_db):
         """Test with empty provider list."""
@@ -1057,7 +1059,7 @@ class TestSaveProviderResults:
 
         valid = generator._save_provider_results(problem_id, [])
 
-        assert valid == []
+        assert_that(valid).is_equal_to([])
 
 
 class TestIsSameProvider:
@@ -1193,10 +1195,10 @@ class TestGenerateInitialCards:
             prompt_template="Prompt",
         )
 
-        assert len(results) == 3
+        assert_that(results).is_length(3)
         # All providers should have been called
         for provider in providers:
-            assert provider.initial_call_count == 1
+            assert_that(provider.initial_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_single_provider(self):
@@ -1216,8 +1218,8 @@ class TestGenerateInitialCards:
             prompt_template="Prompt",
         )
 
-        assert len(results) == 1
-        assert provider.initial_call_count == 1
+        assert_that(results).is_length(1)
+        assert_that(provider.initial_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_no_providers(self):
@@ -1235,7 +1237,7 @@ class TestGenerateInitialCards:
             prompt_template="Prompt",
         )
 
-        assert results == []
+        assert_that(results).is_equal_to([])
 
     @pytest.mark.asyncio
     async def test_many_providers(self):
@@ -1258,7 +1260,7 @@ class TestGenerateInitialCards:
             prompt_template="Prompt",
         )
 
-        assert len(results) == 10
+        assert_that(results).is_length(10)
 
     # -------------------------------------------------------------------------
     # Parameter Passing Tests
@@ -1283,7 +1285,7 @@ class TestGenerateInitialCards:
         )
 
         # Check via call count (MockLLMProvider doesn't track args)
-        assert provider.initial_call_count == 1
+        assert_that(provider.initial_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_passes_json_schema(self):
@@ -1305,7 +1307,7 @@ class TestGenerateInitialCards:
             prompt_template="Prompt",
         )
 
-        assert provider.initial_call_count == 1
+        assert_that(provider.initial_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_passes_prompt_template(self):
@@ -1325,7 +1327,7 @@ class TestGenerateInitialCards:
             prompt_template="Custom prompt template",
         )
 
-        assert provider.initial_call_count == 1
+        assert_that(provider.initial_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_none_prompt_template(self):
@@ -1345,7 +1347,7 @@ class TestGenerateInitialCards:
             prompt_template=None,
         )
 
-        assert len(results) == 1
+        assert_that(results).is_length(1)
 
     # -------------------------------------------------------------------------
     # Error Handling Tests
@@ -1375,7 +1377,7 @@ class TestGenerateInitialCards:
 
         # asyncio.gather collects all results including exceptions
         # depending on implementation, failed results might be None or raise
-        assert len(results) == 3
+        assert_that(results).is_length(3)
 
     @pytest.mark.asyncio
     async def test_handles_all_providers_failing(self):
@@ -1426,8 +1428,8 @@ class TestCombineResults:
             json_schema={},
         )
 
-        assert result is not None
-        assert combiner.combine_call_count == 1
+        assert_that(result).is_not_none()
+        assert_that(combiner.combine_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_combine_single_result(self):
@@ -1447,8 +1449,8 @@ class TestCombineResults:
             json_schema={},
         )
 
-        assert result is not None
-        assert combiner.combine_call_count == 1
+        assert_that(result).is_not_none()
+        assert_that(combiner.combine_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_combine_many_results(self):
@@ -1470,7 +1472,7 @@ class TestCombineResults:
             json_schema={},
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
 
     # -------------------------------------------------------------------------
     # Formatter Tests
@@ -1499,8 +1501,8 @@ class TestCombineResults:
             json_schema={},
         )
 
-        assert result is not None
-        assert formatter.format_call_count == 1
+        assert_that(result).is_not_none()
+        assert_that(formatter.format_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_combine_skips_formatter_when_same_as_combiner(self):
@@ -1520,9 +1522,9 @@ class TestCombineResults:
             json_schema={},
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
         # Format should not be called when combiner == formatter
-        assert same_provider.format_call_count == 0
+        assert_that(same_provider.format_call_count).is_equal_to(0)
 
     @pytest.mark.asyncio
     async def test_combine_different_formatter(self):
@@ -1547,9 +1549,9 @@ class TestCombineResults:
             json_schema={},
         )
 
-        assert result is not None
-        assert combiner.combine_call_count == 1
-        assert formatter.format_call_count == 1
+        assert_that(result).is_not_none()
+        assert_that(combiner.combine_call_count).is_equal_to(1)
+        assert_that(formatter.format_call_count).is_equal_to(1)
 
     # -------------------------------------------------------------------------
     # Failure Cases
@@ -1573,7 +1575,7 @@ class TestCombineResults:
             json_schema={},
         )
 
-        assert result is None
+        assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_combine_returns_none_on_empty_response(self):
@@ -1598,7 +1600,7 @@ class TestCombineResults:
         )
 
         # Empty response from combiner should return None
-        assert result is None
+        assert_that(result).is_none()
 
     # -------------------------------------------------------------------------
     # Input Formatting Tests
@@ -1623,7 +1625,7 @@ class TestCombineResults:
         )
 
         # Combiner should have been called once
-        assert combiner.combine_call_count == 1
+        assert_that(combiner.combine_call_count).is_equal_to(1)
 
 
 # ============================================================================
@@ -1673,8 +1675,8 @@ class TestCardGeneratorWorkflow:
             problem_index=1,
         )
 
-        assert result is not None
-        assert "cards" in result
+        assert_that(result).is_not_none()
+        assert_that(result).contains("cards")
         assert result["category_index"] == 1
         assert result["category_name"] == "Algorithms"
 
@@ -1701,7 +1703,7 @@ class TestCardGeneratorWorkflow:
             model_class=LeetCodeProblem,
         )
 
-        assert result is None
+        assert_that(result).is_none()
 
     @pytest.mark.asyncio
     async def test_workflow_tracks_call_counts(self, full_generator):
@@ -1715,10 +1717,10 @@ class TestCardGeneratorWorkflow:
 
         # Both providers should have been called for initial generation
         for provider in generator.llm_providers:
-            assert provider.initial_call_count == 1
+            assert_that(provider.initial_call_count).is_equal_to(1)
 
         # Combiner should have been called once
-        assert generator.card_combiner.combine_call_count == 1
+        assert_that(generator.card_combiner.combine_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_workflow_processes_multiple_questions(self, full_generator):
@@ -1735,11 +1737,11 @@ class TestCardGeneratorWorkflow:
                 category_name="Test",
                 problem_index=i,
             )
-            assert result is not None
+            assert_that(result).is_not_none()
 
         # Each provider should be called once per question
         for provider in generator.llm_providers:
-            assert provider.initial_call_count == 3
+            assert_that(provider.initial_call_count).is_equal_to(3)
 
 
 # ============================================================================
@@ -1797,7 +1799,7 @@ class TestParametrizedGenerator:
             model_class=LeetCodeProblem,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()
 
     @pytest.mark.parametrize("model_class,expected_type", [
         (LeetCodeProblem, "LeetCodeProblem"),
@@ -1830,4 +1832,4 @@ class TestParametrizedGenerator:
             model_class=model_class,
         )
 
-        assert result is not None
+        assert_that(result).is_not_none()

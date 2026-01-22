@@ -2,6 +2,8 @@
 
 import json
 import pytest
+
+from assertpy import assert_that
 from pathlib import Path
 from datetime import datetime
 
@@ -29,29 +31,29 @@ class TestDatabaseManager:
     def test_init_without_path(self):
         """Test DatabaseManager initialization without path."""
         manager = DatabaseManager()
-        assert manager.is_initialized is False
-        assert manager.db_path is None
+        assert_that(manager.is_initialized).is_false()
+        assert_that(manager.db_path).is_none()
 
     def test_init_with_path(self, tmp_path):
         """Test DatabaseManager initialization with path."""
         db_path = tmp_path / "test.db"
         manager = DatabaseManager(db_path)
-        assert manager.is_initialized is True
-        assert manager.db_path == db_path
+        assert_that(manager.is_initialized).is_true()
+        assert_that(manager.db_path).is_equal_to(db_path)
 
     def test_initialize(self, tmp_path):
         """Test explicit initialization."""
         manager = DatabaseManager()
         db_path = tmp_path / "test.db"
         manager.initialize(db_path)
-        assert manager.is_initialized is True
-        assert manager.db_path == db_path
+        assert_that(manager.is_initialized).is_true()
+        assert_that(manager.db_path).is_equal_to(db_path)
 
     def test_initialize_in_memory(self):
         """Test initialization with in-memory database."""
         manager = DatabaseManager()
         manager.initialize(Path(":memory:"))
-        assert manager.is_initialized is True
+        assert_that(manager.is_initialized).is_true()
 
     def test_get_session_before_init_raises(self):
         """Test that get_session raises before initialization."""
@@ -62,7 +64,7 @@ class TestDatabaseManager:
     def test_get_session_after_init(self, in_memory_db):
         """Test getting a session after initialization."""
         session = in_memory_db.get_session()
-        assert session is not None
+        assert_that(session).is_not_none()
         session.close()
 
     def test_session_scope_commits(self, in_memory_db):
@@ -80,8 +82,8 @@ class TestDatabaseManager:
         # Verify the run was committed
         with in_memory_db.session_scope() as session:
             result = session.query(Run).filter(Run.id == "test-run").first()
-            assert result is not None
-            assert result.mode == "leetcode"
+            assert_that(result).is_not_none()
+            assert_that(result.mode).is_equal_to("leetcode")
 
     def test_session_scope_rollback_on_error(self, in_memory_db):
         """Test that session_scope rolls back on error."""
@@ -102,7 +104,7 @@ class TestDatabaseManager:
         # Verify the run was NOT committed
         with in_memory_db.session_scope() as session:
             result = session.query(Run).filter(Run.id == "test-run-2").first()
-            assert result is None
+            assert_that(result).is_none()
 
 
 class TestSingletonPattern:
@@ -112,7 +114,7 @@ class TestSingletonPattern:
         """Test that get_default creates a new instance."""
         DatabaseManager.reset_default()
         manager = DatabaseManager.get_default()
-        assert manager is not None
+        assert_that(manager).is_not_none()
         DatabaseManager.reset_default()
 
     def test_get_default_returns_same_instance(self):
@@ -155,12 +157,12 @@ class TestRunCRUD:
                 card_type="standard",
                 user_label="test label"
             )
-            assert run.id == "test-run-id"
-            assert run.mode == "leetcode"
-            assert run.subject == "leetcode"
-            assert run.card_type == "standard"
-            assert run.user_label == "test label"
-            assert run.status == "running"
+            assert_that(run.id).is_equal_to("test-run-id")
+            assert_that(run.mode).is_equal_to("leetcode")
+            assert_that(run.subject).is_equal_to("leetcode")
+            assert_that(run.card_type).is_equal_to("standard")
+            assert_that(run.user_label).is_equal_to("test label")
+            assert_that(run.status).is_equal_to("running")
 
     def test_create_run_with_metadata(self, in_memory_db):
         """Test creating a run with metadata."""
@@ -174,9 +176,9 @@ class TestRunCRUD:
                 card_type="mcq",
                 run_metadata=metadata
             )
-            assert run.run_metadata is not None
+            assert_that(run.run_metadata).is_not_none()
             parsed = json.loads(run.run_metadata)
-            assert parsed == metadata
+            assert_that(parsed).is_equal_to(metadata)
 
     def test_update_run(self, in_memory_db):
         """Test updating a run."""
@@ -198,11 +200,11 @@ class TestRunCRUD:
                 successful_problems=8,
                 failed_problems=2
             )
-            assert updated.status == "completed"
-            assert updated.total_problems == 10
-            assert updated.successful_problems == 8
-            assert updated.failed_problems == 2
-            assert updated.completed_at is not None
+            assert_that(updated.status).is_equal_to("completed")
+            assert_that(updated.total_problems).is_equal_to(10)
+            assert_that(updated.successful_problems).is_equal_to(8)
+            assert_that(updated.failed_problems).is_equal_to(2)
+            assert_that(updated.completed_at).is_not_none()
 
     def test_update_run_not_found(self, in_memory_db):
         """Test updating a non-existent run raises error."""
@@ -223,14 +225,14 @@ class TestRunCRUD:
 
         with in_memory_db.session_scope() as session:
             run = get_run(session, "get-test")
-            assert run is not None
-            assert run.id == "get-test"
+            assert_that(run).is_not_none()
+            assert_that(run.id).is_equal_to("get-test")
 
     def test_get_run_not_found(self, in_memory_db):
         """Test getting a non-existent run returns None."""
         with in_memory_db.session_scope() as session:
             run = get_run(session, "nonexistent")
-            assert run is None
+            assert_that(run).is_none()
 
 
 class TestProblemCRUD:
@@ -256,13 +258,13 @@ class TestProblemCRUD:
                 category_index=1,
                 problem_index=1
             )
-            assert problem.id is not None
-            assert problem.question_name == "Two Sum"
-            assert problem.sanitized_name == "two_sum"
-            assert problem.category_name == "Arrays"
-            assert problem.category_index == 1
-            assert problem.problem_index == 1
-            assert problem.status == "running"
+            assert_that(problem.id).is_not_none()
+            assert_that(problem.question_name).is_equal_to("Two Sum")
+            assert_that(problem.sanitized_name).is_equal_to("two_sum")
+            assert_that(problem.category_name).is_equal_to("Arrays")
+            assert_that(problem.category_index).is_equal_to(1)
+            assert_that(problem.problem_index).is_equal_to(1)
+            assert_that(problem.status).is_equal_to("running")
 
     def test_update_problem(self, in_memory_db):
         """Test updating a problem."""
@@ -291,9 +293,9 @@ class TestProblemCRUD:
                 final_card_count=5,
                 processing_time_seconds=2.5
             )
-            assert updated.status == "success"
-            assert updated.final_card_count == 5
-            assert updated.processing_time_seconds == 2.5
+            assert_that(updated.status).is_equal_to("success")
+            assert_that(updated.final_card_count).is_equal_to(5)
+            assert_that(updated.processing_time_seconds).is_equal_to(2.5)
 
     def test_update_problem_not_found(self, in_memory_db):
         """Test updating a non-existent problem raises error."""
@@ -322,8 +324,8 @@ class TestProblemCRUD:
 
         with in_memory_db.session_scope() as session:
             result = get_problem(session, problem_id)
-            assert result is not None
-            assert result.question_name == "Test Problem"
+            assert_that(result).is_not_none()
+            assert_that(result.question_name).is_equal_to("Test Problem")
 
 
 class TestProviderResultCRUD:
@@ -359,11 +361,11 @@ class TestProviderResultCRUD:
                 raw_output='{"cards": []}',
                 card_count=0
             )
-            assert result.id is not None
-            assert result.provider_name == "test_provider"
-            assert result.provider_model == "test-model"
-            assert result.success is True
-            assert result.raw_output == '{"cards": []}'
+            assert_that(result.id).is_not_none()
+            assert_that(result.provider_name).is_equal_to("test_provider")
+            assert_that(result.provider_model).is_equal_to("test-model")
+            assert_that(result.success).is_true()
+            assert_that(result.raw_output).is_equal_to('{"cards": []}')
 
     def test_create_provider_result_failure(self, in_memory_db):
         """Test creating a failed provider result."""
@@ -394,8 +396,8 @@ class TestProviderResultCRUD:
                 success=False,
                 error_message="API timeout"
             )
-            assert result.success is False
-            assert result.error_message == "API timeout"
+            assert_that(result.success).is_false()
+            assert_that(result.error_message).is_equal_to("API timeout")
 
 
 class TestCardCRUD:
@@ -432,7 +434,7 @@ class TestCardCRUD:
                 run_id="card-test-run",
                 cards_data=cards_data
             )
-            assert len(cards) == 2
+            assert_that(cards).is_length(2)
             assert cards[0].front == "Q1"
             assert cards[0].back == "A1"
             assert cards[0].card_type == "Concept"
@@ -465,7 +467,7 @@ class TestCardCRUD:
                 run_id="empty-cards-run",
                 cards_data=[]
             )
-            assert cards == []
+            assert_that(cards).is_equal_to([])
 
 
 class TestDatabaseModels:
@@ -488,7 +490,7 @@ class TestDatabaseModels:
 
         with in_memory_db.session_scope() as session:
             run = get_run(session, "rel-test-run")
-            assert len(run.problems) == 2
+            assert_that(run.problems).is_length(2)
 
     def test_problem_cards_relationship(self, in_memory_db):
         """Test Problem to Cards relationship."""
@@ -515,7 +517,7 @@ class TestDatabaseModels:
 
         with in_memory_db.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert len(problem.cards) == 1
+            assert_that(problem.cards).is_length(1)
 
 
 class TestReferentialIntegrity:
@@ -544,7 +546,7 @@ class TestReferentialIntegrity:
             )
             session.add(problem)
             session.commit()
-            assert problem.id is not None
+            assert_that(problem.id).is_not_none()
 
     def test_card_requires_valid_problem(self, in_memory_db):
         """Test Card references valid Problem."""
@@ -568,7 +570,7 @@ class TestReferentialIntegrity:
                 "fk-test-run",
                 [{"front": "Q", "back": "A", "card_type": "Basic", "tags": []}]
             )
-            assert len(cards) == 1
+            assert_that(cards).is_length(1)
             assert cards[0].problem_id == problem_id
 
     def test_provider_result_requires_valid_run(self, in_memory_db):
@@ -596,8 +598,8 @@ class TestReferentialIntegrity:
                 success=True,
                 raw_output="{}"
             )
-            assert pr.run_id == "pr-fk-run"
-            assert pr.problem_id == problem_id
+            assert_that(pr.run_id).is_equal_to("pr-fk-run")
+            assert_that(pr.problem_id).is_equal_to(problem_id)
 
 
 class TestConcurrentAccess:
@@ -622,8 +624,8 @@ class TestConcurrentAccess:
         run1 = get_run(session1, "concurrent-read-run")
         run2 = get_run(session2, "concurrent-read-run")
 
-        assert run1.id == run2.id
-        assert run1.mode == run2.mode
+        assert_that(run1.id).is_equal_to(run2.id)
+        assert_that(run1.mode).is_equal_to(run2.mode)
 
         session1.close()
         session2.close()
@@ -666,13 +668,13 @@ class TestQueryOperations:
         """Test get_run returns None for non-existent run."""
         with in_memory_db.session_scope() as session:
             run = get_run(session, "missing-run-id")
-            assert run is None
+            assert_that(run).is_none()
 
     def test_get_problem_returns_none_for_missing(self, in_memory_db):
         """Test get_problem returns None for non-existent problem."""
         with in_memory_db.session_scope() as session:
             problem = get_problem(session, 99999)
-            assert problem is None
+            assert_that(problem).is_none()
 
     def test_query_runs_by_status(self, in_memory_db):
         """Test querying runs by status."""
@@ -711,7 +713,7 @@ class TestQueryOperations:
             problems = session.query(Problem).filter(
                 Problem.run_id == "problems-query-run"
             ).all()
-            assert len(problems) == 5
+            assert_that(problems).is_length(5)
 
     def test_query_cards_by_problem(self, in_memory_db):
         """Test querying cards for a specific problem."""
@@ -736,7 +738,7 @@ class TestQueryOperations:
 
         with in_memory_db.session_scope() as session:
             cards = session.query(Card).filter(Card.problem_id == problem_id).all()
-            assert len(cards) == 3
+            assert_that(cards).is_length(3)
 
 
 class TestUpdateOperations:
@@ -761,9 +763,9 @@ class TestUpdateOperations:
                 total_problems=10,
                 successful_problems=10,
             )
-            assert run.status == "completed"
-            assert run.total_problems == 10
-            assert run.successful_problems == 10
+            assert_that(run.status).is_equal_to("completed")
+            assert_that(run.total_problems).is_equal_to(10)
+            assert_that(run.successful_problems).is_equal_to(10)
 
     def test_update_run_with_failure(self, in_memory_db):
         """Test updating run with failed status."""
@@ -783,8 +785,8 @@ class TestUpdateOperations:
                 status="failed",
                 failed_problems=5
             )
-            assert run.status == "failed"
-            assert run.failed_problems == 5
+            assert_that(run.status).is_equal_to("failed")
+            assert_that(run.failed_problems).is_equal_to(5)
 
     def test_update_problem_status(self, in_memory_db):
         """Test updating problem status."""
@@ -803,7 +805,7 @@ class TestUpdateOperations:
 
         with in_memory_db.session_scope() as session:
             problem = update_problem(session, problem_id, status="completed")
-            assert problem.status == "completed"
+            assert_that(problem.status).is_equal_to("completed")
 
 
 class TestEdgeCasesDatabase:
@@ -819,7 +821,7 @@ class TestEdgeCasesDatabase:
                 subject="",
                 card_type=""
             )
-            assert run.mode == ""
+            assert_that(run.mode).is_equal_to("")
 
     def test_very_long_string_fields(self, in_memory_db):
         """Test handling of very long string fields."""
@@ -899,7 +901,7 @@ class TestEdgeCasesDatabase:
                 success=True,
                 raw_output=json.dumps(complex_data)
             )
-            assert pr.raw_output is not None
+            assert_that(pr.raw_output).is_not_none()
 
     def test_null_optional_fields(self, in_memory_db):
         """Test handling of null optional fields."""
@@ -911,8 +913,8 @@ class TestEdgeCasesDatabase:
                 subject="leetcode",
                 card_type="standard"
             )
-            assert run.completed_at is None
-            assert run.user_label is None
+            assert_that(run.completed_at).is_none()
+            assert_that(run.user_label).is_none()
 
     def test_special_characters_in_id(self, in_memory_db):
         """Test handling of special characters in IDs."""
@@ -925,9 +927,9 @@ class TestEdgeCasesDatabase:
                 subject="leetcode",
                 card_type="standard"
             )
-            assert run.id == special_id
+            assert_that(run.id).is_equal_to(special_id)
 
         with in_memory_db.session_scope() as session:
             retrieved = get_run(session, special_id)
-            assert retrieved is not None
-            assert retrieved.id == special_id
+            assert_that(retrieved).is_not_none()
+            assert_that(retrieved.id).is_equal_to(special_id)

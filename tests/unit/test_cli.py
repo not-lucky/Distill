@@ -5,6 +5,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 import warnings
 
+from assertpy import assert_that
+
 from src.cli import (
     normalize_legacy_args,
     create_parser,
@@ -20,62 +22,98 @@ class TestNormalizeLegacyArgs:
     """Tests for normalize_legacy_args function."""
 
     def test_empty_args(self):
-        """Test empty argument list."""
+        """
+        Given empty argument list
+        When normalize_legacy_args is called
+        Then empty list is returned
+        """
         result = normalize_legacy_args([])
-        assert result == []
+        assert_that(result).is_equal_to([])
 
     def test_new_style_generate(self):
-        """Test new-style generate command passes through."""
+        """
+        Given new-style generate command
+        When normalize_legacy_args is called
+        Then args pass through unchanged
+        """
         args = ["generate", "leetcode", "standard"]
         result = normalize_legacy_args(args)
-        assert result == args
+        assert_that(result).is_equal_to(args)
 
     def test_new_style_convert(self):
-        """Test new-style convert command passes through."""
+        """
+        Given new-style convert command
+        When normalize_legacy_args is called
+        Then args pass through unchanged
+        """
         args = ["convert", "file.json"]
         result = normalize_legacy_args(args)
-        assert result == args
+        assert_that(result).is_equal_to(args)
 
     def test_new_style_merge(self):
-        """Test new-style merge command passes through."""
+        """
+        Given new-style merge command
+        When normalize_legacy_args is called
+        Then args pass through unchanged
+        """
         args = ["merge", "cs"]
         result = normalize_legacy_args(args)
-        assert result == args
+        assert_that(result).is_equal_to(args)
 
     def test_new_style_export_md(self):
-        """Test new-style export-md command passes through."""
+        """
+        Given new-style export-md command
+        When normalize_legacy_args is called
+        Then args pass through unchanged
+        """
         args = ["export-md", "--source", "./dir"]
         result = normalize_legacy_args(args)
-        assert result == args
+        assert_that(result).is_equal_to(args)
 
     def test_help_flag(self):
-        """Test help flag passes through."""
+        """
+        Given help flag
+        When normalize_legacy_args is called
+        Then flag passes through unchanged
+        """
         for flag in ["-h", "--help"]:
             result = normalize_legacy_args([flag])
-            assert result == [flag]
+            assert_that(result).is_equal_to([flag])
 
     def test_legacy_subject_only(self):
-        """Test legacy style with subject only."""
+        """
+        Given legacy style with subject only
+        When normalize_legacy_args is called
+        Then generate command is prepended and deprecation warning is issued
+        """
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             result = normalize_legacy_args(["leetcode"])
-            assert result == ["generate", "leetcode"]
-            assert len(w) == 1
-            assert "deprecated" in str(w[0].message).lower()
+            assert_that(result).is_equal_to(["generate", "leetcode"])
+            assert_that(w).is_length(1)
+            assert_that(str(w[0].message).lower()).contains("deprecated")
 
     def test_legacy_subject_with_mcq(self):
-        """Test legacy style with subject and mcq."""
+        """
+        Given legacy style with subject and mcq
+        When normalize_legacy_args is called
+        Then generate command is prepended
+        """
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             result = normalize_legacy_args(["cs", "mcq"])
-            assert result == ["generate", "cs", "mcq"]
+            assert_that(result).is_equal_to(["generate", "cs", "mcq"])
 
     def test_legacy_with_label_equals(self):
-        """Test legacy style with --label=value format."""
+        """
+        Given legacy style with --label=value format
+        When normalize_legacy_args is called
+        Then label is split and generate is prepended
+        """
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             result = normalize_legacy_args(["physics", "--label=test"])
-            assert result == ["generate", "physics", "--label", "test"]
+            assert_that(result).is_equal_to(["generate", "physics", "--label", "test"])
 
 
 class TestCreateParser:
@@ -91,68 +129,112 @@ class TestCreateParser:
             return create_parser()
 
     def test_generate_command_default_subject(self, parser):
-        """Test generate command with default subject."""
+        """
+        Given generate command with no arguments
+        When parsed
+        Then default subject is leetcode and card_type is standard
+        """
         args = parser.parse_args(["generate"])
-        assert args.command == "generate"
-        assert args.subject == "leetcode"
-        assert args.card_type == "standard"
+        assert_that(args.command).is_equal_to("generate")
+        assert_that(args.subject).is_equal_to("leetcode")
+        assert_that(args.card_type).is_equal_to("standard")
 
     def test_generate_command_with_subject(self, parser):
-        """Test generate command with explicit subject."""
+        """
+        Given generate command with explicit subject
+        When parsed
+        Then subject is set correctly
+        """
         args = parser.parse_args(["generate", "cs"])
-        assert args.subject == "cs"
-        assert args.card_type == "standard"
+        assert_that(args.subject).is_equal_to("cs")
+        assert_that(args.card_type).is_equal_to("standard")
 
     def test_generate_command_mcq(self, parser):
-        """Test generate command with MCQ card type."""
+        """
+        Given generate command with MCQ card type
+        When parsed
+        Then card_type is mcq
+        """
         args = parser.parse_args(["generate", "physics", "mcq"])
-        assert args.subject == "physics"
-        assert args.card_type == "mcq"
+        assert_that(args.subject).is_equal_to("physics")
+        assert_that(args.card_type).is_equal_to("mcq")
 
     def test_generate_command_with_label(self, parser):
-        """Test generate command with label."""
+        """
+        Given generate command with label
+        When parsed
+        Then label is set correctly
+        """
         args = parser.parse_args(["generate", "leetcode", "--label", "test run"])
-        assert args.label == "test run"
+        assert_that(args.label).is_equal_to("test run")
 
     def test_generate_command_dry_run(self, parser):
-        """Test generate command with dry-run flag."""
+        """
+        Given generate command with dry-run flag
+        When parsed
+        Then dry_run is True
+        """
         args = parser.parse_args(["generate", "--dry-run"])
-        assert args.dry_run is True
+        assert_that(args.dry_run).is_true()
 
     def test_convert_command(self, parser):
-        """Test convert command."""
+        """
+        Given convert command with json file
+        When parsed
+        Then command and json_file are set correctly
+        """
         args = parser.parse_args(["convert", "deck.json"])
-        assert args.command == "convert"
-        assert args.json_file == "deck.json"
+        assert_that(args.command).is_equal_to("convert")
+        assert_that(args.json_file).is_equal_to("deck.json")
 
     def test_convert_command_with_mode(self, parser):
-        """Test convert command with explicit mode."""
+        """
+        Given convert command with explicit mode
+        When parsed
+        Then mode is set correctly
+        """
         args = parser.parse_args(["convert", "deck.json", "--mode", "cs_mcq"])
-        assert args.mode == "cs_mcq"
+        assert_that(args.mode).is_equal_to("cs_mcq")
 
     def test_convert_command_with_output(self, parser):
-        """Test convert command with output path."""
+        """
+        Given convert command with output path
+        When parsed
+        Then output is set correctly
+        """
         args = parser.parse_args(["convert", "deck.json", "-o", "output.apkg"])
-        assert args.output == "output.apkg"
+        assert_that(args.output).is_equal_to("output.apkg")
 
     def test_merge_command(self, parser):
-        """Test merge command."""
+        """
+        Given merge command with subject
+        When parsed
+        Then command and subject are set correctly
+        """
         args = parser.parse_args(["merge", "cs"])
-        assert args.command == "merge"
-        assert args.subject == "cs"
+        assert_that(args.command).is_equal_to("merge")
+        assert_that(args.subject).is_equal_to("cs")
 
     def test_export_md_command(self, parser):
-        """Test export-md command."""
+        """
+        Given export-md command
+        When parsed
+        Then command is set and paths are None by default
+        """
         args = parser.parse_args(["export-md"])
-        assert args.command == "export-md"
-        assert args.source is None
-        assert args.target is None
+        assert_that(args.command).is_equal_to("export-md")
+        assert_that(args.source).is_none()
+        assert_that(args.target).is_none()
 
     def test_export_md_command_with_paths(self, parser):
-        """Test export-md command with paths."""
+        """
+        Given export-md command with paths
+        When parsed
+        Then paths are set correctly
+        """
         args = parser.parse_args(["export-md", "--source", "./in", "--target", "./out"])
-        assert args.source == "./in"
-        assert args.target == "./out"
+        assert_that(args.source).is_equal_to("./in")
+        assert_that(args.target).is_equal_to("./out")
 
 
 class TestHandleGenerate:
@@ -160,7 +242,11 @@ class TestHandleGenerate:
 
     @pytest.mark.asyncio
     async def test_handle_generate_success(self):
-        """Test successful generate handling."""
+        """
+        Given valid generate arguments
+        When handle_generate is called
+        Then it returns 0 for success
+        """
         args = MagicMock()
         args.subject = "leetcode"
         args.card_type = "standard"
@@ -182,11 +268,15 @@ class TestHandleGenerate:
 
                 result = await handle_generate(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
 
     @pytest.mark.asyncio
     async def test_handle_generate_invalid_subject(self):
-        """Test handling of invalid subject."""
+        """
+        Given invalid subject
+        When handle_generate is called
+        Then it returns 1 for failure
+        """
         args = MagicMock()
         args.subject = "invalid"
         args.card_type = "standard"
@@ -199,11 +289,15 @@ class TestHandleGenerate:
 
             result = await handle_generate(args)
 
-            assert result == 1
+            assert_that(result).is_equal_to(1)
 
     @pytest.mark.asyncio
     async def test_handle_generate_init_fails(self):
-        """Test handling when orchestrator init fails."""
+        """
+        Given orchestrator initialization failure
+        When handle_generate is called
+        Then it returns 1 for failure
+        """
         args = MagicMock()
         args.subject = "leetcode"
         args.card_type = "standard"
@@ -223,14 +317,18 @@ class TestHandleGenerate:
 
                 result = await handle_generate(args)
 
-                assert result == 1
+                assert_that(result).is_equal_to(1)
 
 
 class TestHandleConvert:
     """Tests for handle_convert function."""
 
     def test_handle_convert_file_not_found(self, tmp_path):
-        """Test handling of non-existent file."""
+        """
+        Given non-existent file
+        When handle_convert is called
+        Then it returns 1 for failure
+        """
         args = MagicMock()
         args.json_file = str(tmp_path / "nonexistent.json")
         args.mode = None
@@ -239,10 +337,14 @@ class TestHandleConvert:
 
         result = handle_convert(args)
 
-        assert result == 1
+        assert_that(result).is_equal_to(1)
 
     def test_handle_convert_success(self, tmp_path):
-        """Test successful conversion."""
+        """
+        Given valid JSON file
+        When handle_convert is called
+        Then it returns 0 for success
+        """
         # Create input file
         input_file = tmp_path / "leetcode_deck.json"
         input_file.write_text('[{"title": "Test", "cards": []}]')
@@ -263,10 +365,14 @@ class TestHandleConvert:
 
                 result = handle_convert(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
 
     def test_handle_convert_dry_run(self, tmp_path):
-        """Test conversion in dry run mode."""
+        """
+        Given dry run mode
+        When handle_convert is called
+        Then it returns 0 for success without creating output
+        """
         input_file = tmp_path / "test.json"
         input_file.write_text('[{"title": "Test", "cards": [{"front": "Q", "back": "A"}]}]')
 
@@ -278,14 +384,18 @@ class TestHandleConvert:
 
         result = handle_convert(args)
 
-        assert result == 0
+        assert_that(result).is_equal_to(0)
 
 
 class TestHandleMerge:
     """Tests for handle_merge function."""
 
     def test_handle_merge_success(self):
-        """Test successful merge handling."""
+        """
+        Given valid merge arguments
+        When handle_merge is called
+        Then it returns 0 for success
+        """
         args = MagicMock()
         args.subject = "cs"
         args.dry_run = False
@@ -309,10 +419,14 @@ class TestHandleMerge:
 
                 result = handle_merge(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
 
     def test_handle_merge_failure(self):
-        """Test merge handling when merge fails."""
+        """
+        Given merge failure
+        When handle_merge is called
+        Then it returns 1 for failure
+        """
         args = MagicMock()
         args.subject = "cs"
         args.dry_run = False
@@ -333,14 +447,18 @@ class TestHandleMerge:
 
                 result = handle_merge(args)
 
-                assert result == 1
+                assert_that(result).is_equal_to(1)
 
 
 class TestHandleExportMd:
     """Tests for handle_export_md function."""
 
     def test_handle_export_md_success(self):
-        """Test successful export handling."""
+        """
+        Given valid export arguments
+        When handle_export_md is called
+        Then it returns 0 for success
+        """
         args = MagicMock()
         args.source = None
         args.target = None
@@ -361,10 +479,14 @@ class TestHandleExportMd:
 
                 result = handle_export_md(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
 
     def test_handle_export_md_failure(self):
-        """Test export handling when export fails."""
+        """
+        Given export failure
+        When handle_export_md is called
+        Then it returns 1 for failure
+        """
         args = MagicMock()
         args.source = "/nonexistent"
         args.target = None
@@ -386,14 +508,18 @@ class TestHandleExportMd:
 
                 result = handle_export_md(args)
 
-                assert result == 1
+                assert_that(result).is_equal_to(1)
 
 
 class TestMain:
     """Tests for main function."""
 
     def test_main_no_command(self):
-        """Test main with no command shows help."""
+        """
+        Given no command
+        When main is called
+        Then it shows help and returns 0
+        """
         with patch("src.cli.setup_logging"):
             with patch("src.cli.load_dotenv"):
                 with patch("src.cli.SubjectRegistry") as MockRegistry:
@@ -403,10 +529,14 @@ class TestMain:
 
                     result = main([])
 
-                    assert result == 0
+                    assert_that(result).is_equal_to(0)
 
     def test_main_generate_command(self):
-        """Test main with generate command."""
+        """
+        Given generate command
+        When main is called
+        Then asyncio.run is called
+        """
         with patch("src.cli.setup_logging"):
             with patch("src.cli.load_dotenv"):
                 with patch("src.cli.SubjectRegistry") as MockRegistry:
@@ -425,10 +555,14 @@ class TestMain:
 
                             result = main(["generate", "leetcode"])
 
-                            assert mock_run.called
+                            assert_that(mock_run.called).is_true()
 
     def test_main_convert_command(self, tmp_path):
-        """Test main with convert command."""
+        """
+        Given convert command
+        When main is called
+        Then handle_convert is called
+        """
         input_file = tmp_path / "test.json"
         input_file.write_text("[]")
 
@@ -451,49 +585,77 @@ class TestNormalizeLegacyArgsExtended:
     """Extended tests for normalize_legacy_args edge cases."""
 
     def test_legacy_with_mcq_and_label(self):
-        """Test legacy style with mcq and label."""
+        """
+        Given legacy style with mcq and label
+        When normalize_legacy_args is called
+        Then generate is prepended and label is split
+        """
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             result = normalize_legacy_args(["leetcode", "mcq", "--label=test"])
-            assert result == ["generate", "leetcode", "mcq", "--label", "test"]
+            assert_that(result).is_equal_to(["generate", "leetcode", "mcq", "--label", "test"])
 
     def test_legacy_physics_subject(self):
-        """Test legacy physics subject."""
+        """
+        Given legacy physics subject
+        When normalize_legacy_args is called
+        Then generate is prepended
+        """
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             result = normalize_legacy_args(["physics"])
-            assert result == ["generate", "physics"]
+            assert_that(result).is_equal_to(["generate", "physics"])
 
     def test_legacy_custom_subject(self):
-        """Test legacy custom subject."""
+        """
+        Given legacy custom subject
+        When normalize_legacy_args is called
+        Then generate is prepended
+        """
         with warnings.catch_warnings(record=True):
             warnings.simplefilter("always")
             result = normalize_legacy_args(["my_custom"])
-            assert result == ["generate", "my_custom"]
+            assert_that(result).is_equal_to(["generate", "my_custom"])
 
     def test_generate_with_args_passes_through(self):
-        """Test that generate with all args passes through."""
+        """
+        Given generate with all args
+        When normalize_legacy_args is called
+        Then args pass through unchanged
+        """
         args = ["generate", "cs", "mcq", "--label", "test", "--dry-run"]
         result = normalize_legacy_args(args)
-        assert result == args
+        assert_that(result).is_equal_to(args)
 
     def test_convert_with_all_args(self):
-        """Test convert with all arguments."""
+        """
+        Given convert with all arguments
+        When normalize_legacy_args is called
+        Then args pass through unchanged
+        """
         args = ["convert", "file.json", "--mode", "cs_mcq", "-o", "out.apkg"]
         result = normalize_legacy_args(args)
-        assert result == args
+        assert_that(result).is_equal_to(args)
 
     def test_merge_with_args(self):
-        """Test merge with arguments."""
+        """
+        Given merge with arguments
+        When normalize_legacy_args is called
+        Then args pass through unchanged
+        """
         args = ["merge", "physics", "--dry-run"]
         result = normalize_legacy_args(args)
-        assert result == args
+        assert_that(result).is_equal_to(args)
 
     def test_export_md_with_all_args(self):
-        """Test export-md with all arguments."""
+        """
+        Given export-md with all arguments
+        When normalize_legacy_args is called
+        Then args pass through unchanged
+        """
         args = ["export-md", "--source", "./in", "--target", "./out", "--dry-run"]
         result = normalize_legacy_args(args)
-        assert result == args
+        assert_that(result).is_equal_to(args)
 
 
 class TestCreateParserExtended:
@@ -509,43 +671,67 @@ class TestCreateParserExtended:
             return create_parser()
 
     def test_generate_all_options(self, parser):
-        """Test generate with all options."""
+        """
+        Given generate with all options
+        When parsed
+        Then all options are set correctly
+        """
         args = parser.parse_args(["generate", "cs", "mcq", "--label", "test", "--dry-run"])
-        assert args.subject == "cs"
-        assert args.card_type == "mcq"
-        assert args.label == "test"
-        assert args.dry_run is True
+        assert_that(args.subject).is_equal_to("cs")
+        assert_that(args.card_type).is_equal_to("mcq")
+        assert_that(args.label).is_equal_to("test")
+        assert_that(args.dry_run).is_true()
 
     def test_convert_all_options(self, parser):
-        """Test convert with all options."""
+        """
+        Given convert with all options
+        When parsed
+        Then all options are set correctly
+        """
         args = parser.parse_args(["convert", "deck.json", "--mode", "physics_mcq", "-o", "out.apkg", "--dry-run"])
-        assert args.json_file == "deck.json"
-        assert args.mode == "physics_mcq"
-        assert args.output == "out.apkg"
-        assert args.dry_run is True
+        assert_that(args.json_file).is_equal_to("deck.json")
+        assert_that(args.mode).is_equal_to("physics_mcq")
+        assert_that(args.output).is_equal_to("out.apkg")
+        assert_that(args.dry_run).is_true()
 
     def test_convert_mode_choices(self, parser):
-        """Test convert accepts valid modes."""
+        """
+        Given convert with valid mode choices
+        When parsed
+        Then mode is set correctly for each choice
+        """
         for mode in ["leetcode", "leetcode_mcq", "cs", "cs_mcq", "physics", "physics_mcq"]:
             args = parser.parse_args(["convert", "deck.json", "--mode", mode])
-            assert args.mode == mode
+            assert_that(args.mode).is_equal_to(mode)
 
     def test_merge_with_dry_run(self, parser):
-        """Test merge with dry-run flag."""
+        """
+        Given merge with dry-run flag
+        When parsed
+        Then dry_run is True
+        """
         args = parser.parse_args(["merge", "cs", "--dry-run"])
-        assert args.subject == "cs"
-        assert args.dry_run is True
+        assert_that(args.subject).is_equal_to("cs")
+        assert_that(args.dry_run).is_true()
 
     def test_export_md_with_dry_run(self, parser):
-        """Test export-md with dry-run flag."""
+        """
+        Given export-md with dry-run flag
+        When parsed
+        Then dry_run is True
+        """
         args = parser.parse_args(["export-md", "--dry-run"])
-        assert args.dry_run is True
+        assert_that(args.dry_run).is_true()
 
     def test_generate_card_type_choices(self, parser):
-        """Test generate card_type choices."""
+        """
+        Given generate with valid card_type choices
+        When parsed
+        Then card_type is set correctly for each choice
+        """
         for card_type in ["standard", "mcq"]:
             args = parser.parse_args(["generate", "leetcode", card_type])
-            assert args.card_type == card_type
+            assert_that(args.card_type).is_equal_to(card_type)
 
 
 class TestHandleGenerateExtended:
@@ -553,7 +739,11 @@ class TestHandleGenerateExtended:
 
     @pytest.mark.asyncio
     async def test_handle_generate_dry_run(self):
-        """Test generate in dry run mode."""
+        """
+        Given dry run mode
+        When handle_generate is called
+        Then orchestrator is called with dry_run=True
+        """
         args = MagicMock()
         args.subject = "leetcode"
         args.card_type = "standard"
@@ -575,7 +765,7 @@ class TestHandleGenerateExtended:
 
                 result = await handle_generate(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
                 MockOrch.assert_called_with(
                     subject_config=mock_registry.get_config.return_value,
                     is_mcq=False,
@@ -585,7 +775,11 @@ class TestHandleGenerateExtended:
 
     @pytest.mark.asyncio
     async def test_handle_generate_mcq_mode(self):
-        """Test generate with MCQ card type."""
+        """
+        Given MCQ card type
+        When handle_generate is called
+        Then orchestrator is called with is_mcq=True
+        """
         args = MagicMock()
         args.subject = "cs"
         args.card_type = "mcq"
@@ -607,7 +801,7 @@ class TestHandleGenerateExtended:
 
                 result = await handle_generate(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
                 MockOrch.assert_called_with(
                     subject_config=mock_registry.get_config.return_value,
                     is_mcq=True,
@@ -617,7 +811,11 @@ class TestHandleGenerateExtended:
 
     @pytest.mark.asyncio
     async def test_handle_generate_with_label(self):
-        """Test generate with user label."""
+        """
+        Given user label
+        When handle_generate is called
+        Then label is passed to orchestrator
+        """
         args = MagicMock()
         args.subject = "physics"
         args.card_type = "standard"
@@ -639,17 +837,21 @@ class TestHandleGenerateExtended:
 
                 result = await handle_generate(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
                 # Verify label was passed
                 call_kwargs = MockOrch.call_args.kwargs
-                assert call_kwargs["run_label"] == "my-run-label"
+                assert_that(call_kwargs["run_label"]).is_equal_to("my-run-label")
 
 
 class TestHandleConvertExtended:
     """Extended tests for handle_convert function."""
 
     def test_handle_convert_auto_detect_mode(self, tmp_path):
-        """Test mode auto-detection from filename."""
+        """
+        Given filename with mode hint
+        When handle_convert is called with mode=None
+        Then mode is auto-detected
+        """
         input_file = tmp_path / "cs_mcq_deck.json"
         input_file.write_text('[{"title": "Test", "cards": []}]')
 
@@ -667,10 +869,14 @@ class TestHandleConvertExtended:
 
                 result = handle_convert(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
 
     def test_handle_convert_explicit_output_path(self, tmp_path):
-        """Test convert with explicit output path."""
+        """
+        Given explicit output path
+        When handle_convert is called
+        Then save_package is called with that path
+        """
         input_file = tmp_path / "test.json"
         input_file.write_text('[{"title": "Test", "cards": []}]')
         output_file = tmp_path / "custom_output.apkg"
@@ -689,11 +895,15 @@ class TestHandleConvertExtended:
 
                 result = handle_convert(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
                 mock_gen.save_package.assert_called_with(str(output_file))
 
     def test_handle_convert_exception_handling(self, tmp_path):
-        """Test convert handles exceptions gracefully."""
+        """
+        Given exception during conversion
+        When handle_convert is called
+        Then it returns 1 for failure
+        """
         input_file = tmp_path / "test.json"
         input_file.write_text('[{"title": "Test", "cards": []}]')
 
@@ -708,10 +918,14 @@ class TestHandleConvertExtended:
 
             result = handle_convert(args)
 
-            assert result == 1
+            assert_that(result).is_equal_to(1)
 
     def test_handle_convert_dry_run_with_error(self, tmp_path):
-        """Test dry run with file read error."""
+        """
+        Given dry run with read error
+        When handle_convert is called
+        Then it returns 1 for failure
+        """
         input_file = tmp_path / "test.json"
         input_file.write_text("invalid json")
 
@@ -726,14 +940,18 @@ class TestHandleConvertExtended:
 
             result = handle_convert(args)
 
-            assert result == 1
+            assert_that(result).is_equal_to(1)
 
 
 class TestHandleMergeExtended:
     """Extended tests for handle_merge function."""
 
     def test_handle_merge_dry_run(self):
-        """Test merge in dry run mode."""
+        """
+        Given dry run mode
+        When handle_merge is called
+        Then merge_subject is called with dry_run=True
+        """
         args = MagicMock()
         args.subject = "physics"
         args.dry_run = True
@@ -754,11 +972,15 @@ class TestHandleMergeExtended:
 
                 result = handle_merge(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
                 mock_service.merge_subject.assert_called_with("physics", dry_run=True)
 
     def test_handle_merge_error_message(self):
-        """Test merge displays error message on failure."""
+        """
+        Given merge failure with error message
+        When handle_merge is called
+        Then it returns 1 for failure
+        """
         args = MagicMock()
         args.subject = "leetcode"
         args.dry_run = False
@@ -779,14 +1001,18 @@ class TestHandleMergeExtended:
 
                 result = handle_merge(args)
 
-                assert result == 1
+                assert_that(result).is_equal_to(1)
 
 
 class TestHandleExportMdExtended:
     """Extended tests for handle_export_md function."""
 
     def test_handle_export_md_with_custom_paths(self):
-        """Test export with custom source and target paths."""
+        """
+        Given custom source and target paths
+        When handle_export_md is called
+        Then ExportService is called with those paths
+        """
         args = MagicMock()
         args.source = "/custom/source"
         args.target = "/custom/target"
@@ -807,14 +1033,18 @@ class TestHandleExportMdExtended:
 
                 result = handle_export_md(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
                 MockService.assert_called_with(
                     source_dir=Path("/custom/source"),
                     target_dir=Path("/custom/target")
                 )
 
     def test_handle_export_md_dry_run(self):
-        """Test export in dry run mode."""
+        """
+        Given dry run mode
+        When handle_export_md is called
+        Then export_to_markdown is called with dry_run=True
+        """
         args = MagicMock()
         args.source = None
         args.target = None
@@ -835,7 +1065,7 @@ class TestHandleExportMdExtended:
 
                 result = handle_export_md(args)
 
-                assert result == 0
+                assert_that(result).is_equal_to(0)
                 mock_service.export_to_markdown.assert_called_with(dry_run=True)
 
 
@@ -843,7 +1073,11 @@ class TestMainExtended:
     """Extended tests for main function."""
 
     def test_main_merge_command(self):
-        """Test main with merge command."""
+        """
+        Given merge command
+        When main is called
+        Then handle_merge is called
+        """
         with patch("src.cli.setup_logging"):
             with patch("src.cli.load_dotenv"):
                 with patch("src.cli.SubjectRegistry") as MockRegistry:
@@ -859,7 +1093,11 @@ class TestMainExtended:
                         mock_handle.assert_called_once()
 
     def test_main_export_md_command(self):
-        """Test main with export-md command."""
+        """
+        Given export-md command
+        When main is called
+        Then handle_export_md is called
+        """
         with patch("src.cli.setup_logging"):
             with patch("src.cli.load_dotenv"):
                 with patch("src.cli.SubjectRegistry") as MockRegistry:
@@ -875,7 +1113,11 @@ class TestMainExtended:
                         mock_handle.assert_called_once()
 
     def test_main_unknown_subcommand(self):
-        """Test main with unknown subcommand after generate."""
+        """
+        Given unknown subcommand after generate
+        When main is called
+        Then SystemExit is raised
+        """
         with patch("src.cli.setup_logging"):
             with patch("src.cli.load_dotenv"):
                 with patch("src.cli.SubjectRegistry") as MockRegistry:
@@ -888,7 +1130,11 @@ class TestMainExtended:
                         main(["generate", "leetcode", "invalid_card_type"])
 
     def test_main_help_flag(self):
-        """Test main with help flag."""
+        """
+        Given help flag
+        When main is called
+        Then SystemExit with code 0 is raised
+        """
         with patch("src.cli.setup_logging"):
             with patch("src.cli.load_dotenv"):
                 with patch("src.cli.SubjectRegistry") as MockRegistry:
@@ -899,10 +1145,14 @@ class TestMainExtended:
                     with pytest.raises(SystemExit) as exc_info:
                         main(["--help"])
 
-                    assert exc_info.value.code == 0
+                    assert_that(exc_info.value.code).is_equal_to(0)
 
     def test_main_legacy_args_conversion(self):
-        """Test main handles legacy args conversion."""
+        """
+        Given legacy args
+        When main is called
+        Then asyncio.run is called after conversion
+        """
         with patch("src.cli.setup_logging"):
             with patch("src.cli.load_dotenv"):
                 with patch("src.cli.SubjectRegistry") as MockRegistry:
@@ -923,7 +1173,11 @@ class TestMainExtended:
                         mock_run.assert_called_once()
 
     def test_main_argv_none(self):
-        """Test main with argv=None uses sys.argv."""
+        """
+        Given argv=None
+        When main is called
+        Then sys.argv is used and help is shown
+        """
         with patch("src.cli.setup_logging"):
             with patch("src.cli.load_dotenv"):
                 with patch("src.cli.SubjectRegistry") as MockRegistry:
@@ -934,4 +1188,4 @@ class TestMainExtended:
                     with patch("sys.argv", ["main.py"]):
                         result = main(None)
 
-                        assert result == 0  # Shows help
+                        assert_that(result).is_equal_to(0)  # Shows help

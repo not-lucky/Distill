@@ -11,6 +11,8 @@ Comprehensive tests covering:
 
 import json
 import pytest
+
+from assertpy import assert_that
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch, call
 
@@ -86,19 +88,19 @@ class TestOrchestrator:
         """Test that subject_config is stored correctly."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config)
-            assert orch.subject_config == subject_config
+            assert_that(orch.subject_config).is_equal_to(subject_config)
 
     def test_init_stores_is_mcq(self, subject_config):
         """Test that is_mcq is stored correctly."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config, is_mcq=True)
-            assert orch.is_mcq is True
+            assert_that(orch.is_mcq).is_true()
 
     def test_init_is_mcq_defaults_false(self, subject_config):
         """Test that is_mcq defaults to False."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config)
-            assert orch.is_mcq is False
+            assert_that(orch.is_mcq).is_false()
 
     def test_init_stores_run_label(self, subject_config):
         """Test that run_label is stored correctly."""
@@ -107,13 +109,13 @@ class TestOrchestrator:
                 subject_config=subject_config,
                 run_label="my-test-label",
             )
-            assert orch.run_label == "my-test-label"
+            assert_that(orch.run_label).is_equal_to("my-test-label")
 
     def test_init_run_label_defaults_none(self, subject_config):
         """Test that run_label defaults to None."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config)
-            assert orch.run_label is None
+            assert_that(orch.run_label).is_none()
 
     def test_init_stores_dry_run(self, subject_config):
         """Test that dry_run is stored correctly."""
@@ -122,13 +124,13 @@ class TestOrchestrator:
                 subject_config=subject_config,
                 dry_run=True,
             )
-            assert orch.dry_run is True
+            assert_that(orch.dry_run).is_true()
 
     def test_init_dry_run_defaults_false(self, subject_config):
         """Test that dry_run defaults to False."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config)
-            assert orch.dry_run is False
+            assert_that(orch.dry_run).is_false()
 
     def test_init_creates_run_repository(self, subject_config):
         """Test that RunRepository is created."""
@@ -141,7 +143,7 @@ class TestOrchestrator:
         """Test that card_generator starts as None."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config)
-            assert orch.card_generator is None
+            assert_that(orch.card_generator).is_none()
 
     def test_init_loads_config_settings(self, subject_config):
         """Test that config settings are loaded."""
@@ -157,7 +159,7 @@ class TestOrchestrator:
     def test_run_id_property(self, orchestrator):
         """Test run_id property returns run_repo.run_id."""
         orchestrator.run_repo.run_id = "test-123"
-        assert orchestrator.run_id == "test-123"
+        assert_that(orchestrator.run_id).is_equal_to("test-123")
 
     def test_run_id_property_none(self, subject_config):
         """Test run_id property when None."""
@@ -168,17 +170,17 @@ class TestOrchestrator:
 
             orch = Orchestrator(subject_config=subject_config)
             orch.run_repo = mock_run_repo
-            assert orch.run_id is None
+            assert_that(orch.run_id).is_none()
 
     def test_generation_mode_standard(self, orchestrator):
         """Test generation_mode for standard mode."""
-        assert orchestrator.generation_mode == "leetcode"
+        assert_that(orchestrator.generation_mode).is_equal_to("leetcode")
 
     def test_generation_mode_mcq(self, subject_config):
         """Test generation_mode for MCQ mode."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config, is_mcq=True)
-            assert orch.generation_mode == "leetcode_mcq"
+            assert_that(orch.generation_mode).is_equal_to("leetcode_mcq")
 
     @pytest.mark.parametrize("subject_name,is_mcq,expected", [
         ("leetcode", False, "leetcode"),
@@ -195,17 +197,17 @@ class TestOrchestrator:
         config = create_subject_config(name=subject_name)
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config, is_mcq=is_mcq)
-            assert orch.generation_mode == expected
+            assert_that(orch.generation_mode).is_equal_to(expected)
 
     def test_deck_prefix_standard(self, orchestrator):
         """Test deck_prefix for standard mode."""
-        assert orchestrator.deck_prefix == "LeetCode"
+        assert_that(orchestrator.deck_prefix).is_equal_to("LeetCode")
 
     def test_deck_prefix_mcq(self, subject_config):
         """Test deck_prefix for MCQ mode."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config, is_mcq=True)
-            assert orch.deck_prefix == "LeetCode_MCQ"
+            assert_that(orch.deck_prefix).is_equal_to("LeetCode_MCQ")
 
     @pytest.mark.parametrize("is_mcq,expected", [
         (False, "LeetCode"),
@@ -215,7 +217,7 @@ class TestOrchestrator:
         """Test deck_prefix by mode."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config, is_mcq=is_mcq)
-            assert orch.deck_prefix == expected
+            assert_that(orch.deck_prefix).is_equal_to(expected)
 
 
 class TestOrchestratorInitialize:
@@ -249,8 +251,8 @@ class TestOrchestratorInitialize:
                 orch = Orchestrator(subject_config=subject_config)
                 result = await orch.initialize()
 
-                assert result is True
-                assert orch.card_generator is not None
+                assert_that(result).is_true()
+                assert_that(orch.card_generator).is_not_none()
 
     @pytest.mark.asyncio
     async def test_initialize_creates_run(self, subject_config):
@@ -287,7 +289,7 @@ class TestOrchestratorInitialize:
                 orch = Orchestrator(subject_config=subject_config)
                 result = await orch.initialize()
 
-                assert result is True
+                assert_that(result).is_true()
                 assert orch.card_generator.formatter is not None
 
     # -------------------------------------------------------------------------
@@ -313,7 +315,7 @@ class TestOrchestratorInitialize:
                 orch = Orchestrator(subject_config=subject_config)
                 result = await orch.initialize()
 
-                assert result is True
+                assert_that(result).is_true()
                 # First provider should be combiner, rest should be generators
                 assert orch.card_generator.card_combiner.name == "first"
                 assert len(orch.card_generator.llm_providers) == 1
@@ -333,7 +335,7 @@ class TestOrchestratorInitialize:
                 orch = Orchestrator(subject_config=subject_config)
                 result = await orch.initialize()
 
-                assert result is True
+                assert_that(result).is_true()
                 assert orch.card_generator.card_combiner.name == "single"
                 assert len(orch.card_generator.llm_providers) == 0
 
@@ -354,7 +356,7 @@ class TestOrchestratorInitialize:
                 orch = Orchestrator(subject_config=subject_config)
                 result = await orch.initialize()
 
-                assert result is False
+                assert_that(result).is_false()
                 mock_run_repo.mark_run_failed.assert_called_once()
 
     @pytest.mark.asyncio
@@ -389,7 +391,7 @@ class TestOrchestratorInitialize:
                 orch = Orchestrator(subject_config=subject_config, dry_run=True)
                 result = await orch.initialize()
 
-                assert result is True
+                assert_that(result).is_true()
                 # Card generator should have None repository in dry run
                 assert orch.card_generator.repository is None
 
@@ -446,7 +448,7 @@ class TestOrchestratorInitialize:
                 orch = Orchestrator(subject_config=subject_config)
                 await orch.initialize()
 
-                assert orch.card_generator.combine_prompt == subject_config.combine_prompt
+                assert_that(orch.card_generator.combine_prompt).is_equal_to(subject_config.combine_prompt)
 
     @pytest.mark.asyncio
     async def test_initialize_sets_dry_run_on_generator(self, subject_config):
@@ -502,7 +504,7 @@ class TestOrchestratorRun:
         """Test run raises when card_generator is None."""
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=subject_config)
-            assert orch.card_generator is None
+            assert_that(orch.card_generator).is_none()
 
             with pytest.raises(RuntimeError):
                 await orch.run()
@@ -525,7 +527,7 @@ class TestOrchestratorRun:
                 await orch.initialize()
                 result = await orch.run()
 
-                assert result == []
+                assert_that(result).is_equal_to([])
 
     @pytest.mark.asyncio
     async def test_run_dry_run_does_not_process(self, subject_config):
@@ -573,7 +575,7 @@ class TestOrchestratorRun:
                     results = await orch.run()
 
                     # Should have called process_question for each question
-                    assert mock_gen.process_question.call_count == 2
+                    assert_that(mock_gen.process_question.call_count).is_equal_to(2)
 
     @pytest.mark.asyncio
     async def test_run_returns_successful_results(self, subject_config):
@@ -606,7 +608,7 @@ class TestOrchestratorRun:
                         await orch.initialize()
                         results = await orch.run()
 
-                        assert len(results) == 2
+                        assert_that(results).is_length(2)
 
     @pytest.mark.asyncio
     async def test_run_filters_failures(self, subject_config):
@@ -638,7 +640,7 @@ class TestOrchestratorRun:
                         results = await orch.run()
 
                         # Only 2 successes
-                        assert len(results) == 2
+                        assert_that(results).is_length(2)
 
     @pytest.mark.asyncio
     async def test_run_uses_concurrent_task_runner(self, subject_config):
@@ -729,9 +731,9 @@ class TestOrchestratorRun:
                         # Check stats passed to mark_run_completed
                         call_args = mock_run_repo.mark_run_completed.call_args
                         stats = call_args[0][0]
-                        assert stats.total_problems == 2
-                        assert stats.successful_problems == 1
-                        assert stats.failed_problems == 1
+                        assert_that(stats.total_problems).is_equal_to(2)
+                        assert_that(stats.successful_problems).is_equal_to(1)
+                        assert_that(stats.failed_problems).is_equal_to(1)
 
 
 class TestOrchestratorSaveResults:
@@ -761,7 +763,7 @@ class TestOrchestratorSaveResults:
             orch = Orchestrator(subject_config=subject_config)
             result = orch.save_results([])
 
-            assert result is None
+            assert_that(result).is_none()
 
     def test_save_results_empty_logs_warning(self, subject_config, caplog):
         """Test empty results logs warning."""
@@ -782,7 +784,7 @@ class TestOrchestratorSaveResults:
             orch = Orchestrator(subject_config=subject_config, dry_run=True)
             result = orch.save_results([{"title": "Test"}])
 
-            assert result == "leetcode_anki_deck"
+            assert_that(result).is_equal_to("leetcode_anki_deck")
 
     def test_save_results_dry_run_empty(self, subject_config):
         """Test dry run with empty results still returns filename."""
@@ -790,7 +792,7 @@ class TestOrchestratorSaveResults:
             orch = Orchestrator(subject_config=subject_config, dry_run=True)
             result = orch.save_results([])
 
-            assert result == "leetcode_anki_deck"
+            assert_that(result).is_equal_to("leetcode_anki_deck")
 
     def test_save_results_dry_run_mcq(self, mcq_subject_config):
         """Test dry run MCQ mode filename."""
@@ -802,7 +804,7 @@ class TestOrchestratorSaveResults:
             )
             result = orch.save_results([{"cards": []}])
 
-            assert result == "cs_mcq_anki_deck"
+            assert_that(result).is_equal_to("cs_mcq_anki_deck")
 
     # -------------------------------------------------------------------------
     # Actual File Saving
@@ -826,10 +828,10 @@ class TestOrchestratorSaveResults:
 
             result = orch.save_results(problems)
 
-            assert result == "leetcode_anki_deck"
+            assert_that(result).is_equal_to("leetcode_anki_deck")
             # Verify file was created
             json_files = list(tmp_path.glob("leetcode_anki_deck_*.json"))
-            assert len(json_files) == 1
+            assert_that(json_files).is_length(1)
 
     def test_save_results_mcq_filename(self, mcq_subject_config, tmp_path, monkeypatch):
         """Test MCQ mode uses correct filename."""
@@ -847,9 +849,9 @@ class TestOrchestratorSaveResults:
 
             result = orch.save_results([{"cards": []}])
 
-            assert result == "cs_mcq_anki_deck"
+            assert_that(result).is_equal_to("cs_mcq_anki_deck")
             json_files = list(tmp_path.glob("cs_mcq_anki_deck_*.json"))
-            assert len(json_files) == 1
+            assert_that(json_files).is_length(1)
 
     def test_save_results_file_contains_problems(self, subject_config, tmp_path, monkeypatch):
         """Test saved file contains problem data."""
@@ -869,10 +871,10 @@ class TestOrchestratorSaveResults:
             orch.save_results(problems)
 
             json_files = list(tmp_path.glob("leetcode_anki_deck_*.json"))
-            assert len(json_files) == 1
+            assert_that(json_files).is_length(1)
 
             content = json.loads(json_files[0].read_text())
-            assert len(content) == 1
+            assert_that(content).is_length(1)
             assert content[0]["title"] == "Two Sum"
 
     # -------------------------------------------------------------------------
@@ -907,7 +909,7 @@ class TestOrchestratorSaveResults:
 
             result = orch.save_results([{"cards": []}])
 
-            assert result == expected_prefix
+            assert_that(result).is_equal_to(expected_prefix)
 
 
 # ============================================================================
@@ -957,15 +959,15 @@ class TestOrchestratorIntegration:
 
                         # Initialize
                         init_result = await orch.initialize()
-                        assert init_result is True
+                        assert_that(init_result).is_true()
 
                         # Run
                         run_result = await orch.run()
-                        assert len(run_result) == 1
+                        assert_that(run_result).is_length(1)
 
                         # Save
                         save_result = orch.save_results(run_result)
-                        assert save_result is not None
+                        assert_that(save_result).is_not_none()
 
     @pytest.mark.asyncio
     async def test_workflow_with_no_successful_questions(self, subject_config):
@@ -994,7 +996,7 @@ class TestOrchestratorIntegration:
                         await orch.initialize()
                         results = await orch.run()
 
-                        assert results == []
+                        assert_that(results).is_equal_to([])
                         assert orch.save_results(results) is None
 
 
@@ -1011,7 +1013,7 @@ class TestOrchestratorParametrized:
         config = create_subject_config()
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config, is_mcq=is_mcq)
-            assert orch.is_mcq == is_mcq
+            assert_that(orch.is_mcq).is_equal_to(is_mcq)
 
     @pytest.mark.parametrize("dry_run", [False, True])
     def test_init_with_dry_run_modes(self, dry_run):
@@ -1019,7 +1021,7 @@ class TestOrchestratorParametrized:
         config = create_subject_config()
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config, dry_run=dry_run)
-            assert orch.dry_run == dry_run
+            assert_that(orch.dry_run).is_equal_to(dry_run)
 
     @pytest.mark.parametrize("run_label", [None, "", "test", "my-run-123", "A" * 100])
     def test_init_with_various_labels(self, run_label):
@@ -1027,7 +1029,7 @@ class TestOrchestratorParametrized:
         config = create_subject_config()
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config, run_label=run_label)
-            assert orch.run_label == run_label
+            assert_that(orch.run_label).is_equal_to(run_label)
 
     @pytest.mark.parametrize("num_questions", [1, 5, 10])
     @pytest.mark.asyncio
@@ -1069,7 +1071,7 @@ class TestOrchestratorParametrized:
         config = create_subject_config(target_model=model_class)
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config)
-            assert orch.subject_config.target_model == model_class
+            assert_that(orch.subject_config.target_model).is_equal_to(model_class)
 
 
 # ============================================================================
@@ -1097,7 +1099,7 @@ class TestOrchestratorEdgeCases:
         )
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config)
-            assert orch.subject_config.target_questions == {}
+            assert_that(orch.subject_config.target_questions).is_equal_to({})
 
     def test_single_category_single_question(self):
         """Test with single category and single question."""
@@ -1125,21 +1127,21 @@ class TestOrchestratorEdgeCases:
         config = create_subject_config()
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config, run_label=long_label)
-            assert orch.run_label == long_label
+            assert_that(orch.run_label).is_equal_to(long_label)
 
     def test_unicode_in_run_label(self):
         """Test with unicode characters in run label."""
         config = create_subject_config()
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config, run_label="测试运行")
-            assert orch.run_label == "测试运行"
+            assert_that(orch.run_label).is_equal_to("测试运行")
 
     def test_special_characters_in_subject_name(self):
         """Test with special characters in subject name."""
         config = create_subject_config(name="my-custom_subject.v2")
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config)
-            assert orch.generation_mode == "my-custom_subject.v2"
+            assert_that(orch.generation_mode).is_equal_to("my-custom_subject.v2")
 
     @pytest.mark.asyncio
     async def test_initialize_called_twice(self, subject_config):
@@ -1158,8 +1160,8 @@ class TestOrchestratorEdgeCases:
                 result2 = await orch.initialize()
 
                 # Both should succeed
-                assert result1 is True
-                assert result2 is True
+                assert_that(result1).is_true()
+                assert_that(result2).is_true()
 
     @pytest.mark.asyncio
     async def test_run_with_empty_question_list(self):
@@ -1187,7 +1189,7 @@ class TestOrchestratorEdgeCases:
                         await orch.initialize()
                         results = await orch.run()
 
-                        assert results == []
+                        assert_that(results).is_equal_to([])
 
     def test_deck_prefix_with_spaces(self):
         """Test deck prefix with spaces."""
@@ -1197,10 +1199,10 @@ class TestOrchestratorEdgeCases:
         )
         with patch("src.orchestrator.RunRepository"):
             orch = Orchestrator(subject_config=config)
-            assert orch.deck_prefix == "My Deck"
+            assert_that(orch.deck_prefix).is_equal_to("My Deck")
 
             orch_mcq = Orchestrator(subject_config=config, is_mcq=True)
-            assert orch_mcq.deck_prefix == "My Deck MCQ"
+            assert_that(orch_mcq.deck_prefix).is_equal_to("My Deck MCQ")
 
     @pytest.mark.asyncio
     async def test_initialize_with_all_provider_types(self, subject_config):
@@ -1222,7 +1224,7 @@ class TestOrchestratorEdgeCases:
                 orch = Orchestrator(subject_config=subject_config)
                 result = await orch.initialize()
 
-                assert result is True
+                assert_that(result).is_true()
                 assert len(orch.card_generator.llm_providers) == 2
                 assert orch.card_generator.card_combiner.name == "combiner"
                 assert orch.card_generator.formatter.name == "formatter"

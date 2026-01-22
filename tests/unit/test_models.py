@@ -5,6 +5,8 @@ from hypothesis import given, strategies as st, settings, assume
 from hypothesis.strategies import composite
 from pydantic import ValidationError
 
+from assertpy import assert_that
+
 from src.models import (
     AnkiCard,
     BaseProblem,
@@ -21,26 +23,39 @@ class TestAnkiCard:
     """Tests for AnkiCard model."""
 
     def test_valid_anki_card(self):
-        """Test creating a valid AnkiCard."""
+        """
+        Given valid card parameters
+        When AnkiCard is created
+        Then all fields are stored correctly
+        """
         card = AnkiCard(
             card_type="Concept",
             tags=["Tag1", "Tag2"],
             front="What is X?",
             back="X is Y."
         )
-        assert card.card_type == "Concept"
-        assert card.tags == ["Tag1", "Tag2"]
-        assert card.front == "What is X?"
-        assert card.back == "X is Y."
+        assert_that(card.card_type).is_equal_to("Concept")
+        assert_that(card.tags).is_equal_to(["Tag1", "Tag2"])
+        assert_that(card.front).is_equal_to("What is X?")
+        assert_that(card.back).is_equal_to("X is Y.")
 
     def test_anki_card_required_fields(self):
-        """Test that required fields raise ValidationError when missing."""
+        """
+        Given missing required fields
+        When AnkiCard is created
+        Then ValidationError is raised
+        """
         with pytest.raises(ValidationError) as exc_info:
             AnkiCard(card_type="Concept", tags=["Tag1"])
-        assert "front" in str(exc_info.value) or "back" in str(exc_info.value)
+        error_str = str(exc_info.value)
+        assert_that("front" in error_str or "back" in error_str).is_true()
 
     def test_anki_card_extra_fields_forbidden(self):
-        """Test that extra fields are not allowed."""
+        """
+        Given extra fields
+        When AnkiCard is created
+        Then ValidationError is raised
+        """
         with pytest.raises(ValidationError) as exc_info:
             AnkiCard(
                 card_type="Concept",
@@ -49,24 +64,32 @@ class TestAnkiCard:
                 back="A",
                 extra_field="not allowed"
             )
-        assert "extra" in str(exc_info.value).lower()
+        assert_that(str(exc_info.value).lower()).contains("extra")
 
     def test_anki_card_empty_tags(self):
-        """Test AnkiCard with empty tags list."""
+        """
+        Given empty tags list
+        When AnkiCard is created
+        Then empty list is stored
+        """
         card = AnkiCard(
             card_type="Basic",
             tags=[],
             front="Q",
             back="A"
         )
-        assert card.tags == []
+        assert_that(card.tags).is_equal_to([])
 
 
 class TestLeetCodeProblem:
     """Tests for LeetCodeProblem model."""
 
     def test_valid_leetcode_problem(self):
-        """Test creating a valid LeetCodeProblem."""
+        """
+        Given valid LeetCode problem parameters
+        When LeetCodeProblem is created
+        Then all fields are stored correctly
+        """
         problem = LeetCodeProblem(
             title="Two Sum",
             topic="Arrays",
@@ -80,13 +103,17 @@ class TestLeetCodeProblem:
                 )
             ]
         )
-        assert problem.title == "Two Sum"
-        assert problem.topic == "Arrays"
-        assert problem.difficulty == "Easy"
-        assert len(problem.cards) == 1
+        assert_that(problem.title).is_equal_to("Two Sum")
+        assert_that(problem.topic).is_equal_to("Arrays")
+        assert_that(problem.difficulty).is_equal_to("Easy")
+        assert_that(problem.cards).is_length(1)
 
     def test_leetcode_problem_multiple_cards(self):
-        """Test LeetCodeProblem with multiple cards."""
+        """
+        Given multiple cards
+        When LeetCodeProblem is created
+        Then all cards are stored
+        """
         problem = LeetCodeProblem(
             title="Binary Search",
             topic="Binary Search",
@@ -96,15 +123,23 @@ class TestLeetCodeProblem:
                 AnkiCard(card_type="Code", tags=[], front="Q2", back="A2"),
             ]
         )
-        assert len(problem.cards) == 2
+        assert_that(problem.cards).is_length(2)
 
     def test_leetcode_problem_required_fields(self):
-        """Test that required fields raise ValidationError when missing."""
+        """
+        Given missing required fields
+        When LeetCodeProblem is created
+        Then ValidationError is raised
+        """
         with pytest.raises(ValidationError):
             LeetCodeProblem(title="Test", topic="Test")
 
     def test_leetcode_problem_extra_fields_forbidden(self):
-        """Test that extra fields are not allowed."""
+        """
+        Given extra fields
+        When LeetCodeProblem is created
+        Then ValidationError is raised
+        """
         with pytest.raises(ValidationError):
             LeetCodeProblem(
                 title="Test",
@@ -119,7 +154,11 @@ class TestCSProblem:
     """Tests for CSProblem model."""
 
     def test_valid_cs_problem(self):
-        """Test creating a valid CSProblem."""
+        """
+        Given valid CS problem parameters
+        When CSProblem is created
+        Then all fields are stored correctly
+        """
         problem = CSProblem(
             title="Process Scheduling",
             topic="Operating Systems",
@@ -133,16 +172,20 @@ class TestCSProblem:
                 )
             ]
         )
-        assert problem.title == "Process Scheduling"
-        assert problem.topic == "Operating Systems"
-        assert problem.difficulty == "Intermediate"
+        assert_that(problem.title).is_equal_to("Process Scheduling")
+        assert_that(problem.topic).is_equal_to("Operating Systems")
+        assert_that(problem.difficulty).is_equal_to("Intermediate")
 
 
 class TestPhysicsProblem:
     """Tests for PhysicsProblem model."""
 
     def test_valid_physics_problem(self):
-        """Test creating a valid PhysicsProblem."""
+        """
+        Given valid physics problem parameters
+        When PhysicsProblem is created
+        Then all fields are stored correctly
+        """
         problem = PhysicsProblem(
             title="Newton's Laws",
             topic="Mechanics",
@@ -156,15 +199,19 @@ class TestPhysicsProblem:
                 )
             ]
         )
-        assert problem.title == "Newton's Laws"
-        assert problem.topic == "Mechanics"
+        assert_that(problem.title).is_equal_to("Newton's Laws")
+        assert_that(problem.topic).is_equal_to("Mechanics")
 
 
 class TestMCQCard:
     """Tests for MCQCard model."""
 
     def test_valid_mcq_card(self):
-        """Test creating a valid MCQCard."""
+        """
+        Given valid MCQ card parameters
+        When MCQCard is created
+        Then all fields are stored correctly
+        """
         card = MCQCard(
             card_type="Concept",
             tags=["Algorithm"],
@@ -173,13 +220,17 @@ class TestMCQCard:
             correct_answer="B",
             explanation="Binary search divides the search space in half."
         )
-        assert card.card_type == "Concept"
-        assert card.question == "What is the time complexity of binary search?"
-        assert len(card.options) == 4
-        assert card.correct_answer == "B"
+        assert_that(card.card_type).is_equal_to("Concept")
+        assert_that(card.question).is_equal_to("What is the time complexity of binary search?")
+        assert_that(card.options).is_length(4)
+        assert_that(card.correct_answer).is_equal_to("B")
 
     def test_mcq_card_required_fields(self):
-        """Test that required fields raise ValidationError when missing."""
+        """
+        Given missing required fields
+        When MCQCard is created
+        Then ValidationError is raised
+        """
         with pytest.raises(ValidationError):
             MCQCard(
                 card_type="Concept",
@@ -190,7 +241,11 @@ class TestMCQCard:
             )
 
     def test_mcq_card_extra_fields_forbidden(self):
-        """Test that extra fields are not allowed."""
+        """
+        Given extra fields
+        When MCQCard is created
+        Then ValidationError is raised
+        """
         with pytest.raises(ValidationError):
             MCQCard(
                 card_type="Concept",
@@ -207,7 +262,11 @@ class TestMCQProblem:
     """Tests for MCQProblem model."""
 
     def test_valid_mcq_problem(self):
-        """Test creating a valid MCQProblem."""
+        """
+        Given valid MCQ problem parameters
+        When MCQProblem is created
+        Then all fields are stored correctly
+        """
         problem = MCQProblem(
             title="Data Structures MCQ",
             topic="Arrays",
@@ -228,16 +287,20 @@ class TestMCQProblem:
                 )
             ]
         )
-        assert problem.title == "Data Structures MCQ"
-        assert len(problem.cards) == 1
-        assert problem.cards[0].correct_answer == "A"
+        assert_that(problem.title).is_equal_to("Data Structures MCQ")
+        assert_that(problem.cards).is_length(1)
+        assert_that(problem.cards[0].correct_answer).is_equal_to("A")
 
 
 class TestGenericProblem:
     """Tests for GenericProblem model."""
 
     def test_valid_generic_problem(self):
-        """Test creating a valid GenericProblem."""
+        """
+        Given valid generic problem parameters
+        When GenericProblem is created
+        Then all fields are stored correctly
+        """
         problem = GenericProblem(
             title="Custom Topic",
             topic="Custom Category",
@@ -251,19 +314,27 @@ class TestGenericProblem:
                 )
             ]
         )
-        assert problem.title == "Custom Topic"
-        assert problem.topic == "Custom Category"
+        assert_that(problem.title).is_equal_to("Custom Topic")
+        assert_that(problem.topic).is_equal_to("Custom Category")
 
     def test_generic_problem_inherits_base(self):
-        """Test that GenericProblem inherits from BaseProblem."""
-        assert issubclass(GenericProblem, BaseProblem)
+        """
+        Given GenericProblem class
+        When checking inheritance
+        Then it is a subclass of BaseProblem
+        """
+        assert_that(issubclass(GenericProblem, BaseProblem)).is_true()
 
 
 class TestBaseProblem:
     """Tests for BaseProblem model."""
 
     def test_base_problem_is_abstract_like(self):
-        """Test that BaseProblem can be instantiated (it's not truly abstract)."""
+        """
+        Given BaseProblem class
+        When instantiated
+        Then it can be created (not truly abstract in Pydantic)
+        """
         # BaseProblem is not abstract in Pydantic, but serves as base class
         problem = BaseProblem(
             title="Test",
@@ -271,17 +342,21 @@ class TestBaseProblem:
             difficulty="Easy",
             cards=[]
         )
-        assert problem.title == "Test"
+        assert_that(problem.title).is_equal_to("Test")
 
     def test_base_problem_empty_cards(self):
-        """Test BaseProblem with empty cards list."""
+        """
+        Given empty cards list
+        When BaseProblem is created
+        Then empty list is stored
+        """
         problem = BaseProblem(
             title="Test",
             topic="Test",
             difficulty="Easy",
             cards=[]
         )
-        assert problem.cards == []
+        assert_that(problem.cards).is_equal_to([])
 
 
 # Custom Hypothesis Strategies
@@ -343,44 +418,60 @@ class TestAnkiCardPropertyBased:
     )
     @settings(max_examples=50)
     def test_anki_card_accepts_any_strings(self, card_type, front, back):
-        """Test that AnkiCard accepts any non-empty strings."""
+        """
+        Given any non-empty strings
+        When AnkiCard is created
+        Then all values are stored correctly
+        """
         card = AnkiCard(
             card_type=card_type,
             tags=[],
             front=front,
             back=back,
         )
-        assert card.card_type == card_type
-        assert card.front == front
-        assert card.back == back
+        assert_that(card.card_type).is_equal_to(card_type)
+        assert_that(card.front).is_equal_to(front)
+        assert_that(card.back).is_equal_to(back)
 
     @given(tags=st.lists(st.text(min_size=1, max_size=30), min_size=0, max_size=10))
     @settings(max_examples=50)
     def test_anki_card_accepts_any_tags(self, tags):
-        """Test that AnkiCard accepts any list of tags."""
+        """
+        Given any list of tags
+        When AnkiCard is created
+        Then tags are stored correctly
+        """
         card = AnkiCard(
             card_type="Test",
             tags=tags,
             front="Q",
             back="A",
         )
-        assert card.tags == tags
+        assert_that(card.tags).is_equal_to(tags)
 
     @given(card=valid_anki_cards())
     @settings(max_examples=30)
     def test_anki_card_roundtrip_serialization(self, card):
-        """Test that AnkiCard can be serialized and deserialized."""
+        """
+        Given a valid AnkiCard
+        When serialized and deserialized
+        Then the restored card equals the original
+        """
         data = card.model_dump()
         restored = AnkiCard(**data)
-        assert restored == card
+        assert_that(restored).is_equal_to(card)
 
     @given(card=valid_anki_cards())
     @settings(max_examples=30)
     def test_anki_card_json_roundtrip(self, card):
-        """Test that AnkiCard survives JSON roundtrip."""
+        """
+        Given a valid AnkiCard
+        When converted to JSON and back
+        Then the restored card equals the original
+        """
         json_str = card.model_dump_json()
         restored = AnkiCard.model_validate_json(json_str)
-        assert restored == card
+        assert_that(restored).is_equal_to(card)
 
 
 class TestMCQCardPropertyBased:
@@ -389,7 +480,11 @@ class TestMCQCardPropertyBased:
     @given(correct_answer=st.sampled_from(["A", "B", "C", "D"]))
     @settings(max_examples=20)
     def test_mcq_card_correct_answer_values(self, correct_answer):
-        """Test that MCQCard accepts valid correct answer values."""
+        """
+        Given valid correct answer values (A, B, C, D)
+        When MCQCard is created
+        Then correct_answer is stored correctly
+        """
         card = MCQCard(
             card_type="Test",
             tags=[],
@@ -398,14 +493,18 @@ class TestMCQCardPropertyBased:
             correct_answer=correct_answer,
             explanation="Exp",
         )
-        assert card.correct_answer == correct_answer
+        assert_that(card.correct_answer).is_equal_to(correct_answer)
 
     @given(
         options=st.lists(st.text(min_size=1, max_size=100), min_size=4, max_size=4)
     )
     @settings(max_examples=30)
     def test_mcq_card_accepts_any_options(self, options):
-        """Test that MCQCard accepts any 4 non-empty options."""
+        """
+        Given any 4 non-empty options
+        When MCQCard is created
+        Then options are stored correctly
+        """
         card = MCQCard(
             card_type="Test",
             tags=[],
@@ -414,15 +513,19 @@ class TestMCQCardPropertyBased:
             correct_answer="A",
             explanation="Exp",
         )
-        assert card.options == options
+        assert_that(card.options).is_equal_to(options)
 
     @given(card=valid_mcq_cards())
     @settings(max_examples=30)
     def test_mcq_card_roundtrip_serialization(self, card):
-        """Test that MCQCard can be serialized and deserialized."""
+        """
+        Given a valid MCQCard
+        When serialized and deserialized
+        Then the restored card equals the original
+        """
         data = card.model_dump()
         restored = MCQCard(**data)
-        assert restored == card
+        assert_that(restored).is_equal_to(card)
 
     @given(
         question=st.text(min_size=1, max_size=500),
@@ -430,7 +533,11 @@ class TestMCQCardPropertyBased:
     )
     @settings(max_examples=30)
     def test_mcq_card_accepts_unicode_content(self, question, explanation):
-        """Test that MCQCard accepts unicode in question and explanation."""
+        """
+        Given unicode content in question and explanation
+        When MCQCard is created
+        Then unicode is stored correctly
+        """
         card = MCQCard(
             card_type="Test",
             tags=[],
@@ -439,8 +546,8 @@ class TestMCQCardPropertyBased:
             correct_answer="A",
             explanation=explanation,
         )
-        assert card.question == question
-        assert card.explanation == explanation
+        assert_that(card.question).is_equal_to(question)
+        assert_that(card.explanation).is_equal_to(explanation)
 
 
 class TestProblemModelsPropertyBased:
@@ -453,16 +560,20 @@ class TestProblemModelsPropertyBased:
     )
     @settings(max_examples=30)
     def test_leetcode_problem_accepts_valid_strings(self, title, topic, difficulty):
-        """Test that LeetCodeProblem accepts valid string fields."""
+        """
+        Given valid string fields
+        When LeetCodeProblem is created
+        Then all values are stored correctly
+        """
         problem = LeetCodeProblem(
             title=title,
             topic=topic,
             difficulty=difficulty,
             cards=[],
         )
-        assert problem.title == title
-        assert problem.topic == topic
-        assert problem.difficulty == difficulty
+        assert_that(problem.title).is_equal_to(title)
+        assert_that(problem.topic).is_equal_to(topic)
+        assert_that(problem.difficulty).is_equal_to(difficulty)
 
     @given(
         title=st.text(min_size=1, max_size=100),
@@ -471,15 +582,19 @@ class TestProblemModelsPropertyBased:
     )
     @settings(max_examples=30)
     def test_cs_problem_accepts_valid_strings(self, title, topic, difficulty):
-        """Test that CSProblem accepts valid string fields."""
+        """
+        Given valid string fields
+        When CSProblem is created
+        Then all values are stored correctly
+        """
         problem = CSProblem(
             title=title,
             topic=topic,
             difficulty=difficulty,
             cards=[],
         )
-        assert problem.title == title
-        assert problem.topic == topic
+        assert_that(problem.title).is_equal_to(title)
+        assert_that(problem.topic).is_equal_to(topic)
 
     @given(
         title=st.text(min_size=1, max_size=100),
@@ -488,19 +603,27 @@ class TestProblemModelsPropertyBased:
     )
     @settings(max_examples=30)
     def test_physics_problem_accepts_valid_strings(self, title, topic, difficulty):
-        """Test that PhysicsProblem accepts valid string fields."""
+        """
+        Given valid string fields
+        When PhysicsProblem is created
+        Then all values are stored correctly
+        """
         problem = PhysicsProblem(
             title=title,
             topic=topic,
             difficulty=difficulty,
             cards=[],
         )
-        assert problem.title == title
+        assert_that(problem.title).is_equal_to(title)
 
     @given(num_cards=st.integers(min_value=1, max_value=10))
     @settings(max_examples=20)
     def test_problem_accepts_multiple_cards(self, num_cards):
-        """Test that problems accept multiple cards."""
+        """
+        Given multiple cards
+        When LeetCodeProblem is created
+        Then all cards are stored
+        """
         cards = [
             AnkiCard(card_type="Test", tags=[], front=f"Q{i}", back=f"A{i}")
             for i in range(num_cards)
@@ -511,7 +634,7 @@ class TestProblemModelsPropertyBased:
             difficulty="Easy",
             cards=cards,
         )
-        assert len(problem.cards) == num_cards
+        assert_that(problem.cards).is_length(num_cards)
 
     @given(
         title=st.text(min_size=1, max_size=100),
@@ -519,7 +642,11 @@ class TestProblemModelsPropertyBased:
     )
     @settings(max_examples=30)
     def test_generic_problem_behaves_like_base(self, title, topic):
-        """Test that GenericProblem behaves like BaseProblem."""
+        """
+        Given same title and topic
+        When GenericProblem and BaseProblem are created
+        Then they have equivalent values
+        """
         generic = GenericProblem(
             title=title,
             topic=topic,
@@ -532,8 +659,8 @@ class TestProblemModelsPropertyBased:
             difficulty="Medium",
             cards=[],
         )
-        assert generic.title == base.title
-        assert generic.topic == base.topic
+        assert_that(generic.title).is_equal_to(base.title)
+        assert_that(generic.topic).is_equal_to(base.topic)
 
 
 class TestMCQProblemPropertyBased:
@@ -546,21 +673,29 @@ class TestMCQProblemPropertyBased:
     )
     @settings(max_examples=30)
     def test_mcq_problem_accepts_valid_strings(self, title, topic, difficulty):
-        """Test that MCQProblem accepts valid string fields."""
+        """
+        Given valid string fields
+        When MCQProblem is created
+        Then all values are stored correctly
+        """
         problem = MCQProblem(
             title=title,
             topic=topic,
             difficulty=difficulty,
             cards=[],
         )
-        assert problem.title == title
-        assert problem.topic == topic
-        assert problem.difficulty == difficulty
+        assert_that(problem.title).is_equal_to(title)
+        assert_that(problem.topic).is_equal_to(topic)
+        assert_that(problem.difficulty).is_equal_to(difficulty)
 
     @given(num_cards=st.integers(min_value=1, max_value=10))
     @settings(max_examples=20)
     def test_mcq_problem_accepts_multiple_cards(self, num_cards):
-        """Test that MCQProblem accepts multiple MCQ cards."""
+        """
+        Given multiple MCQ cards
+        When MCQProblem is created
+        Then all cards are stored
+        """
         cards = [
             MCQCard(
                 card_type="Test",
@@ -578,7 +713,7 @@ class TestMCQProblemPropertyBased:
             difficulty="Easy",
             cards=cards,
         )
-        assert len(problem.cards) == num_cards
+        assert_that(problem.cards).is_length(num_cards)
 
 
 class TestModelSerializationPropertyBased:
@@ -587,26 +722,34 @@ class TestModelSerializationPropertyBased:
     @given(card=valid_anki_cards())
     @settings(max_examples=30)
     def test_anki_card_model_dump_contains_all_fields(self, card):
-        """Test that model_dump contains all fields."""
+        """
+        Given a valid AnkiCard
+        When model_dump is called
+        Then all fields are present with no extras
+        """
         data = card.model_dump()
-        assert "card_type" in data
-        assert "tags" in data
-        assert "front" in data
-        assert "back" in data
-        assert len(data) == 4  # No extra fields
+        assert_that(data).contains_key("card_type")
+        assert_that(data).contains_key("tags")
+        assert_that(data).contains_key("front")
+        assert_that(data).contains_key("back")
+        assert_that(data).is_length(4)  # No extra fields
 
     @given(card=valid_mcq_cards())
     @settings(max_examples=30)
     def test_mcq_card_model_dump_contains_all_fields(self, card):
-        """Test that MCQCard model_dump contains all fields."""
+        """
+        Given a valid MCQCard
+        When model_dump is called
+        Then all fields are present with no extras
+        """
         data = card.model_dump()
-        assert "card_type" in data
-        assert "tags" in data
-        assert "question" in data
-        assert "options" in data
-        assert "correct_answer" in data
-        assert "explanation" in data
-        assert len(data) == 6
+        assert_that(data).contains_key("card_type")
+        assert_that(data).contains_key("tags")
+        assert_that(data).contains_key("question")
+        assert_that(data).contains_key("options")
+        assert_that(data).contains_key("correct_answer")
+        assert_that(data).contains_key("explanation")
+        assert_that(data).is_length(6)
 
     @given(
         title=st.text(min_size=1, max_size=50),
@@ -615,7 +758,11 @@ class TestModelSerializationPropertyBased:
     )
     @settings(max_examples=30)
     def test_problem_model_dump_roundtrip(self, title, topic, difficulty):
-        """Test that problem models survive model_dump roundtrip."""
+        """
+        Given a valid LeetCodeProblem
+        When serialized and deserialized via model_dump
+        Then all fields are preserved
+        """
         original = LeetCodeProblem(
             title=title,
             topic=topic,
@@ -624,10 +771,10 @@ class TestModelSerializationPropertyBased:
         )
         data = original.model_dump()
         restored = LeetCodeProblem(**data)
-        assert restored.title == original.title
-        assert restored.topic == original.topic
-        assert restored.difficulty == original.difficulty
-        assert len(restored.cards) == len(original.cards)
+        assert_that(restored.title).is_equal_to(original.title)
+        assert_that(restored.topic).is_equal_to(original.topic)
+        assert_that(restored.difficulty).is_equal_to(original.difficulty)
+        assert_that(restored.cards).is_length(len(original.cards))
 
 
 class TestModelValidationPropertyBased:
@@ -636,7 +783,11 @@ class TestModelValidationPropertyBased:
     @given(extra_key=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Ll",))))
     @settings(max_examples=20)
     def test_anki_card_rejects_extra_fields(self, extra_key):
-        """Test that AnkiCard rejects any extra field."""
+        """
+        Given an extra field key
+        When AnkiCard is created with that extra field
+        Then ValidationError is raised
+        """
         assume(extra_key not in ["card_type", "tags", "front", "back"])
         with pytest.raises(ValidationError):
             AnkiCard(
@@ -650,7 +801,11 @@ class TestModelValidationPropertyBased:
     @given(extra_key=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Ll",))))
     @settings(max_examples=20)
     def test_mcq_card_rejects_extra_fields(self, extra_key):
-        """Test that MCQCard rejects any extra field."""
+        """
+        Given an extra field key
+        When MCQCard is created with that extra field
+        Then ValidationError is raised
+        """
         assume(extra_key not in ["card_type", "tags", "question", "options", "correct_answer", "explanation"])
         with pytest.raises(ValidationError):
             MCQCard(
@@ -666,7 +821,11 @@ class TestModelValidationPropertyBased:
     @given(extra_key=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Ll",))))
     @settings(max_examples=20)
     def test_problem_rejects_extra_fields(self, extra_key):
-        """Test that problem models reject extra fields."""
+        """
+        Given an extra field key
+        When LeetCodeProblem is created with that extra field
+        Then ValidationError is raised
+        """
         assume(extra_key not in ["title", "topic", "difficulty", "cards"])
         with pytest.raises(ValidationError):
             LeetCodeProblem(

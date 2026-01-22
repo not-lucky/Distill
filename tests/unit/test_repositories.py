@@ -2,6 +2,8 @@
 
 import json
 import pytest
+
+from assertpy import assert_that
 from pathlib import Path
 
 from src.database import DatabaseManager
@@ -14,8 +16,8 @@ class TestRunRepository:
     def test_init(self, in_memory_db):
         """Test RunRepository initialization."""
         repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        assert repo.db_path == Path(":memory:")
-        assert repo.run_id is None
+        assert_that(repo.db_path).is_equal_to(Path(":memory:"))
+        assert_that(repo.run_id).is_none()
 
     def test_initialize_database(self, tmp_path):
         """Test database initialization."""
@@ -35,8 +37,8 @@ class TestRunRepository:
             user_label="test"
         )
 
-        assert run_id is not None
-        assert repo.run_id == run_id
+        assert_that(run_id).is_not_none()
+        assert_that(repo.run_id).is_equal_to(run_id)
 
     def test_create_new_run_with_label(self, in_memory_db):
         """Test creating a run with user label."""
@@ -48,7 +50,7 @@ class TestRunRepository:
             user_label="my test run"
         )
 
-        assert run_id is not None
+        assert_that(run_id).is_not_none()
 
     def test_mark_run_failed(self, in_memory_db):
         """Test marking a run as failed."""
@@ -65,7 +67,7 @@ class TestRunRepository:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, repo.run_id)
-            assert run.status == "failed"
+            assert_that(run.status).is_equal_to("failed")
 
     def test_mark_run_failed_no_active_run(self, in_memory_db):
         """Test marking failed without active run raises error."""
@@ -94,11 +96,11 @@ class TestRunRepository:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, repo.run_id)
-            assert run.status == "completed"
-            assert run.total_problems == 10
-            assert run.successful_problems == 8
-            assert run.failed_problems == 2
-            assert run.completed_at is not None
+            assert_that(run.status).is_equal_to("completed")
+            assert_that(run.total_problems).is_equal_to(10)
+            assert_that(run.successful_problems).is_equal_to(8)
+            assert_that(run.failed_problems).is_equal_to(2)
+            assert_that(run.completed_at).is_not_none()
 
     def test_mark_run_completed_no_active_run(self, in_memory_db):
         """Test marking completed without active run raises error."""
@@ -119,9 +121,9 @@ class TestRunRepository:
 
         card_repo = repo.get_card_repository()
 
-        assert card_repo is not None
+        assert_that(card_repo).is_not_none()
         assert isinstance(card_repo, CardRepository)
-        assert card_repo.run_id == repo.run_id
+        assert_that(card_repo.run_id).is_equal_to(repo.run_id)
 
     def test_get_card_repository_no_run(self, in_memory_db):
         """Test getting CardRepository without active run raises error."""
@@ -133,14 +135,14 @@ class TestRunRepository:
     def test_run_id_property(self, in_memory_db):
         """Test run_id property."""
         repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        assert repo.run_id is None
+        assert_that(repo.run_id).is_none()
 
         repo.create_new_run(
             mode="leetcode",
             subject="leetcode",
             card_type="standard"
         )
-        assert repo.run_id is not None
+        assert_that(repo.run_id).is_not_none()
 
 
 class TestCardRepository:
@@ -159,7 +161,7 @@ class TestCardRepository:
 
     def test_init(self, card_repo):
         """Test CardRepository initialization."""
-        assert card_repo.run_id is not None
+        assert_that(card_repo.run_id).is_not_none()
 
     def test_create_initial_problem(self, card_repo):
         """Test creating an initial problem entry."""
@@ -170,7 +172,7 @@ class TestCardRepository:
             problem_index=1
         )
 
-        assert problem_id is not None
+        assert_that(problem_id).is_not_none()
         assert isinstance(problem_id, int)
 
     def test_create_initial_problem_minimal(self, card_repo):
@@ -179,7 +181,7 @@ class TestCardRepository:
             question_name="Simple Problem"
         )
 
-        assert problem_id is not None
+        assert_that(problem_id).is_not_none()
 
     def test_save_provider_result(self, card_repo):
         """Test saving a provider result."""
@@ -199,7 +201,7 @@ class TestCardRepository:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert len(problem.provider_results) == 1
+            assert_that(problem.provider_results).is_length(1)
             assert problem.provider_results[0].provider_name == "test_provider"
 
     def test_save_multiple_provider_results(self, card_repo):
@@ -226,7 +228,7 @@ class TestCardRepository:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert len(problem.provider_results) == 2
+            assert_that(problem.provider_results).is_length(2)
 
     def test_update_problem_failed(self, card_repo):
         """Test marking a problem as failed."""
@@ -242,8 +244,8 @@ class TestCardRepository:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.status == "failed"
-            assert problem.processing_time_seconds == 5.5
+            assert_that(problem.status).is_equal_to("failed")
+            assert_that(problem.processing_time_seconds).is_equal_to(5.5)
 
     def test_save_final_result(self, card_repo):
         """Test saving the final combined result."""
@@ -268,10 +270,10 @@ class TestCardRepository:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.status == "success"
-            assert problem.final_card_count == 2
-            assert problem.processing_time_seconds == 10.0
-            assert len(problem.cards) == 2
+            assert_that(problem.status).is_equal_to("success")
+            assert_that(problem.final_card_count).is_equal_to(2)
+            assert_that(problem.processing_time_seconds).is_equal_to(10.0)
+            assert_that(problem.cards).is_length(2)
 
     def test_save_final_result_empty_cards(self, card_repo):
         """Test saving final result with no cards."""
@@ -290,9 +292,9 @@ class TestCardRepository:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.status == "success"
-            assert problem.final_card_count == 0
-            assert len(problem.cards) == 0
+            assert_that(problem.status).is_equal_to("success")
+            assert_that(problem.final_card_count).is_equal_to(0)
+            assert_that(problem.cards).is_length(0)
 
 
 class TestRunStats:
@@ -306,9 +308,9 @@ class TestRunStats:
             failed_problems=2
         )
 
-        assert stats.total_problems == 10
-        assert stats.successful_problems == 8
-        assert stats.failed_problems == 2
+        assert_that(stats.total_problems).is_equal_to(10)
+        assert_that(stats.successful_problems).is_equal_to(8)
+        assert_that(stats.failed_problems).is_equal_to(2)
 
     def test_run_stats_zero_values(self):
         """Test RunStats with zero values."""
@@ -318,13 +320,13 @@ class TestRunStats:
             failed_problems=0
         )
 
-        assert stats.total_problems == 0
+        assert_that(stats.total_problems).is_equal_to(0)
 
     def test_run_stats_equality(self):
         """Test RunStats equality comparison."""
         stats1 = RunStats(total_problems=5, successful_problems=4, failed_problems=1)
         stats2 = RunStats(total_problems=5, successful_problems=4, failed_problems=1)
-        assert stats1 == stats2
+        assert_that(stats1).is_equal_to(stats2)
 
     def test_run_stats_inequality(self):
         """Test RunStats inequality comparison."""
@@ -339,7 +341,7 @@ class TestRunStats:
             successful_problems=999999,
             failed_problems=1
         )
-        assert stats.total_problems == 1000000
+        assert_that(stats.total_problems).is_equal_to(1000000)
 
 
 class TestRunRepositoryDbManager:
@@ -385,9 +387,9 @@ class TestRunRepositoryModes:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.mode == "leetcode"
-            assert run.subject == "leetcode"
-            assert run.card_type == "standard"
+            assert_that(run.mode).is_equal_to("leetcode")
+            assert_that(run.subject).is_equal_to("leetcode")
+            assert_that(run.card_type).is_equal_to("standard")
 
     def test_leetcode_mcq_mode(self, in_memory_db):
         """Test creating leetcode mcq mode run."""
@@ -400,8 +402,8 @@ class TestRunRepositoryModes:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.mode == "leetcode_mcq"
-            assert run.card_type == "mcq"
+            assert_that(run.mode).is_equal_to("leetcode_mcq")
+            assert_that(run.card_type).is_equal_to("mcq")
 
     def test_cs_mode(self, in_memory_db):
         """Test creating cs mode run."""
@@ -414,8 +416,8 @@ class TestRunRepositoryModes:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.mode == "cs"
-            assert run.subject == "cs"
+            assert_that(run.mode).is_equal_to("cs")
+            assert_that(run.subject).is_equal_to("cs")
 
     def test_cs_mcq_mode(self, in_memory_db):
         """Test creating cs mcq mode run."""
@@ -428,7 +430,7 @@ class TestRunRepositoryModes:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.mode == "cs_mcq"
+            assert_that(run.mode).is_equal_to("cs_mcq")
 
     def test_physics_mode(self, in_memory_db):
         """Test creating physics mode run."""
@@ -441,7 +443,7 @@ class TestRunRepositoryModes:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.mode == "physics"
+            assert_that(run.mode).is_equal_to("physics")
 
     def test_physics_mcq_mode(self, in_memory_db):
         """Test creating physics mcq mode run."""
@@ -454,7 +456,7 @@ class TestRunRepositoryModes:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.mode == "physics_mcq"
+            assert_that(run.mode).is_equal_to("physics_mcq")
 
     def test_custom_mode(self, in_memory_db):
         """Test creating custom subject mode run."""
@@ -467,7 +469,7 @@ class TestRunRepositoryModes:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.mode == "my_custom_subject"
+            assert_that(run.mode).is_equal_to("my_custom_subject")
 
 
 class TestCardRepositoryProblemCategories:
@@ -492,9 +494,9 @@ class TestCardRepositoryProblemCategories:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.category_name is None
-            assert problem.category_index is None
-            assert problem.problem_index is None
+            assert_that(problem.category_name).is_none()
+            assert_that(problem.category_index).is_none()
+            assert_that(problem.problem_index).is_none()
 
     def test_problem_with_full_category_info(self, card_repo):
         """Test creating problem with full category info."""
@@ -507,9 +509,9 @@ class TestCardRepositoryProblemCategories:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.category_name == "Arrays"
-            assert problem.category_index == 1
-            assert problem.problem_index == 5
+            assert_that(problem.category_name).is_equal_to("Arrays")
+            assert_that(problem.category_index).is_equal_to(1)
+            assert_that(problem.problem_index).is_equal_to(5)
 
     def test_problem_category_index_only(self, card_repo):
         """Test creating problem with category index but no name."""
@@ -520,7 +522,7 @@ class TestCardRepositoryProblemCategories:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.category_index == 3
+            assert_that(problem.category_index).is_equal_to(3)
 
     def test_multiple_problems_same_category(self, card_repo):
         """Test creating multiple problems in same category."""
@@ -538,8 +540,8 @@ class TestCardRepositoryProblemCategories:
         with card_repo.db_manager.session_scope() as session:
             for i, pid in enumerate(problems):
                 problem = get_problem(session, pid)
-                assert problem.category_name == "Binary Search"
-                assert problem.problem_index == i + 1
+                assert_that(problem.category_name).is_equal_to("Binary Search")
+                assert_that(problem.problem_index).is_equal_to(i + 1)
 
 
 class TestCardRepositoryProviderResults:
@@ -570,7 +572,7 @@ class TestCardRepositoryProviderResults:
             result = session.query(ProviderResult).filter_by(
                 problem_id=problem_id
             ).first()
-            assert result.card_count is None
+            assert_that(result.card_count).is_none()
 
     def test_save_provider_result_large_output(self, card_repo):
         """Test saving provider result with large raw output."""
@@ -665,9 +667,9 @@ class TestCardRepositoryFinalResults:
         from src.database import get_problem, Card
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.final_card_count == 50
+            assert_that(problem.final_card_count).is_equal_to(50)
             saved_cards = session.query(Card).filter_by(problem_id=problem_id).all()
-            assert len(saved_cards) == 50
+            assert_that(saved_cards).is_length(50)
 
     def test_save_final_result_zero_time(self, card_repo):
         """Test saving final result with zero processing time."""
@@ -680,7 +682,7 @@ class TestCardRepositoryFinalResults:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.processing_time_seconds == 0.0
+            assert_that(problem.processing_time_seconds).is_equal_to(0.0)
 
     def test_save_final_result_large_time(self, card_repo):
         """Test saving final result with large processing time."""
@@ -693,7 +695,7 @@ class TestCardRepositoryFinalResults:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.processing_time_seconds == 999999.99
+            assert_that(problem.processing_time_seconds).is_equal_to(999999.99)
 
 
 class TestIntegrationWorkflow:
@@ -757,15 +759,15 @@ class TestIntegrationWorkflow:
         from src.database import get_run, get_problem, Card
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.status == "completed"
-            assert run.total_problems == 3
-            assert run.successful_problems == 3
+            assert_that(run.status).is_equal_to("completed")
+            assert_that(run.total_problems).is_equal_to(3)
+            assert_that(run.successful_problems).is_equal_to(3)
 
             # Check all problems
             for pid in problem_ids:
                 problem = get_problem(session, pid)
-                assert problem.status == "success"
-                assert problem.final_card_count == 2
+                assert_that(problem.status).is_equal_to("success")
+                assert_that(problem.final_card_count).is_equal_to(2)
 
             # Check cards
             cards = session.query(Card).filter_by(run_id=run_id).all()
@@ -804,9 +806,9 @@ class TestIntegrationWorkflow:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.status == "completed"
-            assert run.successful_problems == 1
-            assert run.failed_problems == 1
+            assert_that(run.status).is_equal_to("completed")
+            assert_that(run.successful_problems).is_equal_to(1)
+            assert_that(run.failed_problems).is_equal_to(1)
 
     def test_run_failure_workflow(self, in_memory_db):
         """Test workflow when entire run fails."""
@@ -822,7 +824,7 @@ class TestIntegrationWorkflow:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.status == "failed"
+            assert_that(run.status).is_equal_to("failed")
 
 
 class TestEdgeCasesRepositories:
@@ -856,7 +858,7 @@ class TestEdgeCasesRepositories:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert len(problem.question_name) == 1000
+            assert_that(problem.question_name).is_length(1000)
 
     def test_special_characters_in_question(self, card_repo):
         """Test special characters in question names."""
@@ -865,7 +867,7 @@ class TestEdgeCasesRepositories:
         from src.database import get_problem
         with card_repo.db_manager.session_scope() as session:
             problem = get_problem(session, problem_id)
-            assert problem.question_name == special_name
+            assert_that(problem.question_name).is_equal_to(special_name)
 
     def test_empty_user_label(self, in_memory_db):
         """Test run with empty string user label."""
@@ -879,7 +881,7 @@ class TestEdgeCasesRepositories:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert run.user_label == ""
+            assert_that(run.user_label).is_equal_to("")
 
     def test_very_long_user_label(self, in_memory_db):
         """Test run with very long user label."""
@@ -894,4 +896,4 @@ class TestEdgeCasesRepositories:
         from src.database import get_run
         with in_memory_db.session_scope() as session:
             run = get_run(session, run_id)
-            assert len(run.user_label) == 500
+            assert_that(run.user_label).is_length(500)
