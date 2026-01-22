@@ -43,3 +43,15 @@ filterwarnings = [
     # Ignore unawaited coroutine warnings from unittest.mock internals (Python 3.12+ issue)
     "ignore:coroutine 'AsyncMockMixin._execute_mock_call' was never awaited:RuntimeWarning",
 ]
+
+[dependency-groups]
+dev = [
+    "assertpy>=1.1",
+    "hypothesis>=6.150.1",
+    "mutmut>=3.4.0",
+    "pytest-cov>=7.0.0",
+    "pytest-httpx>=0.36.0",
+    "pytest-mock>=3.15.1",
+    "pytest-xdist>=3.8.0",
+    "syrupy>=5.0.0",
+]
