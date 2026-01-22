@@ -17,7 +17,7 @@ from src.providers.base import (
     TimeoutError,
     EmptyResponseError,
 )
-from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+from src.prompts import prompts
 from src.utils import strip_json_block
 import logging
 
@@ -187,7 +187,7 @@ class OpenAICompatibleProvider(LLMProvider):
         prompt_template: Optional[str] = None,
     ) -> str:
         """Generate initial cards for a given question."""
-        active_template = prompt_template or INITIAL_PROMPT_TEMPLATE
+        active_template = prompt_template or prompts.initial
 
         chat_messages = [
             {
@@ -217,7 +217,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
         Returns raw response string (may not be valid JSON).
         """
-        active_template = combine_prompt_template or COMBINE_PROMPT_TEMPLATE
+        active_template = combine_prompt_template or prompts.combine
 
         chat_messages = [
             {

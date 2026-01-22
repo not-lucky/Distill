@@ -1,231 +1,252 @@
-# REFACTORING.md - LLM2Deck Improvement Opportunities
+# Refactoring Opportunities
 
-## Priority 1: Critical Architecture Issues
-
-### 1.1 Configuration Duplication and Inconsistency
-**Location:** `src/config/__init__.py` + `src/config/loader.py`
-
-**Problem:** Two parallel configuration systems exist:
-- Legacy module-level constants in `src/config/__init__.py` (hardcoded paths, env vars)
-- Modern Pydantic-based `AppConfig` in `src/config/loader.py`
-
-This creates confusion about which configuration source is authoritative. `DATABASE_PATH`, `CEREBRAS_KEYS_FILE_PATH`, etc. are defined in both places with different resolution logic.
-
-**Refactoring:**
-- Deprecate all module-level constants in `src/config/__init__.py`
-- Route all config access through `load_config()` -> `AppConfig`
-- Update all imports across the codebase to use the unified config
-
-### 1.2 Generator Assumes Repository Always Exists
-**Location:** `src/generator.py:CardGenerator.process_question()`
-
-**Problem:** `process_question()` unconditionally calls `self.repository.create_initial_problem()` on line 122, but `repository` can be `None` in dry-run mode. The dry-run check exists in `Orchestrator` but `CardGenerator` lacks awareness.
-
-**Refactoring:**
-- Add explicit dry-run flag to `CardGenerator`
-- Guard all repository calls with `if self.repository is not None`
-- Or extract a `NullRepository` pattern for dry-run mode
-
-### 1.3 Hardcoded System Prompts
-**Location:** `src/providers/openai_compatible.py` (lines 124, 172, 195)
-
-**Problem:** System prompts like "You are a helpful assistant that generates Anki cards in JSON format." are hardcoded in multiple places (also in `cerebras.py`).
-
-**Refactoring:**
-- Move system prompts to configurable templates in `src/data/prompts/`
-- Allow per-subject or per-mode system prompt customization
+This document outlines potential improvements to the LLM2Deck codebase, organized by priority.
 
 ---
 
-## Priority 2: Code Quality and Maintainability
+## Priority 1: High Impact, Low Risk (COMPLETED)
 
-### 2.1 Inconsistent Return Types in Providers
-**Location:** `src/providers/base.py`, `src/providers/openai_compatible.py`
+### 1.1 Consolidate Pydantic Problem Models - DONE
 
-**Problem:** Method return types are inconsistent:
-- `generate_initial_cards()` returns `str` (empty string on failure)
-- `combine_cards()` returns `Optional[str]` (None on failure)
-- `format_json()` returns `Optional[Dict[str, Any]]`
+**Files:** `src/models.py`
 
-This asymmetry forces callers to handle different failure modes differently.
-
-**Refactoring:**
-- Standardize all methods to return `Optional[T]` with `None` indicating failure
-- Or use a `Result[T, E]` pattern consistently (like `task_runner.py`)
-
-### 2.2 Prompt Loader Backward Compatibility Overhead
-**Location:** `src/prompts.py`
-
-**Problem:** Module-level constants like `INITIAL_PROMPT_TEMPLATE = prompts.initial` are evaluated eagerly at import time, loading all prompt files even when not needed. This contradicts the "lazy-loading" claim in the docstring.
-
-**Refactoring:**
-- Remove module-level constant exports
-- Force callers to use `prompts.initial`, `prompts.combine`, etc. directly
-- Or implement true lazy loading with `__getattr__` at module level
-
-### 2.3 Mixed Async Patterns in `setup.py`
-**Location:** `src/setup.py:initialize_providers()`
-
-**Problem:** `initialize_providers()` is async, but most provider initialization is synchronous. The only async part is `load_keys()`. This creates unnecessary complexity.
-
-**Refactoring:**
-- Make key loading synchronous (it's just file I/O)
-- Convert `initialize_providers()` to sync, or
-- Clearly separate async vs sync initialization
-
-### 2.4 Subject Registry Recreates Config on Every Call
-**Location:** `src/config/subjects.py:SubjectRegistry`
-
-**Problem:** `SubjectRegistry.__init__()` calls `load_config()` on every instantiation. Creating multiple registry instances reloads and re-parses the YAML config file.
-
-**Refactoring:**
-- Cache config at module level, or
-- Accept config as constructor parameter with fallback to `load_config()`
-- Use singleton pattern for `SubjectRegistry`
+**Status:** Implemented. Created `BaseProblem` class that `LeetCodeProblem`, `CSProblem`, `PhysicsProblem`, and `GenericProblem` inherit from.
 
 ---
 
-## Priority 3: Missing Error Handling and Validation
+### 1.2 Remove Deprecated Global Database State - DONE
 
-### 3.1 Silent Failures in Provider Initialization
-**Location:** `src/setup.py:initialize_providers()` line 68
+**Files:** `src/database.py`
 
-**Problem:** Provider initialization failures are logged as warnings but silently swallowed. The orchestrator may proceed with fewer providers than expected without explicit indication.
-
-**Refactoring:**
-- Return initialization errors alongside providers
-- Add a `--strict` mode that fails fast on any provider error
-- Log summary: "Initialized 3/5 providers, 2 failed"
-
-### 3.2 No Validation of Questions Data
-**Location:** `src/questions.py`, `src/config/subjects.py`
-
-**Problem:** Questions loaded from JSON files are not validated. Malformed questions (e.g., empty strings, null values) can cause runtime errors during generation.
-
-**Refactoring:**
-- Add Pydantic models for question data
-- Validate questions at load time
-- Provide clear error messages for invalid questions
-
-### 3.3 Unhandled Database Session Leaks
-**Location:** `src/repositories.py`
-
-**Problem:** Each repository method opens a new session via `session_scope()`. If multiple operations need to be atomic, there's no transaction grouping.
-
-**Refactoring:**
-- Add optional `session` parameter to repository methods for explicit transaction control
-- Or expose `session_scope()` at repository level for batch operations
+**Status:** Implemented. Removed `_engine` and `_SessionLocal` globals. Added deprecation warnings to wrapper functions. Updated call sites in `tests/conftest.py`, `src/queries.py`, and `src/repositories.py` to use `DatabaseManager` directly.
 
 ---
 
-## Priority 4: Performance and Scalability
+### 1.3 Dynamic Prompt Loading - DONE
 
-### 4.1 Sequential Prompt Loading
-**Location:** `src/prompts.py:PromptLoader`
+**Files:** `src/prompts.py`, `src/providers/*.py`
 
-**Problem:** Each prompt is loaded from disk on first access. For custom subjects with many prompts, this creates N disk reads during initialization.
-
-**Refactoring:**
-- Batch-load all prompts from a subject directory
-- Consider embedding prompts as package resources
-
-### 4.2 No Connection Pooling for Providers
-**Location:** `src/providers/openai_compatible.py:_get_client()`
-
-**Problem:** `_get_client()` creates a new `AsyncOpenAI` client for every request. This prevents HTTP connection reuse.
-
-**Refactoring:**
-- Cache client instances per API key
-- Use connection pooling at the provider level
-- Reuse client across multiple requests
-
-### 4.3 Task Runner Creates Results in Completion Order
-**Location:** `src/task_runner.py:run_all()`
-
-**Problem:** `run_all()` appends results in completion order, not input order. `run_all_ordered()` exists but isn't used by the orchestrator.
-
-**Refactoring:**
-- Remove `run_all()` if order matters (which it does for reproducibility)
-- Or document when to use each variant
+**Status:** Implemented. Module-level constants now use `__getattr__` with deprecation warnings. All providers updated to use `prompts` singleton instead of importing deprecated constants. Added deprecation warning to `load_prompt()` function.
 
 ---
 
-## Priority 5: Testing and Observability
+## Priority 2: Medium Impact, Medium Risk
 
-### 5.1 Fixtures Rely on Deprecated Patterns
-**Location:** `tests/conftest.py` lines 65-70
+### 2.1 Data-Driven Subject Configuration
 
-**Problem:** `SubjectRegistry.get_config()` is called as a static method, but it's an instance method.
+**Files:** `src/config/subjects.py`
 
-**Refactoring:**
-- Update fixtures to instantiate `SubjectRegistry()` properly
-- Add type hints to fixtures
+**Issue:** `_get_builtin_config()` (lines 92-146) contains multiple hardcoded dictionaries (`questions_map`, `default_prefixes`, `config_map`) that map subject names to resources. This violates the Open/Closed principle.
 
-### 5.2 No Structured Logging
-**Location:** Throughout the codebase
+**Recommendation:** Move built-in subject definitions to a configuration file (YAML or JSON) or a data structure within the module, using the same format as custom subjects.
 
-**Problem:** Log messages are string-formatted, making it hard to query/aggregate logs. No correlation IDs for tracking a generation run across logs.
-
-**Refactoring:**
-- Add structured logging with JSON output option
-- Include `run_id` in all log messages during a run
-- Use `logging.LoggerAdapter` with extra context
-
-### 5.3 Metrics and Instrumentation
-**Problem:** No observability into:
-- Provider response times
-- API error rates by provider
-- Card generation success rates
-
-**Refactoring:**
-- Add optional metrics collection (prometheus-style or simple counters)
-- Expose run statistics via CLI command
+```yaml
+# Example: subjects could be defined uniformly
+subjects:
+  leetcode:
+    builtin: true
+    deck_prefix: "LeetCode"
+    model: LeetCodeProblem
+    questions: "src/data/questions.json#leetcode"
+```
 
 ---
 
-## Priority 6: Minor Cleanup
+### 2.2 Consolidate Database CRUD Functions into Repositories
 
-### 6.1 Dead Code: `ENABLE_GEMINI` Environment Variable
-**Location:** `src/config/__init__.py`, `src/setup.py`
+**Files:** `src/database.py`, `src/repositories.py`
 
-**Problem:** `ENABLE_GEMINI` env var support is deprecated but still implemented. It adds complexity to `initialize_providers()`.
+**Issue:** `database.py` contains CRUD functions (`create_run`, `update_run`, `create_problem`, etc.) that are called by the repositories. This creates a two-layer abstraction where the repositories are thin wrappers.
 
-**Refactoring:**
-- Remove `ENABLE_GEMINI` support entirely
-- Document migration path in changelog
-
-### 6.2 Unused Type Aliases
-**Location:** `src/types.py`
-
-**Problem:** `CardData`, `MCQCardData`, `ProviderResultData` TypedDicts are defined but not used anywhere in the codebase.
-
-**Refactoring:**
-- Either use these types to annotate relevant code
-- Or remove unused definitions
-
-### 6.3 Inconsistent Naming: `strip_json_block` vs `strip_json_markers`
-**Location:** `src/utils.py`, `src/config/loader.py`
-
-**Problem:** Config uses `strip_json_markers` but utility function is `strip_json_block`.
-
-**Refactoring:**
-- Align naming across config and implementation
-
-### 6.4 Magic Numbers in Anki Generator
-**Location:** `src/anki/generator.py`
-
-**Problem:** `category_index:03d` format assumes < 1000 categories. Options padded to 4 without constant.
-
-**Refactoring:**
-- Extract format strings as constants
-- Document or make configurable
+**Recommendation:** Merge CRUD logic directly into repository classes, making repositories the single point of data access.
 
 ---
 
-## Implementation Notes
+### 2.3 Simplify Provider Initialization Logic
 
-When implementing these refactorings:
-1. Add tests before changing behavior
-2. Use deprecation warnings for breaking API changes
-3. Update `CLAUDE.md` if architectural patterns change
-4. Keep each refactoring as a separate commit for easy review/revert
+**Files:** `src/setup.py`
+
+**Issue:** `initialize_providers()` has complex conditional logic for determining combiner/formatter roles (lines 77-105). The `also_generate` flag adds additional complexity.
+
+**Recommendation:** Consider a more explicit configuration approach where provider roles are declared upfront rather than inferred from matching.
+
+---
+
+## Priority 3: Lower Impact, Larger Scope
+
+### 3.1 Extract CLI Handlers to Service Layer
+
+**Files:** `src/cli.py`
+
+**Issue:** CLI handlers (`handle_convert`, `handle_merge`, `handle_export_md`) contain business logic mixed with argument parsing. The `handle_generate` function imports `Orchestrator` inline.
+
+**Recommendation:** Extract handler logic into dedicated service classes (partially done with `MergeService`, `ExportService`). Apply the same pattern to `convert` and `generate` commands.
+
+---
+
+### 3.2 Standardize Error Types
+
+**Files:** `src/exceptions.py`, `src/providers/base.py`
+
+**Issue:** Error types are split between `src/exceptions.py` and `src/providers/base.py` (retry-related errors). This creates inconsistency in where to find error classes.
+
+**Recommendation:** Consolidate all custom exceptions in `src/exceptions.py` or create a clear hierarchy (e.g., `exceptions/` package with submodules for providers, generation, etc.).
+
+---
+
+### 3.3 Remove Backward Compatibility Shims
+
+**Files:** `src/config/subjects.py:205-215`, `src/prompts.py:181-197`, `src/database.py:259-288`
+
+**Issue:** Multiple backward-compatible functions and constants exist for legacy code support. These add maintenance burden.
+
+**Recommendation:** After confirming no external dependencies, remove:
+- `get_subject_config()` convenience function
+- `load_prompt()` function
+- Module-level prompt constants (`INITIAL_PROMPT_TEMPLATE`, etc.)
+- Global `init_database()`, `get_session()`, `session_scope()` wrappers
+
+---
+
+### 3.4 Type Annotation Improvements
+
+**Files:** Various
+
+**Specific improvements:**
+- `src/orchestrator.py:139` - Use `Tuple[int, str, int, str]` type alias for question metadata
+- `src/generator.py:203` - `model_class: Type[BaseModel]` default should not be `LeetCodeProblem`
+- `src/types.py` - Define and use `CardResult` type more consistently
+
+---
+
+### 3.5 DRY Up Task Runner Methods
+
+**Files:** `src/task_runner.py`
+
+**Issue:** `run_all()` and `run_all_ordered()` (lines 63-134) have duplicated logic for semaphore-based concurrency and request delay handling.
+
+**Recommendation:** Extract shared logic into a private method, or unify into a single method with an `ordered` parameter.
+
+---
+
+### 3.6 Lazy Question Loading
+
+**Files:** `src/questions.py`
+
+**Issue:** Line 71 loads questions at module import time (`QUESTIONS, CS_QUESTIONS, PHYSICS_QUESTIONS = load_questions()`). This causes file I/O during import and makes testing harder.
+
+**Recommendation:** Use lazy loading pattern (e.g., `cached_property` or a singleton loader similar to `PromptLoader`).
+
+---
+
+### 3.7 DRY Up Config Validation Functions
+
+**Files:** `src/config/loader.py`
+
+**Issue:** `get_combiner_config()` (lines 206-243) and `get_formatter_config()` (lines 246-283) have nearly identical validation logic for provider existence, enabled status, and model matching.
+
+**Recommendation:** Extract common validation into a shared helper function.
+
+```python
+def _validate_provider_reference(
+    config: AppConfig,
+    provider_name: str,
+    model: str,
+    role: str  # "Combiner" or "Formatter"
+) -> None:
+    # Common validation logic
+```
+
+---
+
+### 3.8 Deterministic MCQ Option Shuffling
+
+**Files:** `src/anki/generator.py`
+
+**Issue:** `_shuffle_options()` (line 182) uses `random.shuffle()` without seeding, producing non-deterministic output between runs for the same input.
+
+**Recommendation:** Either seed the random generator with a deterministic value (e.g., hash of question content), or make shuffling optional/configurable.
+
+---
+
+### 3.9 Remove Usage of Deprecated Prompt Constants
+
+**Files:** `src/providers/openai_compatible.py`
+
+**Issue:** Lines 20-21 import deprecated module-level constants (`INITIAL_PROMPT_TEMPLATE`, `COMBINE_PROMPT_TEMPLATE`).
+
+**Recommendation:** After implementing dynamic prompt loading (1.3), update this file to use the `prompts` singleton or accept templates as constructor parameters.
+
+---
+
+### 3.10 Provider Registry Conditional Complexity
+
+**Files:** `src/providers/registry.py`
+
+**Issue:** `create_provider_instances()` (lines 104-182) has multiple conditional branches for different provider types (`multi_model`, `uses_base_url`, `key_name`, etc.).
+
+**Recommendation:** Consider a strategy pattern or builder pattern where each `ProviderSpec` knows how to construct its own instances, reducing the central function complexity.
+
+---
+
+### 3.11 Anki Generator Hash Function
+
+**Files:** `src/anki/generator.py`
+
+**Issue:** `_generate_id()` (line 53) uses MD5 for ID generation. While not a security concern here, MD5 is deprecated for cryptographic use.
+
+**Recommendation:** Use a non-cryptographic hash (e.g., `hash()` or `xxhash`) or document that MD5 is intentionally used for deterministic ID generation only.
+
+---
+
+## Priority 4: Code Quality & Testing
+
+### 4.1 Add Integration Tests for Provider Workflow
+
+**Issue:** The provider initialization -> generation -> combination flow lacks integration tests.
+
+**Recommendation:** Add tests that mock LLM responses and verify the full workflow.
+
+---
+
+### 4.2 Configuration Schema Validation
+
+**Issue:** Configuration errors are only caught at runtime when `load_config()` is called.
+
+**Recommendation:** Add a CLI command (`llm2deck config validate`) or pre-flight check to validate configuration before running generation.
+
+---
+
+### 4.3 Centralize Magic Strings
+
+**Files:** Various
+
+**Issue:** Status strings like `"running"`, `"completed"`, `"failed"` are used as literals throughout the codebase.
+
+**Recommendation:** Create an enum or constants module for status values.
+
+```python
+class RunStatus(str, Enum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+```
+
+---
+
+### 4.4 Improve Dry Run Consistency
+
+**Files:** `src/orchestrator.py`, `src/cli.py`, `src/generator.py`
+
+**Issue:** Dry run logic is scattered across multiple files with varying levels of implementation.
+
+**Recommendation:** Consider a `DryRunContext` or similar pattern to centralize dry run behavior.
+
+---
+
+## Notes
+
+- Priority 1 items can be addressed independently with minimal risk
+- Priority 2 items require more careful planning and may affect multiple modules
+- Priority 3 items are quality-of-life improvements that can be addressed incrementally
+- Priority 4 items focus on code quality and testing infrastructure

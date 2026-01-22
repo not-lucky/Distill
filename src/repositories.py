@@ -9,8 +9,6 @@ from typing import Dict, List, Optional, Any
 
 from src.database import (
     DatabaseManager,
-    get_session,
-    init_database,
     create_run,
     update_run,
     create_problem,

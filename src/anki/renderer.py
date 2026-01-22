@@ -47,7 +47,7 @@ def render_markdown(markdown_text: str) -> str:
         'thead', 'tr', 'ul'
     ]
     allowed_html_attributes = {
-        '*': ['class', 'style'],
+        '*': ['class'],
         'a': ['href', 'title', 'target'],
         'img': ['src', 'alt', 'title'],
     }

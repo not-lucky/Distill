@@ -2,9 +2,14 @@
 
 from typing import List, Dict, Optional
 from datetime import datetime
-from src.database import get_session, Run, Problem, ProviderResult, Card
+from src.database import DatabaseManager, Run, Problem, ProviderResult, Card
 from sqlalchemy import func
 import json
+
+
+def _get_session():
+    """Get a database session from the default manager."""
+    return DatabaseManager.get_default().get_session()
 
 
 def get_runs(
@@ -29,7 +34,7 @@ def get_runs(
     Returns:
         List of Run objects matching the criteria
     """
-    session = get_session()
+    session = _get_session()
     query = session.query(Run)
 
     if mode:
@@ -60,7 +65,7 @@ def get_problems_by_run(run_id: str) -> List[Problem]:
     Returns:
         List of Problem objects for this run
     """
-    session = get_session()
+    session = _get_session()
     problems = session.query(Problem).filter(Problem.run_id == run_id).all()
     session.close()
     return problems
@@ -76,7 +81,7 @@ def get_problems_by_question(question_name: str) -> List[Problem]:
     Returns:
         List of Problem objects matching the question name
     """
-    session = get_session()
+    session = _get_session()
     problems = (
         session.query(Problem)
         .filter(Problem.question_name.like(f"%{question_name}%"))
@@ -97,7 +102,7 @@ def get_provider_results_by_problem(problem_id: int) -> List[ProviderResult]:
     Returns:
         List of ProviderResult objects for this problem
     """
-    session = get_session()
+    session = _get_session()
     results = (
         session.query(ProviderResult)
         .filter(ProviderResult.problem_id == problem_id)
@@ -121,7 +126,7 @@ def get_provider_results_by_run(
     Returns:
         List of ProviderResult objects matching the criteria
     """
-    session = get_session()
+    session = _get_session()
     query = session.query(ProviderResult).filter(ProviderResult.run_id == run_id)
 
     if provider_name:
@@ -144,7 +149,7 @@ def get_cards_by_problem(problem_id: int) -> List[Card]:
     Returns:
         List of Card objects for this problem
     """
-    session = get_session()
+    session = _get_session()
     cards = (
         session.query(Card)
         .filter(Card.problem_id == problem_id)
@@ -166,7 +171,7 @@ def get_cards_by_run(run_id: str, card_type: Optional[str] = None) -> List[Card]
     Returns:
         List of Card objects matching the criteria
     """
-    session = get_session()
+    session = _get_session()
     query = session.query(Card).filter(Card.run_id == run_id)
 
     if card_type:
@@ -187,7 +192,7 @@ def search_cards(search_query: str) -> List[Card]:
     Returns:
         List of Card objects matching the search query
     """
-    session = get_session()
+    session = _get_session()
     cards = (
         session.query(Card)
         .filter(
@@ -210,7 +215,7 @@ def get_run_statistics(run_id: str) -> Dict:
     Returns:
         Dictionary with run statistics
     """
-    session = get_session()
+    session = _get_session()
 
     run = session.query(Run).filter(Run.id == run_id).first()
     if not run:

@@ -4,7 +4,7 @@ import asyncio
 from typing import Dict, Any, Optional, List
 from g4f.client import AsyncClient
 from src.providers.base import LLMProvider
-from src.prompts import INITIAL_PROMPT_TEMPLATE, COMBINE_PROMPT_TEMPLATE
+from src.prompts import prompts
 import logging
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ class G4FProvider(LLMProvider):
         # logger.info(f"[G4F:{self.model_name}] Generating initial cards for '{question}'...")
 
         active_template = (
-            prompt_template if prompt_template else INITIAL_PROMPT_TEMPLATE
+            prompt_template if prompt_template else prompts.initial
         )
 
         chat_messages = [
@@ -116,7 +116,7 @@ class G4FProvider(LLMProvider):
         active_template = (
             combine_prompt_template
             if combine_prompt_template
-            else COMBINE_PROMPT_TEMPLATE
+            else prompts.combine
         )
         chat_messages = [
             {

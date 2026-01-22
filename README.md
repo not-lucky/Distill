@@ -368,6 +368,51 @@ All runs are tracked in `llm2deck.db`:
 
 Query with any SQLite client or use `src/queries.py`.
 
+## Testing
+
+The project has comprehensive test coverage with all LLM API calls mocked.
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with verbose output
+uv run pytest -v
+
+# Run specific test file
+uv run pytest tests/test_generator.py
+
+# Run specific test class
+uv run pytest tests/test_cli.py::TestHandleGenerate
+
+# Run tests matching a pattern
+uv run pytest -k "test_merge"
+
+# Run with coverage report
+uv run pytest --cov=src --cov-report=html
+
+# Run only fast tests (skip slow integration tests)
+uv run pytest -m "not slow"
+```
+
+**Test Structure:**
+
+```
+tests/
+├── conftest.py                 # Shared fixtures and mock providers
+├── test_models.py              # Pydantic model validation
+├── test_generator.py           # CardGenerator tests
+├── test_orchestrator.py        # Orchestrator workflow tests
+├── test_cli.py                 # CLI argument parsing
+├── test_e2e.py                 # End-to-end workflow tests
+├── test_config/                # Configuration tests
+├── test_providers/             # Provider tests (all mocked)
+├── test_anki/                  # Anki generation tests
+└── test_services/              # Merge/Export service tests
+```
+
+All tests use mocked LLM responses - no API credits are consumed.
+
 ## License
 
 MIT
