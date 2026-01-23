@@ -253,6 +253,25 @@ class Card(Base):
     )
 
 
+class LLMCache(Base):
+    """Cache for LLM API responses."""
+
+    __tablename__ = "llm_cache"
+
+    cache_key = Column(String(64), primary_key=True)  # SHA256 hex
+    provider_name = Column(String(50), nullable=False)
+    model = Column(String(100), nullable=False)
+    prompt_preview = Column(String(200), nullable=True)  # First 200 chars for debugging
+    response = Column(Text, nullable=False)  # Raw JSON response
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    hit_count = Column(Integer, default=0)
+
+    __table_args__ = (
+        Index("idx_llm_cache_provider", "provider_name"),
+        Index("idx_llm_cache_created", "created_at"),
+    )
+
+
 def init_database(db_path: Path) -> None:
     """
     Initialize database engine and create tables.
