@@ -400,15 +400,24 @@ uv run pytest -m "not slow"
 ```
 tests/
 ├── conftest.py                 # Shared fixtures and mock providers
-├── test_models.py              # Pydantic model validation
-├── test_generator.py           # CardGenerator tests
-├── test_orchestrator.py        # Orchestrator workflow tests
-├── test_cli.py                 # CLI argument parsing
-├── test_e2e.py                 # End-to-end workflow tests
-├── test_config/                # Configuration tests
-├── test_providers/             # Provider tests (all mocked)
-├── test_anki/                  # Anki generation tests
-└── test_services/              # Merge/Export service tests
+├── unit/
+│   ├── test_models.py          # Pydantic model validation
+│   ├── test_generator.py       # CardGenerator tests
+│   ├── test_orchestrator.py    # Orchestrator workflow tests
+│   ├── test_cli.py             # CLI argument parsing and handlers
+│   ├── test_setup.py           # Provider initialization tests
+│   ├── test_queries.py         # Database query function tests
+│   ├── config/
+│   │   └── test_keys.py        # API key loading tests
+│   ├── providers/
+│   │   ├── test_base.py        # Base provider tests
+│   │   ├── test_concrete_providers.py
+│   │   ├── test_registry.py    # Provider registry tests
+│   │   └── test_gemini_factory.py  # Gemini factory tests
+│   ├── anki/                   # Anki generation tests
+│   └── services/               # Merge/Export service tests
+├── integration/                # Component interaction tests
+└── e2e/                        # End-to-end workflow tests
 ```
 
 All tests use mocked LLM responses - no API credits are consumed.

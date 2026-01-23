@@ -7,7 +7,7 @@ This document describes the testing infrastructure, patterns, and practices for 
 LLM2Deck targets high testing rigor:
 - **5:1** test-to-code ratio for core modules (providers, generator, orchestrator)
 - **2:1** ratio for peripheral modules (anki, services, config)
-- **Current metrics**: ~3.77:1 overall ratio, 1341+ tests, 84% coverage
+- **Current metrics**: ~4.0:1 overall ratio, 1425+ tests, 87% coverage
 
 Check current metrics:
 ```bash
@@ -27,9 +27,14 @@ tests/
 │   ├── conftest.py      # Unit-specific fixtures + auto-marker
 │   ├── anki/            # Tests for src/anki/
 │   ├── config/          # Tests for src/config/
+│   │   └── test_keys.py # API key loading tests
 │   ├── providers/       # Tests for src/providers/
+│   │   └── test_gemini_factory.py  # Gemini factory tests
 │   ├── services/        # Tests for src/services/
-│   └── test_*.py        # Tests for src/*.py modules
+│   ├── test_cli.py      # CLI tests (including handle_cache)
+│   ├── test_setup.py    # Provider initialization tests
+│   ├── test_queries.py  # Database query function tests
+│   └── test_*.py        # Tests for other src/*.py modules
 ├── integration/         # Component interaction tests
 │   └── conftest.py
 └── e2e/                 # End-to-end CLI tests
