@@ -2,6 +2,18 @@
 
 This document describes the testing infrastructure, patterns, and practices for LLM2Deck.
 
+## Overview
+
+LLM2Deck targets high testing rigor:
+- **5:1** test-to-code ratio for core modules (providers, generator, orchestrator)
+- **2:1** ratio for peripheral modules (anki, services, config)
+- **Current metrics**: ~3.77:1 overall ratio, 1341+ tests, 84% coverage
+
+Check current metrics:
+```bash
+uv run python scripts/test-metrics.py
+```
+
 ## Test Organization
 
 Tests are organized into three categories:
@@ -247,16 +259,36 @@ def test_with_mock_provider(mock_provider_with_responses):
 
 ## CI Integration
 
-Recommended CI configuration:
+Tests run automatically via GitHub Actions on push and PR:
 
 ```yaml
-test:
-  script:
-    - uv sync
-    - uv run pytest tests/unit/ -n auto --cov=src --cov-report=xml
-    - uv run pytest tests/integration/ -x
-  coverage:
-    report:
-      coverage_format: cobertura
-      path: coverage.xml
+# .github/workflows/test.yml
+jobs:
+  unit-tests:     # Python 3.11 & 3.12 matrix, with coverage
+  integration-tests:
+  e2e-tests:
+  type-check:     # ty type checker
+  mutation-testing:  # mutmut (push only)
 ```
+
+### Running CI Locally
+
+```bash
+# Full CI check
+uv run pytest tests/unit/ --cov=src --cov-report=term && \
+uv run pytest tests/integration/ -x && \
+ty check src/
+
+# Generate coverage HTML report
+uv run pytest --cov=src --cov-report=html && open htmlcov/index.html
+
+# Run mutation testing (slow)
+uv run mutmut run --paths-to-mutate=src/
+
+# Check test metrics
+uv run python scripts/test-metrics.py
+
+# Run tests in random order (verify isolation)
+uv run pytest --random-order
+```
+
