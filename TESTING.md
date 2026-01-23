@@ -2,6 +2,18 @@
 
 This document describes the testing infrastructure, patterns, and practices for LLM2Deck.
 
+## Overview
+
+LLM2Deck targets high testing rigor:
+- **5:1** test-to-code ratio for core modules (providers, generator, orchestrator)
+- **2:1** ratio for peripheral modules (anki, services, config)
+- **Current metrics**: ~4.0:1 overall ratio, 1425+ tests, 87% coverage
+
+Check current metrics:
+```bash
+uv run python scripts/test-metrics.py
+```
+
 ## Test Organization
 
 Tests are organized into three categories:
@@ -15,9 +27,14 @@ tests/
 │   ├── conftest.py      # Unit-specific fixtures + auto-marker
 │   ├── anki/            # Tests for src/anki/
 │   ├── config/          # Tests for src/config/
+│   │   └── test_keys.py # API key loading tests
 │   ├── providers/       # Tests for src/providers/
+│   │   └── test_gemini_factory.py  # Gemini factory tests
 │   ├── services/        # Tests for src/services/
-│   └── test_*.py        # Tests for src/*.py modules
+│   ├── test_cli.py      # CLI tests (including handle_cache)
+│   ├── test_setup.py    # Provider initialization tests
+│   ├── test_queries.py  # Database query function tests
+│   └── test_*.py        # Tests for other src/*.py modules
 ├── integration/         # Component interaction tests
 │   └── conftest.py
 └── e2e/                 # End-to-end CLI tests
@@ -247,16 +264,36 @@ def test_with_mock_provider(mock_provider_with_responses):
 
 ## CI Integration
 
-Recommended CI configuration:
+Tests run automatically via GitHub Actions on push and PR:
 
 ```yaml
-test:
-  script:
-    - uv sync
-    - uv run pytest tests/unit/ -n auto --cov=src --cov-report=xml
-    - uv run pytest tests/integration/ -x
-  coverage:
-    report:
-      coverage_format: cobertura
-      path: coverage.xml
+# .github/workflows/test.yml
+jobs:
+  unit-tests:     # Python 3.11 & 3.12 matrix, with coverage
+  integration-tests:
+  e2e-tests:
+  type-check:     # ty type checker
+  mutation-testing:  # mutmut (push only)
 ```
+
+### Running CI Locally
+
+```bash
+# Full CI check
+uv run pytest tests/unit/ --cov=src --cov-report=term && \
+uv run pytest tests/integration/ -x && \
+ty check src/
+
+# Generate coverage HTML report
+uv run pytest --cov=src --cov-report=html && open htmlcov/index.html
+
+# Run mutation testing (slow)
+uv run mutmut run --paths-to-mutate=src/
+
+# Check test metrics
+uv run python scripts/test-metrics.py
+
+# Run tests in random order (verify isolation)
+uv run pytest --random-order
+```
+

@@ -1,11 +1,14 @@
 import json
 import re
 import asyncio
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from g4f.client import AsyncClient
 from src.providers.base import LLMProvider
 from src.prompts import prompts
 import logging
+
+if TYPE_CHECKING:
+    from g4f.providers.types import ProviderType
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +25,8 @@ class G4FProvider(LLMProvider):
         self.provider_name = provider_name
         self.max_retries = max_retries
         self.json_parse_retries = json_parse_retries
-        self.async_client = AsyncClient(provider=self.provider_name)
+        # provider_name is a string that g4f resolves internally
+        self.async_client = AsyncClient(provider=self.provider_name)  # type: ignore[arg-type]
 
     @property
     def name(self) -> str:
@@ -41,7 +45,7 @@ class G4FProvider(LLMProvider):
             try:
                 api_response = await self.async_client.chat.completions.create(
                     model=self.model_name,
-                    messages=chat_messages,
+                    messages=chat_messages,  # type: ignore[arg-type]
                 )
 
                 response_content = api_response.choices[0].message.content

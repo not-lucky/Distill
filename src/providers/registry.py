@@ -3,7 +3,7 @@
 import itertools
 import logging
 from dataclasses import dataclass, field
-from typing import Awaitable, Callable, Dict, Iterator, List, Optional, Type
+from typing import Any, Awaitable, Callable, Dict, Iterator, List, Optional, Type, cast
 
 from src.config.keys import load_keys
 from src.config.loader import DefaultsConfig, ProviderConfig
@@ -133,8 +133,10 @@ async def create_provider_instances(
     # Handle multi-model providers (e.g., google_antigravity)
     if spec.multi_model:
         base_url = cfg.base_url or DEFAULT_BASE_URLS.get(name, "")
+        # Cast provider_class to Any to allow dynamic kwargs
+        provider_cls = cast(Any, spec.provider_class)
         return [
-            spec.provider_class(
+            provider_cls(
                 model=model,
                 base_url=base_url,
                 timeout=effective_timeout,
@@ -147,7 +149,7 @@ async def create_provider_instances(
         ]
 
     # Build kwargs for provider instantiation
-    kwargs: Dict[str, any] = {}
+    kwargs: Dict[str, Any] = {}
 
     # Add retry configuration
     kwargs["max_retries"] = max_retries

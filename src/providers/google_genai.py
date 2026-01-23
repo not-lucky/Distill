@@ -77,7 +77,7 @@ class GoogleGenAIProvider(LLMProvider):
                 # Build the config
                 config_dict: Dict[str, Any] = {
                     "thinking_config": types.ThinkingConfig(
-                        thinking_level=self.thinking_level
+                        thinking_level=self.thinking_level  # type: ignore[arg-type]
                     ),
                     "temperature": 1.0,  # Gemini 3 recommends keeping temperature at 1.0
                     # "tools": [

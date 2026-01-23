@@ -50,12 +50,20 @@ filterwarnings = [
 [tool.coverage.run]
 source = ["src"]
 branch = true
+parallel = true
 
 [tool.coverage.report]
+fail_under = 0
+show_missing = true
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
 ]
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [dependency-groups]
 dev = [

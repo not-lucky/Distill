@@ -9,6 +9,7 @@ from src.config.loader import (
     get_combiner_config,
     get_formatter_config,
     DefaultsConfig,
+    ProviderConfig,
 )
 from src.providers.base import LLMProvider
 from src.providers.registry import PROVIDER_REGISTRY, create_provider_instances
@@ -60,7 +61,6 @@ async def initialize_providers() -> Tuple[List[LLMProvider], Optional[LLMProvide
         # Handle ENABLE_GEMINI env var for backward compatibility
         if name == "gemini_webapi" and ENABLE_GEMINI:
             if cfg is None:
-                from src.config.loader import ProviderConfig
                 cfg = ProviderConfig(enabled=True)
             elif not cfg.enabled:
                 cfg = ProviderConfig(enabled=True)
@@ -96,9 +96,9 @@ async def initialize_providers() -> Tuple[List[LLMProvider], Optional[LLMProvide
 
                 # Determine if instance should be added to active generators
                 should_add = True
-                if is_combiner and not combiner_cfg.also_generate:
+                if is_combiner and combiner_cfg and not combiner_cfg.also_generate:
                     should_add = False
-                if is_formatter and not formatter_cfg.also_generate:
+                if is_formatter and formatter_cfg and not formatter_cfg.also_generate:
                     should_add = False
 
                 if should_add:

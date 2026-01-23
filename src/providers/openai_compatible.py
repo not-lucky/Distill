@@ -2,7 +2,7 @@
 
 import json
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Iterator
+from typing import Any, Dict, List, Optional, Iterator, Callable
 
 from openai import AsyncOpenAI
 from openai import RateLimitError as OpenAIRateLimitError
@@ -11,6 +11,8 @@ from tenacity import RetryError, retry, stop_after_attempt, wait_fixed, retry_if
 
 from src.providers.base import (
     LLMProvider,
+    TokenUsage,
+    TokenUsageCallback,
     create_retry_decorator,
     RetryableError,
     RateLimitError,
@@ -19,6 +21,8 @@ from src.providers.base import (
 )
 from src.prompts import prompts
 from src.utils import strip_json_block
+from src.cache import generate_cache_key, CacheRepository
+from src.database import DatabaseManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -47,6 +51,9 @@ class OpenAICompatibleProvider(LLMProvider):
         strip_json_markers: bool = True,
         top_p: Optional[float] = None,
         extra_params: Optional[Dict[str, Any]] = None,
+        use_cache: bool = True,
+        bypass_cache_lookup: bool = False,
+        on_token_usage: Optional[TokenUsageCallback] = None,
     ):
         """
         Initialize an OpenAI-compatible provider.
@@ -63,6 +70,9 @@ class OpenAICompatibleProvider(LLMProvider):
             strip_json_markers: Whether to strip ```json markers from responses
             top_p: Nucleus sampling parameter (None for API default)
             extra_params: Additional provider-specific parameters
+            use_cache: Whether to use response caching (default: True)
+            bypass_cache_lookup: If True, skip cache lookup but still store results (default: False)
+            on_token_usage: Callback for token usage updates (provider, model, usage, success)
         """
         self.model_name = model
         self.base_url = base_url
@@ -75,6 +85,9 @@ class OpenAICompatibleProvider(LLMProvider):
         self.strip_json_markers = strip_json_markers
         self.top_p = top_p
         self.extra_params = extra_params or {}
+        self.use_cache = use_cache
+        self.bypass_cache_lookup = bypass_cache_lookup
+        self.on_token_usage = on_token_usage
 
     @property
     def model(self) -> str:
@@ -122,7 +135,7 @@ class OpenAICompatibleProvider(LLMProvider):
         json_schema: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """
-        Make a request to the API with retry logic.
+        Make a request to the API with retry logic and optional caching.
 
         Args:
             chat_messages: List of chat messages
@@ -131,13 +144,41 @@ class OpenAICompatibleProvider(LLMProvider):
         Returns:
             Response content string, or None if all retries failed
         """
+        cache_key: Optional[str] = None
+
+        # Cache lookup (skip if bypass_cache_lookup is True)
+        if self.use_cache:
+            try:
+                db_manager = DatabaseManager.get_default()
+                if db_manager.is_initialized:
+                    cache_key = generate_cache_key(
+                        provider_name=self.name,
+                        model=self.model_name,
+                        messages=chat_messages,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        top_p=self.top_p,
+                        json_schema=json_schema,
+                    )
+                    # Only do cache lookup if not bypassing
+                    if not self.bypass_cache_lookup:
+                        with db_manager.session_scope() as session:
+                            cache_repo = CacheRepository(session)
+                            cached = cache_repo.get(cache_key)
+                            if cached is not None:
+                                logger.info(f"[CACHE HIT] {self.name}/{self.model_name}")
+                                return cached
+            except Exception as e:
+                # Log but don't fail if cache lookup fails
+                logger.debug(f"[CACHE] Lookup failed, proceeding without cache: {e}")
+
         retry_decorator = create_retry_decorator(
             max_retries=self.max_retries,
             retry_logger=logger,
         )
 
         @retry_decorator
-        async def _do_request() -> str:
+        async def _do_request() -> tuple[str, TokenUsage]:
             try:
                 client = self._get_client()
 
@@ -155,6 +196,14 @@ class OpenAICompatibleProvider(LLMProvider):
 
                 completion = await client.chat.completions.create(**request_params)
                 response_content = completion.choices[0].message.content
+                
+                # Extract token usage if available
+                usage = TokenUsage()
+                if completion.usage:
+                    usage = TokenUsage(
+                        input_tokens=completion.usage.prompt_tokens or 0,
+                        output_tokens=completion.usage.completion_tokens or 0,
+                    )
 
                 if not response_content:
                     raise EmptyResponseError(
@@ -164,7 +213,7 @@ class OpenAICompatibleProvider(LLMProvider):
                 if self.strip_json_markers and json_schema:
                     response_content = strip_json_block(response_content)
 
-                return response_content
+                return response_content, usage
 
             except OpenAIRateLimitError as e:
                 raise RateLimitError(f"[{self.model_name}] Rate limit hit") from e
@@ -172,12 +221,51 @@ class OpenAICompatibleProvider(LLMProvider):
                 raise TimeoutError(f"[{self.model_name}] Request timed out") from e
 
         try:
-            return await _do_request()
+            response, token_usage = await _do_request()
+            
+            # Report token usage via callback
+            if self.on_token_usage:
+                self.on_token_usage(self.name, self.model_name, token_usage, True)
+
+            # Cache storage (only on success)
+            if self.use_cache and cache_key is not None and response is not None:
+                try:
+                    db_manager = DatabaseManager.get_default()
+                    if db_manager.is_initialized:
+                        # Use first message content as prompt preview
+                        prompt_preview = ""
+                        if chat_messages:
+                            first_user_msg = next(
+                                (m.get("content", "") for m in chat_messages if m.get("role") == "user"),
+                                ""
+                            )
+                            prompt_preview = first_user_msg[:200] if first_user_msg else ""
+                        with db_manager.session_scope() as session:
+                            cache_repo = CacheRepository(session)
+                            cache_repo.put(
+                                cache_key=cache_key,
+                                provider_name=self.name,
+                                model=self.model_name,
+                                prompt_preview=prompt_preview,
+                                response=response,
+                            )
+                        logger.debug(f"[CACHE STORE] {self.name}/{self.model_name}")
+                except Exception as e:
+                    # Log but don't fail if cache storage fails
+                    logger.debug(f"[CACHE] Storage failed: {e}")
+
+            return response
         except RetryError:
             logger.error(f"[{self.model_name}] All retry attempts failed")
+            # Report failure via callback
+            if self.on_token_usage:
+                self.on_token_usage(self.name, self.model_name, TokenUsage(), False)
             return None
         except Exception as e:
             logger.error(f"[{self.model_name}] Unexpected error: {e}")
+            # Report failure via callback
+            if self.on_token_usage:
+                self.on_token_usage(self.name, self.model_name, TokenUsage(), False)
             return None
 
     async def generate_initial_cards(

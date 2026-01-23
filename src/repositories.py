@@ -207,7 +207,8 @@ class CardRepository:
                 problem_index=problem_index,
                 status="running",
             )
-            return problem.id
+            # problem.id is an int Column, cast to int for return type
+            return int(problem.id)  # type: ignore[arg-type]
 
     def save_provider_result(
         self,

@@ -1,7 +1,7 @@
 """Orchestrator for LLM2Deck card generation workflow."""
 
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 
 from src.config import DATABASE_PATH
 from src.config.loader import load_config
@@ -11,9 +11,11 @@ from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.repositories import RunRepository, RunStats
-from src.task_runner import ConcurrentTaskRunner, Success
+from src.task_runner import ConcurrentTaskRunner, Success, TaskInfo
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions
+from src.progress import ProgressTracker, ProviderStatus
+from src.providers.base import TokenUsage
 
 
 class Orchestrator:
@@ -25,6 +27,7 @@ class Orchestrator:
         is_mcq: bool = False,
         run_label: Optional[str] = None,
         dry_run: bool = False,
+        bypass_cache_lookup: bool = False,
     ):
         """
         Initialize the orchestrator.
@@ -34,13 +37,17 @@ class Orchestrator:
             is_mcq: Whether generating MCQ cards
             run_label: Optional user-provided label for the run
             dry_run: If True, show what would be done without making changes
+            bypass_cache_lookup: If True, skip cache lookup but still store results
         """
         self.subject_config = subject_config
         self.is_mcq = is_mcq
         self.run_label = run_label
         self.dry_run = dry_run
+        self.bypass_cache_lookup = bypass_cache_lookup
         self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
+        self.progress_tracker: Optional[ProgressTracker] = None
+        self._llm_providers: List = []  # Store for progress tracking
 
         # Load generation config
         config = load_config()
@@ -89,6 +96,16 @@ class Orchestrator:
         # Initialize providers - returns (generators, combiner, formatter)
         llm_providers, combiner, formatter = await initialize_providers()
 
+        # Apply bypass_cache_lookup setting to all providers
+        if self.bypass_cache_lookup:
+            for provider in llm_providers:
+                if hasattr(provider, 'bypass_cache_lookup'):
+                    setattr(provider, 'bypass_cache_lookup', True)
+            if combiner and hasattr(combiner, 'bypass_cache_lookup'):
+                setattr(combiner, 'bypass_cache_lookup', True)
+            if formatter and hasattr(formatter, 'bypass_cache_lookup'):
+                setattr(formatter, 'bypass_cache_lookup', True)
+
         # If no explicit combiner configured, use first provider as combiner
         if combiner is None:
             if not llm_providers:
@@ -103,6 +120,11 @@ class Orchestrator:
             if not self.dry_run:
                 self.run_repo.mark_run_failed()
             return False
+
+        # Store providers for progress tracking
+        self._llm_providers = llm_providers
+        self._combiner = combiner
+        self._formatter = formatter
 
         if self.dry_run:
             logger.info(f"[DRY RUN] Combiner: {combiner.name} ({combiner.model})")
@@ -125,7 +147,7 @@ class Orchestrator:
 
         return True
 
-    async def run(self) -> List[Dict]:
+    async def run(self) -> List[Dict[str, Any]]:
         """
         Execute the card generation workflow.
 
@@ -134,6 +156,9 @@ class Orchestrator:
         """
         if self.card_generator is None:
             raise RuntimeError("Orchestrator not initialized. Call initialize() first.")
+
+        # Capture card_generator locally to help type checker
+        card_generator = self.card_generator
 
         # Build question list with metadata
         questions_with_metadata: List[Tuple] = get_indexed_questions(
@@ -150,12 +175,49 @@ class Orchestrator:
                 logger.info(f"[DRY RUN]   ... and {len(questions_with_metadata) - preview_count} more")
             return []
 
+        # Collect all providers for progress tracking
+        all_providers: List[Tuple[str, str]] = []
+        for p in self._llm_providers:
+            all_providers.append((p.name, p.model))
+        if self._combiner:
+            all_providers.append((self._combiner.name, self._combiner.model))
+        if self._formatter and self._formatter != self._combiner:
+            all_providers.append((self._formatter.name, self._formatter.model))
+
+        # Initialize progress tracker
+        self.progress_tracker = ProgressTracker(
+            total_questions=len(questions_with_metadata),
+            provider_names=all_providers,
+        )
+
+        # Set up token usage callback for all providers
+        def on_token_usage(provider_name: str, model: str, usage: TokenUsage, success: bool):
+            if self.progress_tracker:
+                status = ProviderStatus.SUCCESS if success else ProviderStatus.FAILED
+                self.progress_tracker.update_provider_status(
+                    provider_name=provider_name,
+                    model=model,
+                    status=status,
+                    success=success,
+                    tokens_input=usage.input_tokens,
+                    tokens_output=usage.output_tokens,
+                )
+
+        # Wire up the callback to all providers
+        for provider in self._llm_providers:
+            if hasattr(provider, 'on_token_usage'):
+                provider.on_token_usage = on_token_usage
+        if hasattr(self._combiner, 'on_token_usage'):
+            self._combiner.on_token_usage = on_token_usage  # type: ignore[union-attr]
+        if self._formatter and hasattr(self._formatter, 'on_token_usage'):
+            self._formatter.on_token_usage = on_token_usage  # type: ignore[union-attr]
+
         logger.info(f"Starting generation for {len(questions_with_metadata)} questions...")
 
         # Create task functions for each question
         def make_task(cat_idx: int, cat_name: str, prob_idx: int, question: str):
             async def task():
-                return await self.card_generator.process_question(
+                return await card_generator.process_question(
                     question,
                     self.subject_config.initial_prompt,
                     self.subject_config.target_model,
@@ -170,17 +232,44 @@ class Orchestrator:
             for cat_idx, cat_name, prob_idx, question in questions_with_metadata
         ]
 
-        # Run with concurrency control and staggered request starts
-        task_runner = ConcurrentTaskRunner(
-            max_concurrent=self.concurrent_requests,
-            request_delay=self.request_delay,
-        )
-        results = await task_runner.run_all(tasks)
+        # Task names for progress display
+        task_names = [question for _, _, _, question in questions_with_metadata]
+
+        # Set up progress callbacks
+        def on_task_start(info: TaskInfo):
+            if self.progress_tracker:
+                self.progress_tracker.start_question(info.name)
+
+        def on_task_complete(info: TaskInfo, success: bool):
+            if self.progress_tracker:
+                self.progress_tracker.complete_question(
+                    info.name,
+                    success=success,
+                    duration=info.duration,
+                )
+
+        # Start progress display
+        self.progress_tracker.start()
+
+        try:
+            # Run with concurrency control and staggered request starts
+            task_runner = ConcurrentTaskRunner(
+                max_concurrent=self.concurrent_requests,
+                request_delay=self.request_delay,
+                on_task_start=on_task_start,
+                on_task_complete=on_task_complete,
+            )
+            results = await task_runner.run_all(tasks, task_names=task_names)
+        finally:
+            # Stop progress display
+            self.progress_tracker.stop()
+            self.progress_tracker.print_summary()
 
         # Extract successful results
-        all_generated_problems = [
-            result.value for result in results if isinstance(result, Success)
-        ]
+        all_generated_problems: List[Dict[str, Any]] = []
+        for result in results:
+            if isinstance(result, Success) and result.value is not None:
+                all_generated_problems.append(result.value)  # type: ignore[arg-type]
 
         # Update run status
         self.run_repo.mark_run_completed(
@@ -193,7 +282,7 @@ class Orchestrator:
 
         return all_generated_problems
 
-    def save_results(self, problems: List[Dict]) -> Optional[str]:
+    def save_results(self, problems: List[Dict[str, Any]]) -> Optional[str]:
         """
         Save generated problems to JSON file.
 

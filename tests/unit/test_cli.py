@@ -14,6 +14,7 @@ from src.cli import (
     handle_convert,
     handle_merge,
     handle_export_md,
+    handle_cache,
     main,
 )
 
@@ -749,6 +750,7 @@ class TestHandleGenerateExtended:
         args.card_type = "standard"
         args.label = None
         args.dry_run = True
+        args.no_cache = False
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -771,6 +773,7 @@ class TestHandleGenerateExtended:
                     is_mcq=False,
                     run_label=None,
                     dry_run=True,
+                    bypass_cache_lookup=False,
                 )
 
     @pytest.mark.asyncio
@@ -785,6 +788,7 @@ class TestHandleGenerateExtended:
         args.card_type = "mcq"
         args.label = "test-mcq"
         args.dry_run = False
+        args.no_cache = False
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -807,6 +811,7 @@ class TestHandleGenerateExtended:
                     is_mcq=True,
                     run_label="test-mcq",
                     dry_run=False,
+                    bypass_cache_lookup=False,
                 )
 
     @pytest.mark.asyncio
@@ -821,6 +826,7 @@ class TestHandleGenerateExtended:
         args.card_type = "standard"
         args.label = "my-run-label"
         args.dry_run = False
+        args.no_cache = False
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -1189,3 +1195,98 @@ class TestMainExtended:
                         result = main(None)
 
                         assert_that(result).is_equal_to(0)  # Shows help
+
+
+class TestHandleCache:
+    """Tests for handle_cache function."""
+
+    def test_handle_cache_no_subcommand(self, capsys):
+        """
+        Given cache command with no subcommand
+        When handle_cache is called
+        Then it prints usage and returns 1
+        """
+        args = MagicMock()
+        args.cache_command = None
+
+        result = handle_cache(args)
+
+        assert_that(result).is_equal_to(1)
+        captured = capsys.readouterr()
+        assert_that(captured.out).contains("Usage: llm2deck cache")
+
+    def test_handle_cache_clear_success(self, capsys):
+        """
+        Given cache clear command
+        When handle_cache is called
+        Then it clears cache and returns 0
+        """
+        args = MagicMock()
+        args.cache_command = "clear"
+
+        with patch("src.database.DatabaseManager") as MockDbManager:
+            mock_db = MagicMock()
+            mock_session = MagicMock()
+            mock_db.session_scope.return_value.__enter__ = MagicMock(return_value=mock_session)
+            mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
+            MockDbManager.get_default.return_value = mock_db
+
+            with patch("src.cache.CacheRepository") as MockRepo:
+                mock_repo = MagicMock()
+                mock_repo.clear.return_value = 5
+                MockRepo.return_value = mock_repo
+
+                result = handle_cache(args)
+
+                assert_that(result).is_equal_to(0)
+                mock_repo.clear.assert_called_once()
+                captured = capsys.readouterr()
+                assert_that(captured.out).contains("Cleared 5 cache entries")
+
+    def test_handle_cache_stats_success(self, capsys):
+        """
+        Given cache stats command
+        When handle_cache is called
+        Then it prints stats and returns 0
+        """
+        args = MagicMock()
+        args.cache_command = "stats"
+
+        with patch("src.database.DatabaseManager") as MockDbManager:
+            mock_db = MagicMock()
+            mock_session = MagicMock()
+            mock_db.session_scope.return_value.__enter__ = MagicMock(return_value=mock_session)
+            mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
+            MockDbManager.get_default.return_value = mock_db
+
+            with patch("src.cache.CacheRepository") as MockRepo:
+                mock_repo = MagicMock()
+                mock_repo.stats.return_value = {"total_entries": 10, "total_hits": 25}
+                MockRepo.return_value = mock_repo
+
+                result = handle_cache(args)
+
+                assert_that(result).is_equal_to(0)
+                mock_repo.stats.assert_called_once()
+                captured = capsys.readouterr()
+                assert_that(captured.out).contains("Cache entries: 10")
+                assert_that(captured.out).contains("Total hits: 25")
+
+    def test_handle_cache_unknown_subcommand(self, capsys):
+        """
+        Given cache command with unknown subcommand
+        When handle_cache is called
+        Then it returns 1
+        """
+        args = MagicMock()
+        args.cache_command = "unknown"
+
+        with patch("src.database.DatabaseManager") as MockDbManager:
+            mock_db = MagicMock()
+            mock_db.session_scope.return_value.__enter__ = MagicMock(return_value=MagicMock())
+            mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
+            MockDbManager.get_default.return_value = mock_db
+
+            result = handle_cache(args)
+
+            assert_that(result).is_equal_to(1)

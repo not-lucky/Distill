@@ -35,7 +35,7 @@ def normalize_legacy_args(argv: list[str]) -> list[str]:
     Returns:
         Normalized argument list compatible with new subcommand syntax.
     """
-    SUBCOMMANDS = {"generate", "convert", "merge", "export-md", "-h", "--help"}
+    SUBCOMMANDS = {"generate", "convert", "merge", "export-md", "cache", "query", "-h", "--help"}
 
     if not argv or argv[0] in SUBCOMMANDS:
         return argv
@@ -96,6 +96,11 @@ def create_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Show what would be done without making API calls or writing files",
+    )
+    generate_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass cache lookup (still stores new results)",
     )
 
     # ====== convert command ======
@@ -168,6 +173,193 @@ def create_parser() -> argparse.ArgumentParser:
         help="Show what would be done without writing files",
     )
 
+    # ====== cache command ======
+    cache_parser = subparsers.add_parser(
+        "cache",
+        help="Cache management commands",
+        description="Manage LLM response cache.",
+    )
+    cache_subparsers = cache_parser.add_subparsers(dest="cache_command", help="Cache operations")
+
+    # cache clear
+    cache_clear_parser = cache_subparsers.add_parser(
+        "clear",
+        help="Clear all cached LLM responses",
+    )
+
+    # cache stats
+    cache_stats_parser = cache_subparsers.add_parser(
+        "stats",
+        help="Show cache statistics",
+    )
+
+    # ====== query command ======
+    query_parser = subparsers.add_parser(
+        "query",
+        help="Query database for runs, problems, cards, and statistics",
+        description="Query the LLM2Deck database.",
+    )
+    query_subparsers = query_parser.add_subparsers(dest="query_command", help="Query operations")
+
+    # Common query options
+    def add_format_option(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--format",
+            "-f",
+            choices=["table", "json"],
+            default="table",
+            help="Output format (default: table)",
+        )
+
+    def add_limit_option(parser: argparse.ArgumentParser, default: int = 20) -> None:
+        parser.add_argument(
+            "--limit",
+            "-n",
+            type=int,
+            default=default,
+            help=f"Maximum number of results (default: {default})",
+        )
+
+    # query runs
+    query_runs_parser = query_subparsers.add_parser(
+        "runs",
+        help="List generation runs",
+    )
+    query_runs_parser.add_argument(
+        "--subject",
+        "-s",
+        type=str,
+        default=None,
+        help="Filter by subject (leetcode, cs, physics, etc.)",
+    )
+    query_runs_parser.add_argument(
+        "--status",
+        type=str,
+        choices=["running", "completed", "failed"],
+        default=None,
+        help="Filter by status",
+    )
+    add_limit_option(query_runs_parser)
+    add_format_option(query_runs_parser)
+
+    # query run <id>
+    query_run_parser = query_subparsers.add_parser(
+        "run",
+        help="Show details for a specific run",
+    )
+    query_run_parser.add_argument(
+        "run_id",
+        type=str,
+        help="Run ID (can be partial, will match prefix)",
+    )
+    add_format_option(query_run_parser)
+
+    # query problems
+    query_problems_parser = query_subparsers.add_parser(
+        "problems",
+        help="List problems",
+    )
+    query_problems_parser.add_argument(
+        "--run",
+        "-r",
+        type=str,
+        default=None,
+        help="Filter by run ID",
+    )
+    query_problems_parser.add_argument(
+        "--status",
+        type=str,
+        choices=["running", "success", "failed", "partial"],
+        default=None,
+        help="Filter by status",
+    )
+    query_problems_parser.add_argument(
+        "--search",
+        "-q",
+        type=str,
+        default=None,
+        help="Search in question names",
+    )
+    add_limit_option(query_problems_parser)
+    add_format_option(query_problems_parser)
+
+    # query providers
+    query_providers_parser = query_subparsers.add_parser(
+        "providers",
+        help="List provider results",
+    )
+    query_providers_parser.add_argument(
+        "--run",
+        "-r",
+        type=str,
+        default=None,
+        help="Filter by run ID",
+    )
+    query_providers_parser.add_argument(
+        "--provider",
+        "-p",
+        type=str,
+        default=None,
+        help="Filter by provider name",
+    )
+    query_providers_parser.add_argument(
+        "--success",
+        action="store_true",
+        default=None,
+        help="Show only successful results",
+    )
+    query_providers_parser.add_argument(
+        "--failed",
+        action="store_true",
+        default=None,
+        help="Show only failed results",
+    )
+    add_limit_option(query_providers_parser)
+    add_format_option(query_providers_parser)
+
+    # query cards
+    query_cards_parser = query_subparsers.add_parser(
+        "cards",
+        help="List and search cards",
+    )
+    query_cards_parser.add_argument(
+        "--run",
+        "-r",
+        type=str,
+        default=None,
+        help="Filter by run ID",
+    )
+    query_cards_parser.add_argument(
+        "--type",
+        "-t",
+        type=str,
+        default=None,
+        help="Filter by card type",
+    )
+    query_cards_parser.add_argument(
+        "--search",
+        "-q",
+        type=str,
+        default=None,
+        help="Search in card content (front/back)",
+    )
+    add_limit_option(query_cards_parser)
+    add_format_option(query_cards_parser)
+
+    # query stats
+    query_stats_parser = query_subparsers.add_parser(
+        "stats",
+        help="Show global statistics",
+    )
+    query_stats_parser.add_argument(
+        "--subject",
+        "-s",
+        type=str,
+        default=None,
+        help="Filter by subject",
+    )
+    add_format_option(query_stats_parser)
+
     return parser
 
 
@@ -180,6 +372,7 @@ async def handle_generate(args: argparse.Namespace) -> int:
 
     is_mcq = args.card_type == "mcq"
     dry_run = getattr(args, "dry_run", False)
+    no_cache = getattr(args, "no_cache", False)
 
     # Get subject configuration using registry
     registry = SubjectRegistry()
@@ -198,12 +391,15 @@ async def handle_generate(args: argparse.Namespace) -> int:
         logger.info(f"Running: Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
     if args.label:
         logger.info(f"Run Label: {args.label}")
+    if no_cache:
+        logger.info("Cache lookup disabled (--no-cache)")
 
     orchestrator = Orchestrator(
         subject_config=subject_config,
         is_mcq=is_mcq,
         run_label=args.label,
         dry_run=dry_run,
+        bypass_cache_lookup=no_cache,
     )
 
     if not await orchestrator.initialize():
@@ -315,6 +511,122 @@ def handle_export_md(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_cache(args: argparse.Namespace) -> int:
+    """Handle the cache subcommand."""
+    from src.config import DATABASE_PATH
+    from src.database import DatabaseManager
+    from src.cache import CacheRepository
+
+    if args.cache_command is None:
+        print("Usage: llm2deck cache {clear,stats}")
+        print("Run 'llm2deck cache --help' for more information.")
+        return 1
+
+    # Initialize database if needed
+    db_manager = DatabaseManager.get_default()
+    db_manager.initialize(DATABASE_PATH)
+
+    if args.cache_command == "clear":
+        with db_manager.session_scope() as session:
+            repo = CacheRepository(session)
+            count = repo.clear()
+            print(f"Cleared {count} cache entries.")
+        return 0
+
+    elif args.cache_command == "stats":
+        with db_manager.session_scope() as session:
+            repo = CacheRepository(session)
+            stats = repo.stats()
+            print(f"Cache entries: {stats['total_entries']}")
+            print(f"Total hits: {stats['total_hits']}")
+        return 0
+
+    return 1
+
+
+def handle_query(args: argparse.Namespace) -> int:
+    """Handle the query subcommand."""
+    from src.config import DATABASE_PATH
+    from src.database import DatabaseManager
+    from src.services.query import QueryService
+
+    if args.query_command is None:
+        print("Usage: llm2deck query {runs,run,problems,providers,cards,stats}")
+        print("Run 'llm2deck query --help' for more information.")
+        return 1
+
+    # Initialize database
+    db_manager = DatabaseManager.get_default()
+    if not db_manager.is_initialized:
+        db_manager.initialize(DATABASE_PATH)
+
+    service = QueryService()
+    output_format = getattr(args, "format", "table")
+
+    if args.query_command == "runs":
+        result = service.list_runs(
+            subject=getattr(args, "subject", None),
+            status=getattr(args, "status", None),
+            limit=getattr(args, "limit", 20),
+            output_format=output_format,
+        )
+    elif args.query_command == "run":
+        result = service.show_run(
+            run_id=args.run_id,
+            output_format=output_format,
+        )
+    elif args.query_command == "problems":
+        result = service.list_problems(
+            run_id=getattr(args, "run", None),
+            status=getattr(args, "status", None),
+            question_search=getattr(args, "search", None),
+            limit=getattr(args, "limit", 20),
+            output_format=output_format,
+        )
+    elif args.query_command == "providers":
+        # Handle --success and --failed flags
+        success_filter = None
+        if getattr(args, "success", False):
+            success_filter = True
+        elif getattr(args, "failed", False):
+            success_filter = False
+
+        result = service.list_providers(
+            run_id=getattr(args, "run", None),
+            provider_name=getattr(args, "provider", None),
+            success=success_filter,
+            limit=getattr(args, "limit", 20),
+            output_format=output_format,
+        )
+    elif args.query_command == "cards":
+        result = service.list_cards(
+            run_id=getattr(args, "run", None),
+            card_type=getattr(args, "type", None),
+            search_query=getattr(args, "search", None),
+            limit=getattr(args, "limit", 20),
+            output_format=output_format,
+        )
+    elif args.query_command == "stats":
+        result = service.show_stats(
+            subject=getattr(args, "subject", None),
+            output_format=output_format,
+        )
+    else:
+        print("Unknown query command")
+        return 1
+
+    if not result.success:
+        print(f"Error: {result.error}")
+        return 1
+
+    if result.message:
+        print(result.message)
+    if result.data:
+        print(result.data)
+
+    return 0
+
+
 def main(argv: Optional[list] = None) -> int:
     """Main entry point for CLI."""
     setup_logging()
@@ -340,6 +652,10 @@ def main(argv: Optional[list] = None) -> int:
         return handle_merge(args)
     elif args.command == "export-md":
         return handle_export_md(args)
+    elif args.command == "cache":
+        return handle_cache(args)
+    elif args.command == "query":
+        return handle_query(args)
     else:
         parser.print_help()
         return 1

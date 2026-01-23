@@ -33,3 +33,5 @@ CLAUDE.md
 
 # Hypothesis test cache
 .hypothesis/
+.coverage
+htmlcov/
