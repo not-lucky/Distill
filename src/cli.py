@@ -35,7 +35,7 @@ def normalize_legacy_args(argv: list[str]) -> list[str]:
     Returns:
         Normalized argument list compatible with new subcommand syntax.
     """
-    SUBCOMMANDS = {"generate", "convert", "merge", "export-md", "-h", "--help"}
+    SUBCOMMANDS = {"generate", "convert", "merge", "export-md", "cache", "-h", "--help"}
 
     if not argv or argv[0] in SUBCOMMANDS:
         return argv
@@ -171,6 +171,26 @@ def create_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Show what would be done without writing files",
+    )
+
+    # ====== cache command ======
+    cache_parser = subparsers.add_parser(
+        "cache",
+        help="Cache management commands",
+        description="Manage LLM response cache.",
+    )
+    cache_subparsers = cache_parser.add_subparsers(dest="cache_command", help="Cache operations")
+
+    # cache clear
+    cache_clear_parser = cache_subparsers.add_parser(
+        "clear",
+        help="Clear all cached LLM responses",
+    )
+
+    # cache stats
+    cache_stats_parser = cache_subparsers.add_parser(
+        "stats",
+        help="Show cache statistics",
     )
 
     return parser
@@ -324,6 +344,39 @@ def handle_export_md(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_cache(args: argparse.Namespace) -> int:
+    """Handle the cache subcommand."""
+    from src.config import DATABASE_PATH
+    from src.database import DatabaseManager
+    from src.cache import CacheRepository
+
+    if args.cache_command is None:
+        print("Usage: llm2deck cache {clear,stats}")
+        print("Run 'llm2deck cache --help' for more information.")
+        return 1
+
+    # Initialize database if needed
+    db_manager = DatabaseManager.get_default()
+    db_manager.initialize(DATABASE_PATH)
+
+    if args.cache_command == "clear":
+        with db_manager.session_scope() as session:
+            repo = CacheRepository(session)
+            count = repo.clear()
+            print(f"Cleared {count} cache entries.")
+        return 0
+
+    elif args.cache_command == "stats":
+        with db_manager.session_scope() as session:
+            repo = CacheRepository(session)
+            stats = repo.stats()
+            print(f"Cache entries: {stats['total_entries']}")
+            print(f"Total hits: {stats['total_hits']}")
+        return 0
+
+    return 1
+
+
 def main(argv: Optional[list] = None) -> int:
     """Main entry point for CLI."""
     setup_logging()
@@ -349,6 +402,8 @@ def main(argv: Optional[list] = None) -> int:
         return handle_merge(args)
     elif args.command == "export-md":
         return handle_export_md(args)
+    elif args.command == "cache":
+        return handle_cache(args)
     else:
         parser.print_help()
         return 1
