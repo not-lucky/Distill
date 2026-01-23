@@ -97,6 +97,11 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show what would be done without making API calls or writing files",
     )
+    generate_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass cache lookup (still stores new results)",
+    )
 
     # ====== convert command ======
     convert_parser = subparsers.add_parser(
@@ -180,6 +185,7 @@ async def handle_generate(args: argparse.Namespace) -> int:
 
     is_mcq = args.card_type == "mcq"
     dry_run = getattr(args, "dry_run", False)
+    no_cache = getattr(args, "no_cache", False)
 
     # Get subject configuration using registry
     registry = SubjectRegistry()
@@ -198,12 +204,15 @@ async def handle_generate(args: argparse.Namespace) -> int:
         logger.info(f"Running: Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
     if args.label:
         logger.info(f"Run Label: {args.label}")
+    if no_cache:
+        logger.info("Cache lookup disabled (--no-cache)")
 
     orchestrator = Orchestrator(
         subject_config=subject_config,
         is_mcq=is_mcq,
         run_label=args.label,
         dry_run=dry_run,
+        bypass_cache_lookup=no_cache,
     )
 
     if not await orchestrator.initialize():

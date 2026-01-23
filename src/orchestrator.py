@@ -25,6 +25,7 @@ class Orchestrator:
         is_mcq: bool = False,
         run_label: Optional[str] = None,
         dry_run: bool = False,
+        bypass_cache_lookup: bool = False,
     ):
         """
         Initialize the orchestrator.
@@ -34,11 +35,13 @@ class Orchestrator:
             is_mcq: Whether generating MCQ cards
             run_label: Optional user-provided label for the run
             dry_run: If True, show what would be done without making changes
+            bypass_cache_lookup: If True, skip cache lookup but still store results
         """
         self.subject_config = subject_config
         self.is_mcq = is_mcq
         self.run_label = run_label
         self.dry_run = dry_run
+        self.bypass_cache_lookup = bypass_cache_lookup
         self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
 
@@ -88,6 +91,16 @@ class Orchestrator:
 
         # Initialize providers - returns (generators, combiner, formatter)
         llm_providers, combiner, formatter = await initialize_providers()
+
+        # Apply bypass_cache_lookup setting to all providers
+        if self.bypass_cache_lookup:
+            for provider in llm_providers:
+                if hasattr(provider, 'bypass_cache_lookup'):
+                    provider.bypass_cache_lookup = True
+            if combiner and hasattr(combiner, 'bypass_cache_lookup'):
+                combiner.bypass_cache_lookup = True
+            if formatter and hasattr(formatter, 'bypass_cache_lookup'):
+                formatter.bypass_cache_lookup = True
 
         # If no explicit combiner configured, use first provider as combiner
         if combiner is None:

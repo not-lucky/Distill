@@ -50,6 +50,7 @@ class OpenAICompatibleProvider(LLMProvider):
         top_p: Optional[float] = None,
         extra_params: Optional[Dict[str, Any]] = None,
         use_cache: bool = True,
+        bypass_cache_lookup: bool = False,
     ):
         """
         Initialize an OpenAI-compatible provider.
@@ -67,6 +68,7 @@ class OpenAICompatibleProvider(LLMProvider):
             top_p: Nucleus sampling parameter (None for API default)
             extra_params: Additional provider-specific parameters
             use_cache: Whether to use response caching (default: True)
+            bypass_cache_lookup: If True, skip cache lookup but still store results (default: False)
         """
         self.model_name = model
         self.base_url = base_url
@@ -80,6 +82,7 @@ class OpenAICompatibleProvider(LLMProvider):
         self.top_p = top_p
         self.extra_params = extra_params or {}
         self.use_cache = use_cache
+        self.bypass_cache_lookup = bypass_cache_lookup
 
     @property
     def model(self) -> str:
@@ -138,7 +141,7 @@ class OpenAICompatibleProvider(LLMProvider):
         """
         cache_key: Optional[str] = None
 
-        # Cache lookup
+        # Cache lookup (skip if bypass_cache_lookup is True)
         if self.use_cache:
             try:
                 db_manager = DatabaseManager.get_default()
@@ -152,12 +155,14 @@ class OpenAICompatibleProvider(LLMProvider):
                         top_p=self.top_p,
                         json_schema=json_schema,
                     )
-                    with db_manager.session_scope() as session:
-                        cache_repo = CacheRepository(session)
-                        cached = cache_repo.get(cache_key)
-                        if cached is not None:
-                            logger.info(f"[CACHE HIT] {self.name}/{self.model_name}")
-                            return cached
+                    # Only do cache lookup if not bypassing
+                    if not self.bypass_cache_lookup:
+                        with db_manager.session_scope() as session:
+                            cache_repo = CacheRepository(session)
+                            cached = cache_repo.get(cache_key)
+                            if cached is not None:
+                                logger.info(f"[CACHE HIT] {self.name}/{self.model_name}")
+                                return cached
             except Exception as e:
                 # Log but don't fail if cache lookup fails
                 logger.debug(f"[CACHE] Lookup failed, proceeding without cache: {e}")
