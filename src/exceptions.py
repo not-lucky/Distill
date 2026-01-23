@@ -1,5 +1,7 @@
 """Custom exceptions for LLM2Deck."""
 
+from typing import Optional
+
 
 class LLM2DeckError(Exception):
     """Base exception for LLM2Deck."""
@@ -58,7 +60,7 @@ class ConfigurationError(LLM2DeckError):
 class SubjectError(ConfigurationError):
     """Raised when subject configuration is invalid."""
 
-    def __init__(self, subject: str, message: str = None):
+    def __init__(self, subject: str, message: Optional[str] = None):
         self.subject = subject
         msg = message or f"Unknown subject: {subject}"
         super().__init__(msg)

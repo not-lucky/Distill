@@ -89,7 +89,7 @@ class DatabaseManager:
 
     def get_session(self) -> Session:
         """Get a new database session."""
-        if not self.is_initialized:
+        if not self.is_initialized or self._session_factory is None:
             raise RuntimeError("Database not initialized. Call initialize() first.")
         return self._session_factory()
 

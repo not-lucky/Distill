@@ -1,7 +1,7 @@
 """Orchestrator for LLM2Deck card generation workflow."""
 
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 
 from src.config import DATABASE_PATH
 from src.config.loader import load_config
@@ -96,11 +96,11 @@ class Orchestrator:
         if self.bypass_cache_lookup:
             for provider in llm_providers:
                 if hasattr(provider, 'bypass_cache_lookup'):
-                    provider.bypass_cache_lookup = True
+                    setattr(provider, 'bypass_cache_lookup', True)
             if combiner and hasattr(combiner, 'bypass_cache_lookup'):
-                combiner.bypass_cache_lookup = True
+                setattr(combiner, 'bypass_cache_lookup', True)
             if formatter and hasattr(formatter, 'bypass_cache_lookup'):
-                formatter.bypass_cache_lookup = True
+                setattr(formatter, 'bypass_cache_lookup', True)
 
         # If no explicit combiner configured, use first provider as combiner
         if combiner is None:
@@ -138,7 +138,7 @@ class Orchestrator:
 
         return True
 
-    async def run(self) -> List[Dict]:
+    async def run(self) -> List[Dict[str, Any]]:
         """
         Execute the card generation workflow.
 
@@ -147,6 +147,9 @@ class Orchestrator:
         """
         if self.card_generator is None:
             raise RuntimeError("Orchestrator not initialized. Call initialize() first.")
+
+        # Capture card_generator locally to help type checker
+        card_generator = self.card_generator
 
         # Build question list with metadata
         questions_with_metadata: List[Tuple] = get_indexed_questions(
@@ -168,7 +171,7 @@ class Orchestrator:
         # Create task functions for each question
         def make_task(cat_idx: int, cat_name: str, prob_idx: int, question: str):
             async def task():
-                return await self.card_generator.process_question(
+                return await card_generator.process_question(
                     question,
                     self.subject_config.initial_prompt,
                     self.subject_config.target_model,
@@ -191,9 +194,10 @@ class Orchestrator:
         results = await task_runner.run_all(tasks)
 
         # Extract successful results
-        all_generated_problems = [
-            result.value for result in results if isinstance(result, Success)
-        ]
+        all_generated_problems: List[Dict[str, Any]] = []
+        for result in results:
+            if isinstance(result, Success) and result.value is not None:
+                all_generated_problems.append(result.value)  # type: ignore[arg-type]
 
         # Update run status
         self.run_repo.mark_run_completed(
@@ -206,7 +210,7 @@ class Orchestrator:
 
         return all_generated_problems
 
-    def save_results(self, problems: List[Dict]) -> Optional[str]:
+    def save_results(self, problems: List[Dict[str, Any]]) -> Optional[str]:
         """
         Save generated problems to JSON file.
 

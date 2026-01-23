@@ -88,9 +88,9 @@ class CerebrasProvider(LLMProvider):
                 params["reasoning_effort"] = self.reasoning_effort
 
             # Cerebras SDK is sync, so run in thread
+            # Use lambda to handle kwargs properly for type checker
             completion = await asyncio.to_thread(
-                client.chat.completions.create,
-                **params,
+                lambda: client.chat.completions.create(**params)  # type: ignore[arg-type]
             )
 
             content = completion.choices[0].message.content

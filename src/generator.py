@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Type
 
 from pydantic import BaseModel
 
@@ -62,6 +62,9 @@ class CardGenerator:
         Returns:
             List of valid (non-empty) results.
         """
+        if self.repository is None:
+            raise RuntimeError("CardGenerator requires a repository for non-dry-run mode")
+        
         valid_results = []
 
         for provider, result in zip(self.llm_providers, provider_results):
@@ -200,7 +203,7 @@ class CardGenerator:
         self,
         question: str,
         prompt_template: Optional[str] = None,
-        model_class: BaseModel = LeetCodeProblem,
+        model_class: Type[BaseModel] = LeetCodeProblem,
         category_index: Optional[int] = None,
         category_name: Optional[str] = None,
         problem_index: Optional[int] = None,
@@ -211,7 +214,7 @@ class CardGenerator:
         Args:
             question: The question/problem name.
             prompt_template: Optional prompt template.
-            model_class: Pydantic model for the card structure.
+            model_class: Pydantic model class for the card structure.
             category_index: 1-based index of the category (for ordering).
             category_name: Name of the category.
             problem_index: 1-based index of the problem within its category.
@@ -219,6 +222,9 @@ class CardGenerator:
         Returns:
             CardResult with card data including category metadata if provided.
         """
+        if self.repository is None:
+            raise RuntimeError("CardGenerator requires a repository for non-dry-run mode")
+        
         start_time = time.time()
         json_schema = model_class.model_json_schema()
 
@@ -267,4 +273,5 @@ class CardGenerator:
             problem_id, final_card_data, time.time() - start_time
         )
 
-        return final_card_data
+        # Cast to CardResult (the dict has the right structure after post-processing)
+        return final_card_data  # type: ignore[return-value]

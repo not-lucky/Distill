@@ -1,6 +1,6 @@
 """Query utilities for filtering and retrieving data from the database"""
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import datetime
 from src.database import DatabaseManager, Run, Problem, ProviderResult, Card
 from sqlalchemy import func
@@ -205,7 +205,7 @@ def search_cards(search_query: str) -> List[Card]:
     return cards
 
 
-def get_run_statistics(run_id: str) -> Dict:
+def get_run_statistics(run_id: str) -> Dict[str, Any]:
     """
     Get aggregate statistics for a run.
 
@@ -231,7 +231,10 @@ def get_run_statistics(run_id: str) -> Dict:
     successful_problems = [p for p in problems if p.status == "success"]
     failed_problems = [p for p in problems if p.status == "failed"]
 
-    stats = {
+    # Build by_provider dict separately for type safety
+    by_provider: Dict[str, Dict[str, Any]] = {}
+
+    stats: Dict[str, Any] = {
         "run_id": run_id,
         "user_label": run.user_label,
         "mode": run.mode,
@@ -258,36 +261,35 @@ def get_run_statistics(run_id: str) -> Dict:
             "total": len(provider_results),
             "successful": sum(1 for pr in provider_results if pr.success),
             "failed": sum(1 for pr in provider_results if not pr.success),
-            "by_provider": {},
+            "by_provider": by_provider,
         },
     }
 
     # Provider breakdown
     for pr in provider_results:
-        if pr.provider_name not in stats["provider_results"]["by_provider"]:
-            stats["provider_results"]["by_provider"][pr.provider_name] = {
+        provider_name = str(pr.provider_name) if pr.provider_name else "unknown"
+        if provider_name not in by_provider:
+            by_provider[provider_name] = {
                 "total": 0,
                 "successful": 0,
                 "failed": 0,
                 "avg_cards": 0,
             }
-        stats["provider_results"]["by_provider"][pr.provider_name]["total"] += 1
+        by_provider[provider_name]["total"] += 1
         if pr.success:
-            stats["provider_results"]["by_provider"][pr.provider_name][
-                "successful"
-            ] += 1
+            by_provider[provider_name]["successful"] += 1
         else:
-            stats["provider_results"]["by_provider"][pr.provider_name]["failed"] += 1
+            by_provider[provider_name]["failed"] += 1
 
     # Calculate avg cards per provider
-    for provider_name in stats["provider_results"]["by_provider"]:
+    for provider_name in by_provider:
         provider_cards = [
             pr.card_count
             for pr in provider_results
             if pr.provider_name == provider_name and pr.card_count is not None
         ]
         if provider_cards:
-            stats["provider_results"]["by_provider"][provider_name]["avg_cards"] = sum(
+            by_provider[provider_name]["avg_cards"] = sum(
                 provider_cards
             ) / len(provider_cards)
 
@@ -295,7 +297,7 @@ def get_run_statistics(run_id: str) -> Dict:
     return stats
 
 
-def compare_runs(run_id1: str, run_id2: str) -> Dict:
+def compare_runs(run_id1: str, run_id2: str) -> Dict[str, Any]:
     """
     Compare two runs side-by-side.
 

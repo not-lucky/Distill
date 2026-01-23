@@ -50,11 +50,9 @@ class GeminiProvider(LLMProvider):
         combined_inputs: str,
         json_schema: Dict[str, Any],
         combine_prompt_template: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[str]:
         # Gemini webapi might not be best for strict JSON schema enforcement in the same way as OpenAI
         # But we can try prompting it.
-        # For now, let's assume we rely on OpenAI/Cerebras for the combination step as per original logic,
-        # or implement a best-effort approach here.
         # The original code didn't use Gemini for combination.
         logger.warning(
             "[Gemini] Combination not implemented/recommended for this provider."
