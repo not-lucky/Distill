@@ -98,6 +98,7 @@ Commands:
   merge       Merge archived JSON files for a subject
   export-md   Export JSON cards to Markdown format
   cache       Cache management (clear, stats)
+  query       Query database for runs, problems, cards, and statistics
 ```
 
 ### Generate Cards
@@ -187,6 +188,39 @@ uv run main.py cache stats
 
 # Clear all cached responses
 uv run main.py cache clear
+```
+
+### Query Database
+
+Inspect runs, problems, provider results, and cards in the database:
+
+```bash
+# List recent runs
+uv run main.py query runs
+uv run main.py query runs --subject leetcode --status completed --limit 10
+
+# Show details for a specific run (supports partial ID)
+uv run main.py query run abc12345
+
+# List problems
+uv run main.py query problems --run abc12345
+uv run main.py query problems --status success --search "binary"
+
+# List provider results
+uv run main.py query providers --run abc12345 --success
+uv run main.py query providers --provider cerebras
+
+# Search cards
+uv run main.py query cards --search "binary search"
+uv run main.py query cards --type Algorithm --limit 20
+
+# Show global statistics
+uv run main.py query stats
+uv run main.py query stats --subject leetcode
+
+# Output formats
+uv run main.py query runs --format json      # JSON output
+uv run main.py query runs --format table     # Table output (default)
 ```
 
 ## Configuration
@@ -620,7 +654,23 @@ tail -f app.log
 
 ### Database Queries
 
-Inspect the SQLite database directly:
+Use the built-in query command for easy database inspection:
+
+```bash
+# List recent runs with statistics
+uv run main.py query runs --limit 5
+
+# Show detailed run statistics
+uv run main.py query run <run_id>
+
+# Search cards
+uv run main.py query cards --search "binary search"
+
+# Global statistics
+uv run main.py query stats
+```
+
+Or inspect the SQLite database directly:
 
 ```bash
 sqlite3 llm2deck.db
