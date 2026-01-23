@@ -1,148 +1,259 @@
 # LLM2Deck
 
-Generate high-quality Anki flashcards using multiple LLMs in parallel.
+<p align="center">
+  <strong>Generate high-quality Anki flashcards using multiple LLMs in parallel</strong>
+</p>
 
-LLM2Deck runs multiple LLM providers simultaneously, then combines their outputs into comprehensive flashcard decks. It supports LeetCode algorithms, Computer Science concepts, Physics topics, and custom subjects you define.
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#configuration">Configuration</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#development">Development</a>
+</p>
+
+---
+
+LLM2Deck is a powerful tool that generates comprehensive Anki flashcard decks by orchestrating multiple Large Language Models in parallel. It uses a two-stage generation process: first, multiple LLMs generate cards independently, then a "combiner" model synthesizes the best elements into a final, polished deck.
 
 ## Features
 
-- **Parallel LLM Generation** - Query multiple providers at once, combine the best results
-- **Built-in Subjects** - LeetCode, CS, Physics with optimized prompts
-- **Custom Subjects** - Add your own topics with custom prompts and questions
-- **MCQ Support** - Generate multiple-choice questions with explanations
-- **Hierarchical Decks** - Organized by category (e.g., `LeetCode::Binary Search::Two Sum`)
-- **Rich Formatting** - Syntax highlighting, Markdown, Catppuccin theme
-- **Run Tracking** - SQLite database logs all generations
+- **Parallel LLM Generation** — Query multiple providers simultaneously (Cerebras, OpenRouter, NVIDIA NIM, Google Gemini, and more)
+- **Two-Stage Quality Pipeline** — Generate → Combine workflow produces higher-quality cards than single-model approaches
+- **Built-in Subjects** — LeetCode algorithms, Computer Science fundamentals, and Physics concepts ready to go
+- **Custom Subjects** — Define your own subjects with custom prompts and question sets
+- **Multiple Card Formats** — Standard Q&A and Multiple Choice Question (MCQ) modes
+- **Beautiful Cards** — Catppuccin-themed styling with syntax highlighting for code
+- **Full Traceability** — SQLite database tracks all runs, provider outputs, and final cards
+- **Caching** — Intelligent response caching to avoid redundant API calls
+- **Anki Export** — Direct conversion to `.apkg` format ready for import
+
+## Installation
+
+### Prerequisites
+
+- **Python 3.12+**
+- **[uv](https://github.com/astral-sh/uv)** package manager (recommended)
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/LLM2Deck.git
+cd LLM2Deck
+
+# Install dependencies with uv
+uv sync
+
+# Or with pip
+pip install -e .
+```
+
+### API Keys
+
+Create JSON files at the project root for each provider you want to use:
+
+| Provider | Key File | Format |
+|----------|----------|--------|
+| Cerebras | `api_keys.json` | `{"keys": ["key1", "key2"]}` |
+| OpenRouter | `openrouter_apikeys.json` | `{"keys": ["key1"]}` |
+| NVIDIA NIM | `nvidia_keys.json` | `{"keys": ["key1"]}` |
+| Google GenAI | `google_genai_keys.json` | `{"keys": ["key1"]}` |
+| Canopywave | `canopywave_keys.json` | `{"keys": ["key1"]}` |
+| Baseten | `baseten_keys.json` | `{"keys": ["key1"]}` |
+
+You can also set key file paths via environment variables:
+- `CEREBRAS_KEYS_FILE_PATH`
+- `OPENROUTER_KEYS_FILE_PATH`
+- `NVIDIA_KEYS_FILE_PATH`
+- `GOOGLE_GENAI_KEYS_FILE_PATH`
 
 ## Quick Start
 
 ```bash
-# Install
-git clone <repo_url> && cd LLM2Deck
-uv sync
+# Generate LeetCode flashcards (default)
+uv run main.py generate
 
-# Configure providers in config.yaml (see Configuration section)
+# Generate CS concept cards in MCQ format
+uv run main.py generate cs mcq
 
-# Generate cards
-uv run main.py generate leetcode          # LeetCode standard cards
-uv run main.py generate cs mcq            # CS multiple choice
-uv run main.py generate physics           # Physics cards
+# Convert generated JSON to Anki package
+uv run main.py convert leetcode_anki_deck_20260109T154055.json
 
-# Convert to Anki package
-uv run main.py convert leetcode_anki_deck_20260107.json
+# Import the .apkg file into Anki!
 ```
 
-## Installation
+## Usage
 
-**Requirements:** Python >= 3.12, [uv](https://github.com/astral-sh/uv)
+### Commands Overview
 
 ```bash
-git clone <repository_url>
-cd LLM2Deck
-uv sync
+uv run main.py <command> [options]
+
+Commands:
+  generate    Generate flashcards from LLM providers
+  convert     Convert JSON deck to Anki .apkg format
+  merge       Merge archived JSON files for a subject
+  export-md   Export JSON cards to Markdown format
+  cache       Cache management (clear, stats)
+```
+
+### Generate Cards
+
+```bash
+# Basic usage
+uv run main.py generate                          # LeetCode standard (default)
+uv run main.py generate <subject>                # Specific subject
+uv run main.py generate <subject> mcq            # MCQ format
+uv run main.py generate cs mcq --label "test"    # With run label
+
+# Built-in subjects: leetcode, cs, physics
+# Custom subjects: defined in config.yaml
+
+# Options
+--label TEXT     Optional label for this run (stored in database)
+--dry-run        Show what would be done without making API calls
+--no-cache       Bypass cache lookup (still stores new results)
+```
+
+**Examples:**
+
+```bash
+# Generate LeetCode algorithm cards
+uv run main.py generate leetcode
+
+# Generate Computer Science MCQs with a label
+uv run main.py generate cs mcq --label "exam-prep"
+
+# Preview generation without API calls
+uv run main.py generate physics --dry-run
+```
+
+### Convert to Anki
+
+```bash
+uv run main.py convert <json_file> [options]
+
+Options:
+  --mode MODE      Override auto-detected mode (leetcode, cs, physics, *_mcq)
+  --output FILE    Custom output filename
+  --dry-run        Preview without writing files
+```
+
+**Examples:**
+
+```bash
+# Auto-detect mode from filename
+uv run main.py convert leetcode_anki_deck_20260109T154055.json
+
+# Specify output file
+uv run main.py convert cs_cards.json --output my_cs_deck.apkg
+
+# Force MCQ mode
+uv run main.py convert cards.json --mode cs_mcq
+```
+
+### Merge Archives
+
+Combine multiple JSON files from different runs into a single deck:
+
+```bash
+uv run main.py merge <subject>
+
+# Preview merge operation
+uv run main.py merge leetcode --dry-run
+```
+
+### Export to Markdown
+
+Convert archived JSON cards to readable Markdown format:
+
+```bash
+uv run main.py export-md [options]
+
+Options:
+  --source DIR    Source directory with JSON files
+  --target DIR    Target directory for Markdown output
+  --dry-run       Preview without writing files
+```
+
+### Cache Management
+
+```bash
+# View cache statistics
+uv run main.py cache stats
+
+# Clear all cached responses
+uv run main.py cache clear
 ```
 
 ## Configuration
 
-All configuration is in `config.yaml`.
+### config.yaml
 
-### Providers
-
-Enable/disable providers and set models:
+The main configuration file controls all aspects of LLM2Deck:
 
 ```yaml
+# Global defaults for all providers
+defaults:
+  timeout: 120.0              # Request timeout in seconds
+  temperature: 0.4            # Sampling temperature
+  max_tokens: null            # Max tokens (null = API default)
+  max_retries: 5              # Retry attempts for API requests
+  json_parse_retries: 5       # Retries for JSON parsing
+  retry_delay: 1.0            # Base delay between retries
+
+# Provider Configuration
 providers:
   cerebras:
     enabled: true
     model: "gpt-oss-120b"
-    reasoning_effort: "high"      # Optional: low, medium, high
+    reasoning_effort: "high"
 
   openrouter:
     enabled: false
-    model: "anthropic/claude-3-opus"
+    model: "xiaomi/mimo-v2-flash:free"
 
   nvidia:
     enabled: false
-    model: "meta/llama-3.1-405b-instruct"
-    timeout: 900                  # Optional: request timeout in seconds
+    model: "moonshotai/kimi-k2-thinking"
+    timeout: 900
+    max_tokens: 16384
 
   google_genai:
     enabled: false
-    model: "gemini-2.0-flash"
-    thinking_level: "high"        # Optional: for thinking models
+    model: "gemini-3-flash-preview"
+    thinking_level: "high"
+    temperature: 1.0
 
   google_antigravity:
     enabled: true
-    models:                       # Multiple models = multiple instances
+    models:
       - "gemini-3-pro-preview"
-      - "gemini-claude-sonnet-4-5-thinking"
+      - "gemini-claude-opus-4-5-thinking"
+    timeout: 900
 
-  g4f:
-    enabled: false
-    model: "gpt-4"
-    provider_name: "Bing"         # G4F provider name
-```
-
-**Available Providers:**
-
-| Provider | API Keys File | Notes |
-|----------|--------------|-------|
-| `cerebras` | `api_keys.json` | Native SDK |
-| `openrouter` | `openrouter_keys.json` | OpenAI-compatible |
-| `nvidia` | `nvidia_keys.json` | NVIDIA NIM |
-| `google_genai` | `google_genai_keys.json` | Official Google API |
-| `google_antigravity` | None | Local proxy, no auth |
-| `canopywave` | `canopywave_keys.json` | OpenAI-compatible |
-| `baseten` | `baseten_keys.json` | OpenAI-compatible |
-| `gemini_webapi` | `python3ds.json` | Browser cookies (experimental) |
-| `g4f` | None | gpt4free (experimental) |
-
-### API Keys
-
-Create JSON files at project root:
-
-```json
-// api_keys.json (Cerebras)
-[{"api_key": "sk-..."}]
-
-// nvidia_keys.json
-["nvapi-...", "nvapi-..."]
-
-// openrouter_keys.json
-[{"data": {"key": "sk-or-..."}}]
-
-// google_genai_keys.json
-["AIza...", "AIza..."]
-```
-
-### Generation Settings
-
-```yaml
+# Generation Settings
 generation:
-  concurrent_requests: 8      # Parallel question processing
-  request_delay: 1            # Seconds between requests (rate limiting)
-  max_retries: 5              # API retry attempts
-  json_parse_retries: 3       # JSON parsing retries
+  concurrent_requests: 7      # Max parallel API requests
+  request_delay: 1            # Delay between starting requests
+  max_retries: 10
 
-  # Combiner: which model merges outputs from all providers
+  # Combiner merges outputs from all generators
   combiner:
     provider: google_antigravity
-    model: gemini-pro
-    also_generate: true       # Also use for initial generation
+    model: gemini-claude-opus-4-5-thinking
+    also_generate: true       # Also use as generator
 
-  # Formatter: separate model for JSON output (optional)
-  # Use when combiner is smart but unreliable at JSON
+  # Optional formatter for JSON output
   formatter:
     provider: cerebras
     model: gpt-oss-120b
-    also_generate: false      # Only format, don't generate
-```
+    also_generate: false
 
-### Subjects
-
-Built-in subjects work out of the box:
-
-```yaml
+# Subject Settings
 subjects:
   leetcode:
     enabled: true
@@ -150,278 +261,439 @@ subjects:
     enabled: true
   physics:
     enabled: false
+
+  # Custom subject example
+  # my_subject:
+  #   enabled: true
+  #   deck_prefix: "MySubject"
+  #   prompts_dir: "prompts/my_subject"
+  #   questions_file: "data/my_questions.json"
+
+# Paths
+paths:
+  archival_dir: "anki_cards_archival"
+  markdown_dir: "anki_cards_markdown"
+  timestamp_format: "%Y%m%dT%H%M%S"
+
+# Database
+database:
+  path: "llm2deck.db"
 ```
 
-## Usage
+### Provider Configuration
 
-### Generate Cards
+Each provider supports these common options:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `enabled` | Whether to use this provider | `false` |
+| `model` | Model identifier | Provider-specific |
+| `timeout` | Request timeout (seconds) | `120.0` |
+| `temperature` | Sampling temperature | `0.4` |
+| `max_tokens` | Maximum output tokens | API default |
+| `max_retries` | Retry attempts | `5` |
+
+Provider-specific options:
+- **Cerebras**: `reasoning_effort` (low/medium/high)
+- **Google GenAI**: `thinking_level` (low/medium/high)
+- **G4F**: `provider_name` (LMArena, etc.)
+
+### Adding Custom Subjects
+
+1. **Create prompt templates:**
 
 ```bash
-# Basic usage
-uv run main.py generate                    # Default: leetcode standard
-uv run main.py generate leetcode           # LeetCode problems
-uv run main.py generate cs                 # Computer Science concepts
-uv run main.py generate physics            # Physics topics
-
-# MCQ mode
-uv run main.py generate leetcode mcq       # LeetCode multiple choice
-uv run main.py generate cs mcq             # CS multiple choice
-uv run main.py generate physics mcq        # Physics multiple choice
-
-# With label (for tracking)
-uv run main.py generate leetcode --label "binary-search-batch"
-
-# Custom subject (after configuring in config.yaml)
-uv run main.py generate biology
+mkdir -p prompts/my_subject
 ```
 
-**Output:** `{subject}_anki_deck_{timestamp}.json`
-
-### Convert to Anki Package
-
-```bash
-# Auto-detect mode from filename
-uv run main.py convert leetcode_anki_deck_20260107T143025.json
-
-# Explicit mode
-uv run main.py convert output.json --mode cs_mcq
-
-# Custom output filename
-uv run main.py convert cards.json -o my_deck.apkg
-```
-
-**Valid modes:** `leetcode`, `cs`, `physics`, `leetcode_mcq`, `cs_mcq`, `physics_mcq`, `mcq`
-
-### Merge JSON Files
-
-Combine multiple generation runs:
-
-```bash
-# Merge all JSON files in anki_cards_archival/{subject}/
-uv run main.py merge leetcode
-uv run main.py merge cs
-uv run main.py merge physics
-```
-
-**Output:** `{subject}_anki_deck_{timestamp}.json`
-
-### Export to Markdown
-
-Convert cards to readable Markdown:
-
-```bash
-# Default directories
-uv run main.py export-md
-
-# Custom directories
-uv run main.py export-md --source ./my_cards --target ./markdown_output
-```
-
-## Custom Subjects
-
-Add your own subjects with custom prompts and questions.
-
-### 1. Create Prompt Files
-
-Create a directory with your prompts:
-
-```
-prompts/biology/
-├── initial.md      # Prompt for initial card generation
-└── combine.md      # Prompt for combining results from multiple providers
-```
-
-**initial.md example:**
+Create `prompts/my_subject/initial.md`:
 ```markdown
-You are an expert educator creating Anki flashcards for: **{topic}**
+You are an expert tutor on {question}.
 
-Generate comprehensive flashcards covering:
-- Core definitions
+Generate comprehensive Anki cards covering:
 - Key concepts
-- Practical applications
+- Examples
+- Common misconceptions
 
-Return JSON:
+Output valid JSON matching the schema.
+```
+
+Create `prompts/my_subject/combine.md`:
+```markdown
+You are synthesizing multiple card sets for {question}.
+
+Combine the best elements from each set:
+{combined_inputs}
+
+Output a unified set of high-quality cards as valid JSON.
+```
+
+2. **Create questions file:**
+
+Create `data/my_questions.json`:
+```json
 {
-  "title": "Topic Title",
-  "topic": "Category",
-  "difficulty": "Basic|Intermediate|Advanced",
+  "Category 1": [
+    "Question 1",
+    "Question 2"
+  ],
+  "Category 2": [
+    "Question 3"
+  ]
+}
+```
+
+3. **Add to config.yaml:**
+
+```yaml
+subjects:
+  my_subject:
+    enabled: true
+    deck_prefix: "MySubject"
+    prompts_dir: "prompts/my_subject"
+    questions_file: "data/my_questions.json"
+```
+
+4. **Generate cards:**
+
+```bash
+uv run main.py generate my_subject
+```
+
+## Architecture
+
+### Generation Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                           Orchestrator                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐                          │
+│   │ Provider │  │ Provider │  │ Provider │   ← Parallel Generation  │
+│   │ Cerebras │  │  NVIDIA  │  │  Gemini  │                          │
+│   └────┬─────┘  └────┬─────┘  └────┬─────┘                          │
+│        │             │             │                                 │
+│        └─────────────┴─────────────┘                                 │
+│                      │                                               │
+│                      ▼                                               │
+│              ┌──────────────┐                                        │
+│              │   Combiner   │  ← Synthesize best cards               │
+│              │   (Gemini)   │                                        │
+│              └──────┬───────┘                                        │
+│                     │                                                │
+│                     ▼                                                │
+│              ┌──────────────┐                                        │
+│              │  Formatter   │  ← Optional JSON formatting            │
+│              │  (Cerebras)  │                                        │
+│              └──────┬───────┘                                        │
+│                     │                                                │
+│                     ▼                                                │
+│              ┌──────────────┐                                        │
+│              │  Final JSON  │                                        │
+│              │   + SQLite   │                                        │
+│              └──────────────┘                                        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Directory Structure
+
+```
+LLM2Deck/
+├── main.py                 # Entry point
+├── config.yaml             # Runtime configuration
+├── src/
+│   ├── cli.py              # CLI interface (argparse)
+│   ├── orchestrator.py     # Generation workflow coordinator
+│   ├── generator.py        # Parallel card generation
+│   ├── prompts.py          # PromptLoader - lazy prompt loading
+│   ├── models.py           # Pydantic models (LeetCodeProblem, etc.)
+│   ├── database.py         # SQLite operations
+│   ├── repositories.py     # Database abstraction layer
+│   ├── exceptions.py       # Custom exceptions
+│   ├── task_runner.py      # Concurrent task execution
+│   ├── cache.py            # Response caching
+│   ├── config/
+│   │   ├── loader.py       # YAML config parsing
+│   │   ├── subjects.py     # SubjectRegistry
+│   │   ├── keys.py         # API key loading
+│   │   ├── models.py       # Config dataclasses
+│   │   └── modes.py        # Mode definitions
+│   ├── providers/
+│   │   ├── base.py         # LLMProvider abstract base
+│   │   ├── openai_compatible.py  # Shared implementation
+│   │   ├── registry.py     # Provider factory
+│   │   ├── cerebras.py     # Cerebras provider
+│   │   ├── nvidia.py       # NVIDIA NIM
+│   │   ├── openrouter.py   # OpenRouter
+│   │   ├── google_genai.py # Google Generative AI
+│   │   └── ...             # Other providers
+│   ├── anki/
+│   │   ├── generator.py    # DeckGenerator
+│   │   ├── models.py       # Anki note models
+│   │   ├── renderer.py     # Markdown → HTML
+│   │   └── styles.py       # Catppuccin theme CSS
+│   ├── services/
+│   │   ├── merge.py        # MergeService
+│   │   └── export.py       # ExportService
+│   └── data/
+│       ├── prompts/        # Prompt templates
+│       └── questions.json  # Built-in questions
+├── tests/                  # Test suite
+├── anki_cards_archival/    # Archived JSON outputs
+└── llm2deck.db             # SQLite database
+```
+
+### Card Models
+
+**Standard Cards (Q&A):**
+```json
+{
+  "title": "Two Sum",
+  "topic": "Arrays and Hashing",
+  "difficulty": "Easy",
   "cards": [
     {
       "card_type": "Concept",
-      "tags": ["Tag1"],
-      "front": "Question",
-      "back": "Answer"
+      "tags": ["Arrays", "HashMap"],
+      "front": "What is the Two Sum problem?",
+      "back": "Given an array and target, find two numbers that sum to target..."
     }
   ]
 }
 ```
 
-**combine.md example:**
-```markdown
-Review and combine these flashcard sets for **{topic}**:
-
-{cards}
-
-Remove duplicates, improve clarity, ensure completeness.
-Return the same JSON format with merged cards.
-```
-
-### 2. Create Questions File
-
+**MCQ Cards:**
 ```json
 {
-  "Cell Biology": [
-    "Photosynthesis",
-    "Cell Division",
-    "Mitochondria"
-  ],
-  "Ecology": [
-    "Food Chains",
-    "Ecosystems",
-    "Biodiversity"
+  "title": "Binary Trees",
+  "topic": "Data Structures",
+  "difficulty": "Medium",
+  "cards": [
+    {
+      "card_type": "Application",
+      "tags": ["Trees", "Traversal"],
+      "question": "What is the time complexity of BFS on a tree?",
+      "options": ["A. O(1)", "B. O(log n)", "C. O(n)", "D. O(n²)"],
+      "correct_answer": "C",
+      "explanation": "BFS visits each node exactly once..."
+    }
   ]
 }
 ```
 
-### 3. Configure in config.yaml
+### Database Schema
 
-```yaml
-subjects:
-  biology:
-    enabled: true
-    deck_prefix: "Biology"
-    deck_prefix_mcq: "Biology_MCQ"           # Optional
-    prompts_dir: "prompts/biology"
-    questions_file: "data/biology_questions.json"
-```
+LLM2Deck tracks all generation data in SQLite:
 
-### 4. Generate
+| Table | Purpose |
+|-------|---------|
+| `runs` | Execution metadata, timestamps, statistics |
+| `problems` | Individual questions processed |
+| `provider_results` | Raw LLM outputs before combination |
+| `cards` | Final individual cards |
+| `cache` | Cached LLM responses |
 
-```bash
-uv run main.py generate biology
-uv run main.py generate biology mcq
-```
+## Card Styling
 
-See `src/data/prompts/example/` for template prompts.
+Cards are styled with the **Catppuccin** color scheme, automatically adapting to Anki's light/dark mode:
 
-## Project Structure
+- **Latte** (light) — Clean, readable daytime theme
+- **Mocha** (dark) — Easy on the eyes for night study
 
-```
-LLM2Deck/
-├── main.py                 # Entry point
-├── config.yaml             # Configuration
-├── src/
-│   ├── cli.py              # CLI interface
-│   ├── orchestrator.py     # Generation workflow
-│   ├── generator.py        # Parallel card generation
-│   ├── prompts.py          # Prompt loading
-│   ├── models.py           # Pydantic card models
-│   ├── database.py         # SQLite operations
-│   ├── repositories.py     # Database abstraction
-│   ├── config/
-│   │   ├── loader.py       # YAML config parsing
-│   │   ├── subjects.py     # Subject registry
-│   │   └── keys.py         # API key loading
-│   ├── providers/
-│   │   ├── base.py         # Abstract provider
-│   │   ├── registry.py     # Provider factory
-│   │   ├── cerebras.py     # Cerebras
-│   │   ├── openrouter.py   # OpenRouter
-│   │   ├── nvidia.py       # NVIDIA NIM
-│   │   └── ...             # Other providers
-│   ├── anki/
-│   │   ├── generator.py    # Deck creation
-│   │   ├── renderer.py     # Markdown → HTML
-│   │   └── styles.py       # Card CSS
-│   └── data/
-│       ├── prompts/        # Prompt templates
-│       └── questions.json  # Built-in questions
-└── llm2deck.db             # SQLite database
-```
+Features:
+- Syntax highlighting for code blocks (Pygments)
+- Responsive typography
+- Clear visual hierarchy for card types, tags, and metadata
 
-## How It Works
+## Development
 
-1. **Parallel Generation**: Each enabled provider generates cards for a question simultaneously
-2. **Combination**: The first provider combines all results into a final comprehensive set
-3. **Validation**: Pydantic models validate card structure
-4. **Storage**: Results saved to JSON and SQLite database
-5. **Conversion**: JSON converted to `.apkg` for Anki import
-
-## Environment Variables
-
-Optional overrides:
+### Setup Development Environment
 
 ```bash
-LLM2DECK_CONFIG=custom_config.yaml      # Custom config file
-LLM2DECK_PROMPTS_DIR=./my_prompts       # Custom prompts directory
-CONCURRENT_REQUESTS=16                   # Override concurrent requests
+# Install with dev dependencies
+uv sync --dev
+
+# Or with pip
+pip install -e ".[dev]"
 ```
 
-## Database
-
-All runs are tracked in `llm2deck.db`:
-
-- `runs` - Generation metadata and statistics
-- `problems` - Individual questions processed
-- `provider_results` - Raw LLM outputs
-- `cards` - Final generated cards
-
-Query with any SQLite client or use `src/queries.py`.
-
-## Testing
-
-The project has comprehensive test coverage with all LLM API calls mocked.
+### Running Tests
 
 ```bash
-# Run all tests
+# All tests (LLM calls are mocked)
 uv run pytest
 
-# Run with verbose output
-uv run pytest -v
+# By category
+uv run pytest tests/unit/ -m unit          # Fast, isolated
+uv run pytest tests/integration/           # Component interactions
+uv run pytest tests/e2e/                   # Full CLI workflows
 
-# Run specific test file
-uv run pytest tests/test_generator.py
+# Parallel execution
+uv run pytest tests/unit/ -n auto
 
-# Run specific test class
-uv run pytest tests/test_cli.py::TestHandleGenerate
-
-# Run tests matching a pattern
-uv run pytest -k "test_merge"
-
-# Run with coverage report
+# With coverage
 uv run pytest --cov=src --cov-report=html
 
-# Run only fast tests (skip slow integration tests)
-uv run pytest -m "not slow"
+# Random order (verify isolation)
+uv run pytest --random-order
+
+# Check test metrics
+uv run python scripts/test-metrics.py
 ```
 
-**Test Structure:**
+### Type Checking
 
-```
-tests/
-├── conftest.py                 # Shared fixtures and mock providers
-├── unit/
-│   ├── test_models.py          # Pydantic model validation
-│   ├── test_generator.py       # CardGenerator tests
-│   ├── test_orchestrator.py    # Orchestrator workflow tests
-│   ├── test_cli.py             # CLI argument parsing and handlers
-│   ├── test_setup.py           # Provider initialization tests
-│   ├── test_queries.py         # Database query function tests
-│   ├── config/
-│   │   └── test_keys.py        # API key loading tests
-│   ├── providers/
-│   │   ├── test_base.py        # Base provider tests
-│   │   ├── test_concrete_providers.py
-│   │   ├── test_registry.py    # Provider registry tests
-│   │   └── test_gemini_factory.py  # Gemini factory tests
-│   ├── anki/                   # Anki generation tests
-│   └── services/               # Merge/Export service tests
-├── integration/                # Component interaction tests
-└── e2e/                        # End-to-end workflow tests
+```bash
+# Uses 'ty' type checker
+ty check src/
 ```
 
-All tests use mocked LLM responses - no API credits are consumed.
+### Code Quality Targets
+
+- **Test-to-code ratio**: 5:1 for core modules, 2:1 for peripheral
+- **Coverage**: 87%+ overall
+- **Test count**: 1400+ tests
+
+### Adding a New Provider
+
+1. **Create provider class:**
+
+```python
+# src/providers/my_provider.py
+from src.providers.openai_compatible import OpenAICompatibleProvider
+
+class MyProvider(OpenAICompatibleProvider):
+    def __init__(self, api_keys: Iterator[str], model: str):
+        super().__init__(
+            model=model,
+            base_url="https://api.example.com/v1",
+            api_keys=api_keys,
+        )
+
+    @property
+    def name(self) -> str:
+        return "my_provider"
+```
+
+2. **Register in `src/providers/registry.py`**
+
+3. **Add key config in `src/config/keys.py`**
+
+4. **Add to `config.yaml`**
+
+### Project Guidelines
+
+- **Error Handling**: Use custom exceptions from `src/exceptions.py`
+- **Async Pattern**: Use `asyncio` for all I/O operations
+- **Testing**: Mock all LLM calls, never make real API requests in tests
+- **Configuration**: All settings via `config.yaml`, environment variables for secrets
+
+## Troubleshooting
+
+### Common Issues
+
+**"No providers enabled"**
+- Check `config.yaml` — at least one provider must have `enabled: true`
+- Verify API key files exist and contain valid keys
+
+**"All providers failed"**
+- Check API key validity
+- Verify network connectivity
+- Review `app.log` for detailed error messages
+
+**"JSON parse error"**
+- Some models produce invalid JSON — configure a `formatter` provider
+- Increase `json_parse_retries` in config
+
+**Rate limiting**
+- Increase `request_delay` in generation settings
+- Reduce `concurrent_requests`
+
+### Logs
+
+Check `app.log` for detailed execution logs:
+
+```bash
+tail -f app.log
+```
+
+### Database Queries
+
+Inspect the SQLite database directly:
+
+```bash
+sqlite3 llm2deck.db
+
+# Recent runs
+SELECT * FROM runs ORDER BY created_at DESC LIMIT 5;
+
+# Provider success rates
+SELECT provider_name, COUNT(*) FROM provider_results GROUP BY provider_name;
+```
+
+## Built-in Subjects
+
+### LeetCode (`leetcode`)
+
+Covers NeetCode 150 patterns:
+- Arrays and Hashing
+- Two Pointers
+- Sliding Window
+- Stacks
+- Binary Search
+- Linked Lists
+- Trees
+- Tries
+- Heap/Priority Queue
+- Backtracking
+- Graphs
+- Dynamic Programming
+- And more...
+
+Cards include:
+- Problem understanding
+- Multiple solution approaches (brute force → optimal)
+- Code implementations (Python)
+- Complexity analysis
+- Common pitfalls
+
+### Computer Science (`cs`)
+
+Foundational CS concepts:
+- Python fundamentals
+- Data structures (stacks, queues, trees, graphs)
+- Algorithms (sorting, searching)
+- Recursion and dynamic programming
+- System design basics
+
+### Physics (`physics`)
+
+Core physics topics:
+- Mechanics
+- Thermodynamics
+- Electromagnetism
+- Waves and optics
+- Modern physics
 
 ## License
 
-MIT
+MIT License — see [LICENSE](LICENSE) for details.
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Write tests for new functionality
+4. Ensure all tests pass (`uv run pytest`)
+5. Submit a pull request
+
+See [TESTING.md](TESTING.md) for testing guidelines and [AGENTS.md](AGENTS.md) for detailed development documentation.
+
+---
+
+<p align="center">
+  Made with ❤️ for spaced repetition learners
+</p>
