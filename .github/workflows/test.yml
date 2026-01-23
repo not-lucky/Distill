@@ -46,3 +46,16 @@ jobs:
         run: uv sync --all-extras
       - name: Run e2e tests
         run: uv run pytest tests/e2e/ -x -q
+
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Install ty type checker
+        run: uv tool install ty
+      - name: Run type checking
+        run: ty check src/
+        continue-on-error: true
