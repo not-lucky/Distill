@@ -22,6 +22,7 @@ LLM2Deck is a powerful tool that generates comprehensive Anki flashcard decks by
 
 - **Parallel LLM Generation** — Query multiple providers simultaneously (Cerebras, OpenRouter, NVIDIA NIM, Google Gemini, and more)
 - **Two-Stage Quality Pipeline** — Generate → Combine workflow produces higher-quality cards than single-model approaches
+- **Real-Time Progress Visualization** — Rich progress bar with ETA, provider status indicators, and live token/cost tracking
 - **Built-in Subjects** — LeetCode algorithms, Computer Science fundamentals, and Physics concepts ready to go
 - **Custom Subjects** — Define your own subjects with custom prompts and question sets
 - **Multiple Card Formats** — Standard Q&A and Multiple Choice Question (MCQ) modes
@@ -131,6 +132,33 @@ uv run main.py generate cs mcq --label "exam-prep"
 # Preview generation without API calls
 uv run main.py generate physics --dry-run
 ```
+
+### Progress Visualization
+
+During generation, LLM2Deck displays a real-time progress panel:
+
+```
+╭──────────────────── LLM2Deck Generation Progress ─────────────────────╮
+│ ◐ Generating cards ████████████░░░░░░░░░░░░░░░░░░░░ 35% (7/20) 0:02:15 │
+│                                                                        │
+│ Current: Binary Search Tree Insertion                                  │
+│                                                                        │
+│               Provider Status                                          │
+│ Provider          Model              Status  Success Failed Tokens Cost│
+│ cerebras          llama-70b          ✓ success    7      0   45,230 $0.02│
+│ google_antigravity gemini-pro        ✓ success    7      0   52,100 $0.00│
+│ nvidia            kimi-k2-thinking   🔄 running   6      1   38,500 $0.02│
+│                                                                        │
+│ ETA: 4.2m │ Total Tokens: 135,830 │ Est. Cost: $0.0412                 │
+╰────────────────────────────────────────────────────────────────────────╯
+```
+
+Features:
+- **Progress bar** with question count and elapsed time
+- **Current question** being processed
+- **Provider status table** showing success/fail counts, tokens used, and estimated cost
+- **ETA estimation** based on rolling average of processing times
+- **Live cost tracking** per provider with automatic pricing lookup
 
 ### Convert to Anki
 
@@ -440,6 +468,7 @@ LLM2Deck/
 │   ├── cli.py              # CLI interface (argparse)
 │   ├── orchestrator.py     # Generation workflow coordinator
 │   ├── generator.py        # Parallel card generation
+│   ├── progress.py         # Real-time progress visualization
 │   ├── prompts.py          # PromptLoader - lazy prompt loading
 │   ├── models.py           # Pydantic models (LeetCodeProblem, etc.)
 │   ├── database.py         # SQLite operations
@@ -587,7 +616,7 @@ ty check src/
 
 - **Test-to-code ratio**: 5:1 for core modules, 2:1 for peripheral
 - **Coverage**: 87%+ overall
-- **Test count**: 1400+ tests
+- **Test count**: 1500+ tests
 
 ### Adding a New Provider
 

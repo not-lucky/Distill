@@ -2,7 +2,7 @@
 
 import json
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Iterator
+from typing import Any, Dict, List, Optional, Iterator, Callable
 
 from openai import AsyncOpenAI
 from openai import RateLimitError as OpenAIRateLimitError
@@ -11,6 +11,8 @@ from tenacity import RetryError, retry, stop_after_attempt, wait_fixed, retry_if
 
 from src.providers.base import (
     LLMProvider,
+    TokenUsage,
+    TokenUsageCallback,
     create_retry_decorator,
     RetryableError,
     RateLimitError,
@@ -51,6 +53,7 @@ class OpenAICompatibleProvider(LLMProvider):
         extra_params: Optional[Dict[str, Any]] = None,
         use_cache: bool = True,
         bypass_cache_lookup: bool = False,
+        on_token_usage: Optional[TokenUsageCallback] = None,
     ):
         """
         Initialize an OpenAI-compatible provider.
@@ -69,6 +72,7 @@ class OpenAICompatibleProvider(LLMProvider):
             extra_params: Additional provider-specific parameters
             use_cache: Whether to use response caching (default: True)
             bypass_cache_lookup: If True, skip cache lookup but still store results (default: False)
+            on_token_usage: Callback for token usage updates (provider, model, usage, success)
         """
         self.model_name = model
         self.base_url = base_url
@@ -83,6 +87,7 @@ class OpenAICompatibleProvider(LLMProvider):
         self.extra_params = extra_params or {}
         self.use_cache = use_cache
         self.bypass_cache_lookup = bypass_cache_lookup
+        self.on_token_usage = on_token_usage
 
     @property
     def model(self) -> str:
@@ -173,7 +178,7 @@ class OpenAICompatibleProvider(LLMProvider):
         )
 
         @retry_decorator
-        async def _do_request() -> str:
+        async def _do_request() -> tuple[str, TokenUsage]:
             try:
                 client = self._get_client()
 
@@ -191,6 +196,14 @@ class OpenAICompatibleProvider(LLMProvider):
 
                 completion = await client.chat.completions.create(**request_params)
                 response_content = completion.choices[0].message.content
+                
+                # Extract token usage if available
+                usage = TokenUsage()
+                if completion.usage:
+                    usage = TokenUsage(
+                        input_tokens=completion.usage.prompt_tokens or 0,
+                        output_tokens=completion.usage.completion_tokens or 0,
+                    )
 
                 if not response_content:
                     raise EmptyResponseError(
@@ -200,7 +213,7 @@ class OpenAICompatibleProvider(LLMProvider):
                 if self.strip_json_markers and json_schema:
                     response_content = strip_json_block(response_content)
 
-                return response_content
+                return response_content, usage
 
             except OpenAIRateLimitError as e:
                 raise RateLimitError(f"[{self.model_name}] Rate limit hit") from e
@@ -208,7 +221,11 @@ class OpenAICompatibleProvider(LLMProvider):
                 raise TimeoutError(f"[{self.model_name}] Request timed out") from e
 
         try:
-            response = await _do_request()
+            response, token_usage = await _do_request()
+            
+            # Report token usage via callback
+            if self.on_token_usage:
+                self.on_token_usage(self.name, self.model_name, token_usage, True)
 
             # Cache storage (only on success)
             if self.use_cache and cache_key is not None and response is not None:
@@ -240,9 +257,15 @@ class OpenAICompatibleProvider(LLMProvider):
             return response
         except RetryError:
             logger.error(f"[{self.model_name}] All retry attempts failed")
+            # Report failure via callback
+            if self.on_token_usage:
+                self.on_token_usage(self.name, self.model_name, TokenUsage(), False)
             return None
         except Exception as e:
             logger.error(f"[{self.model_name}] Unexpected error: {e}")
+            # Report failure via callback
+            if self.on_token_usage:
+                self.on_token_usage(self.name, self.model_name, TokenUsage(), False)
             return None
 
     async def generate_initial_cards(

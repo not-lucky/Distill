@@ -11,9 +11,11 @@ from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
 from src.repositories import RunRepository, RunStats
-from src.task_runner import ConcurrentTaskRunner, Success
+from src.task_runner import ConcurrentTaskRunner, Success, TaskInfo
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions
+from src.progress import ProgressTracker, ProviderStatus
+from src.providers.base import TokenUsage
 
 
 class Orchestrator:
@@ -44,6 +46,8 @@ class Orchestrator:
         self.bypass_cache_lookup = bypass_cache_lookup
         self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
+        self.progress_tracker: Optional[ProgressTracker] = None
+        self._llm_providers: List = []  # Store for progress tracking
 
         # Load generation config
         config = load_config()
@@ -117,6 +121,11 @@ class Orchestrator:
                 self.run_repo.mark_run_failed()
             return False
 
+        # Store providers for progress tracking
+        self._llm_providers = llm_providers
+        self._combiner = combiner
+        self._formatter = formatter
+
         if self.dry_run:
             logger.info(f"[DRY RUN] Combiner: {combiner.name} ({combiner.model})")
             if formatter:
@@ -166,6 +175,43 @@ class Orchestrator:
                 logger.info(f"[DRY RUN]   ... and {len(questions_with_metadata) - preview_count} more")
             return []
 
+        # Collect all providers for progress tracking
+        all_providers: List[Tuple[str, str]] = []
+        for p in self._llm_providers:
+            all_providers.append((p.name, p.model))
+        if self._combiner:
+            all_providers.append((self._combiner.name, self._combiner.model))
+        if self._formatter and self._formatter != self._combiner:
+            all_providers.append((self._formatter.name, self._formatter.model))
+
+        # Initialize progress tracker
+        self.progress_tracker = ProgressTracker(
+            total_questions=len(questions_with_metadata),
+            provider_names=all_providers,
+        )
+
+        # Set up token usage callback for all providers
+        def on_token_usage(provider_name: str, model: str, usage: TokenUsage, success: bool):
+            if self.progress_tracker:
+                status = ProviderStatus.SUCCESS if success else ProviderStatus.FAILED
+                self.progress_tracker.update_provider_status(
+                    provider_name=provider_name,
+                    model=model,
+                    status=status,
+                    success=success,
+                    tokens_input=usage.input_tokens,
+                    tokens_output=usage.output_tokens,
+                )
+
+        # Wire up the callback to all providers
+        for provider in self._llm_providers:
+            if hasattr(provider, 'on_token_usage'):
+                provider.on_token_usage = on_token_usage
+        if hasattr(self._combiner, 'on_token_usage'):
+            self._combiner.on_token_usage = on_token_usage  # type: ignore[union-attr]
+        if self._formatter and hasattr(self._formatter, 'on_token_usage'):
+            self._formatter.on_token_usage = on_token_usage  # type: ignore[union-attr]
+
         logger.info(f"Starting generation for {len(questions_with_metadata)} questions...")
 
         # Create task functions for each question
@@ -186,12 +232,38 @@ class Orchestrator:
             for cat_idx, cat_name, prob_idx, question in questions_with_metadata
         ]
 
-        # Run with concurrency control and staggered request starts
-        task_runner = ConcurrentTaskRunner(
-            max_concurrent=self.concurrent_requests,
-            request_delay=self.request_delay,
-        )
-        results = await task_runner.run_all(tasks)
+        # Task names for progress display
+        task_names = [question for _, _, _, question in questions_with_metadata]
+
+        # Set up progress callbacks
+        def on_task_start(info: TaskInfo):
+            if self.progress_tracker:
+                self.progress_tracker.start_question(info.name)
+
+        def on_task_complete(info: TaskInfo, success: bool):
+            if self.progress_tracker:
+                self.progress_tracker.complete_question(
+                    info.name,
+                    success=success,
+                    duration=info.duration,
+                )
+
+        # Start progress display
+        self.progress_tracker.start()
+
+        try:
+            # Run with concurrency control and staggered request starts
+            task_runner = ConcurrentTaskRunner(
+                max_concurrent=self.concurrent_requests,
+                request_delay=self.request_delay,
+                on_task_start=on_task_start,
+                on_task_complete=on_task_complete,
+            )
+            results = await task_runner.run_all(tasks, task_names=task_names)
+        finally:
+            # Stop progress display
+            self.progress_tracker.stop()
+            self.progress_tracker.print_summary()
 
         # Extract successful results
         all_generated_problems: List[Dict[str, Any]] = []

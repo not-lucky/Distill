@@ -2,7 +2,8 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from dataclasses import dataclass, field
+from typing import Dict, Any, Optional, Callable
 
 from tenacity import (
     retry,
@@ -14,6 +15,21 @@ from tenacity import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TokenUsage:
+    """Token usage statistics from an API call."""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+
+# Callback type for token usage updates
+TokenUsageCallback = Callable[[str, str, TokenUsage, bool], None]  # (provider, model, usage, success) -> None
 
 
 # Common retryable exceptions

@@ -384,7 +384,7 @@ class QueryService:
                         "card_type": c.card_type,
                         "front": c.front,
                         "back": c.back,
-                        "tags": json.loads(c.tags) if c.tags else [],
+                        "tags": json.loads(str(c.tags)) if c.tags else [],
                         "created_at": c.created_at.isoformat() if c.created_at else None,
                     }
                     for c in cards
@@ -403,7 +403,7 @@ class QueryService:
                     str(c.problem_id),
                     str(c.card_type or "-"),
                     _truncate(str(c.front), 50),
-                    _truncate(c.tags or "[]", 20),
+                    _truncate(str(c.tags) if c.tags else "[]", 20),
                 ]
                 for c in cards
             ]
