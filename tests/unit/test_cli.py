@@ -749,6 +749,7 @@ class TestHandleGenerateExtended:
         args.card_type = "standard"
         args.label = None
         args.dry_run = True
+        args.no_cache = False
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -771,6 +772,7 @@ class TestHandleGenerateExtended:
                     is_mcq=False,
                     run_label=None,
                     dry_run=True,
+                    bypass_cache_lookup=False,
                 )
 
     @pytest.mark.asyncio
@@ -785,6 +787,7 @@ class TestHandleGenerateExtended:
         args.card_type = "mcq"
         args.label = "test-mcq"
         args.dry_run = False
+        args.no_cache = False
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -807,6 +810,7 @@ class TestHandleGenerateExtended:
                     is_mcq=True,
                     run_label="test-mcq",
                     dry_run=False,
+                    bypass_cache_lookup=False,
                 )
 
     @pytest.mark.asyncio
@@ -821,6 +825,7 @@ class TestHandleGenerateExtended:
         args.card_type = "standard"
         args.label = "my-run-label"
         args.dry_run = False
+        args.no_cache = False
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
