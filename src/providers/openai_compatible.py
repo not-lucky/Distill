@@ -19,6 +19,8 @@ from src.providers.base import (
 )
 from src.prompts import prompts
 from src.utils import strip_json_block
+from src.cache import generate_cache_key, CacheRepository
+from src.database import DatabaseManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,7 @@ class OpenAICompatibleProvider(LLMProvider):
         strip_json_markers: bool = True,
         top_p: Optional[float] = None,
         extra_params: Optional[Dict[str, Any]] = None,
+        use_cache: bool = True,
     ):
         """
         Initialize an OpenAI-compatible provider.
@@ -63,6 +66,7 @@ class OpenAICompatibleProvider(LLMProvider):
             strip_json_markers: Whether to strip ```json markers from responses
             top_p: Nucleus sampling parameter (None for API default)
             extra_params: Additional provider-specific parameters
+            use_cache: Whether to use response caching (default: True)
         """
         self.model_name = model
         self.base_url = base_url
@@ -75,6 +79,7 @@ class OpenAICompatibleProvider(LLMProvider):
         self.strip_json_markers = strip_json_markers
         self.top_p = top_p
         self.extra_params = extra_params or {}
+        self.use_cache = use_cache
 
     @property
     def model(self) -> str:
@@ -122,7 +127,7 @@ class OpenAICompatibleProvider(LLMProvider):
         json_schema: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """
-        Make a request to the API with retry logic.
+        Make a request to the API with retry logic and optional caching.
 
         Args:
             chat_messages: List of chat messages
@@ -131,6 +136,32 @@ class OpenAICompatibleProvider(LLMProvider):
         Returns:
             Response content string, or None if all retries failed
         """
+        cache_key: Optional[str] = None
+
+        # Cache lookup
+        if self.use_cache:
+            try:
+                db_manager = DatabaseManager.get_default()
+                if db_manager.is_initialized:
+                    cache_key = generate_cache_key(
+                        provider_name=self.name,
+                        model=self.model_name,
+                        messages=chat_messages,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        top_p=self.top_p,
+                        json_schema=json_schema,
+                    )
+                    with db_manager.session_scope() as session:
+                        cache_repo = CacheRepository(session)
+                        cached = cache_repo.get(cache_key)
+                        if cached is not None:
+                            logger.info(f"[CACHE HIT] {self.name}/{self.model_name}")
+                            return cached
+            except Exception as e:
+                # Log but don't fail if cache lookup fails
+                logger.debug(f"[CACHE] Lookup failed, proceeding without cache: {e}")
+
         retry_decorator = create_retry_decorator(
             max_retries=self.max_retries,
             retry_logger=logger,
@@ -172,7 +203,36 @@ class OpenAICompatibleProvider(LLMProvider):
                 raise TimeoutError(f"[{self.model_name}] Request timed out") from e
 
         try:
-            return await _do_request()
+            response = await _do_request()
+
+            # Cache storage (only on success)
+            if self.use_cache and cache_key is not None and response is not None:
+                try:
+                    db_manager = DatabaseManager.get_default()
+                    if db_manager.is_initialized:
+                        # Use first message content as prompt preview
+                        prompt_preview = ""
+                        if chat_messages:
+                            first_user_msg = next(
+                                (m.get("content", "") for m in chat_messages if m.get("role") == "user"),
+                                ""
+                            )
+                            prompt_preview = first_user_msg[:200] if first_user_msg else ""
+                        with db_manager.session_scope() as session:
+                            cache_repo = CacheRepository(session)
+                            cache_repo.put(
+                                cache_key=cache_key,
+                                provider_name=self.name,
+                                model=self.model_name,
+                                prompt_preview=prompt_preview,
+                                response=response,
+                            )
+                        logger.debug(f"[CACHE STORE] {self.name}/{self.model_name}")
+                except Exception as e:
+                    # Log but don't fail if cache storage fails
+                    logger.debug(f"[CACHE] Storage failed: {e}")
+
+            return response
         except RetryError:
             logger.error(f"[{self.model_name}] All retry attempts failed")
             return None
