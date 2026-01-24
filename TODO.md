@@ -1,37 +1,41 @@
-# TODO.md - Priority 1: Progress Visualization
+# TODO: Resume Failed Runs Implementation
 
-## Status: ✅ COMPLETE
+## Phase 1: Repository Layer ✅
+- [x] Add `get_successful_questions_for_run()` to `src/queries.py`
+- [x] Add `load_existing_run()` to `RunRepository`
+- [x] Add `get_processed_questions()` to `RunRepository`
+- [x] Add `get_existing_results()` to `RunRepository`
+- [x] Add `update_run_status()` to `RunRepository`
+- [x] Add `set_run_id()` method to `RunRepository` for resume mode
 
-All tasks for Priority 1 (Progress Visualization) have been completed.
+## Phase 2: Orchestrator Changes ✅
+- [x] Add `resume_run_id` parameter to `Orchestrator.__init__`
+- [x] Add `initialize_for_resume()` method
+- [x] Modify `initialize()` to handle resume mode
+- [x] Add logic to filter out already-processed questions in `run()`
+- [x] Merge existing results with new results in `save_results()`
 
-### Completed Tasks
-- [x] Create PLAN.md
-- [x] Analyze existing codebase
-- [x] Design architecture
-- [x] Implement ProgressTracker class (`src/progress.py`)
-- [x] Add progress callback to ConcurrentTaskRunner (`src/task_runner.py`)
-- [x] Add TokenUsage dataclass to providers (`src/providers/base.py`)
-- [x] Add token tracking to OpenAI-compatible providers (`src/providers/openai_compatible.py`)
-- [x] Integrate ProgressTracker with Orchestrator (`src/orchestrator.py`)
-- [x] Write unit tests for ProgressTracker (`tests/unit/test_progress.py`)
-- [x] Run all unit tests - 1468 passed
-- [x] Type check all modified files
+## Phase 3: CLI Changes ✅
+- [x] Add `--resume` argument to generate parser
+- [x] Update `handle_generate()` to pass resume_run_id
+- [x] Add validation for resume mode (run exists, valid status)
+- [x] Add helpful error messages
 
-### Summary of Changes
-| File | Change |
-|------|--------|
-| `src/progress.py` | NEW - Progress visualization module |
-| `src/task_runner.py` | Added TaskInfo, callbacks, task_names |
-| `src/providers/base.py` | Added TokenUsage, TokenUsageCallback |
-| `src/providers/openai_compatible.py` | Added token tracking, callback |
-| `src/orchestrator.py` | Integrated ProgressTracker |
-| `tests/unit/test_progress.py` | NEW - 31 tests |
+## Phase 4: Testing ✅
+- [x] Create `tests/unit/test_resume.py`
+- [x] Test `load_existing_run()` returns correct run
+- [x] Test `get_processed_questions()` returns correct set
+- [x] Test filtering removes already-processed questions
+- [x] Test partial run ID matching
+- [x] Test validation errors (wrong status, not found)
+- [x] Create `tests/integration/test_resume_integration.py`
+- [x] Test full resume workflow
 
-### Next Steps (Future Priorities)
-See `IMPROVEMENT.md` for remaining items:
-- Priority 2: Resume Failed Runs
-- Priority 3: Selective Question Generation
-- Priority 4: Cost Estimation & Budgeting
+## Phase 5: Documentation ✅
+- [x] Update README.md with resume examples
+- [x] Update AGENTS.md with resume command
 
----
-*Completed: 2026-01-14*
+## Verification ✅
+- [x] Run all tests: `uv run pytest tests/unit/test_resume.py -v`
+- [x] Run integration tests: `uv run pytest tests/integration/test_resume_integration.py -v`
+- [x] Check types: `ty check src/`

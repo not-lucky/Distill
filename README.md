@@ -118,6 +118,7 @@ uv run main.py generate cs mcq --label "test"    # With run label
 --label TEXT     Optional label for this run (stored in database)
 --dry-run        Show what would be done without making API calls
 --no-cache       Bypass cache lookup (still stores new results)
+--resume RUN_ID  Resume a failed/interrupted run (skips already-processed questions)
 ```
 
 **Examples:**
@@ -131,7 +132,33 @@ uv run main.py generate cs mcq --label "exam-prep"
 
 # Preview generation without API calls
 uv run main.py generate physics --dry-run
+
+# Resume a failed run (use partial run ID from query runs)
+uv run main.py generate leetcode --resume abc12345
 ```
+
+### Resume Failed Runs
+
+If a generation run crashes or fails mid-way, you can resume it to avoid reprocessing already-completed questions:
+
+```bash
+# 1. Find the failed run ID
+uv run main.py query runs --status failed
+
+# 2. Resume the run (supports partial IDs)
+uv run main.py generate leetcode --resume abc12345
+```
+
+The resume feature:
+- **Skips processed questions** — Questions that succeeded in the original run are not regenerated
+- **Merges results** — Combines existing results with newly generated ones in the final output
+- **Updates run status** — The run is marked as completed once all questions are processed
+- **Preserves run ID** — Uses the same run ID for traceability
+
+**Validation:**
+- The run must exist and have status "failed" or "running" (not "completed")
+- The subject and card type must match the original run
+- Partial run IDs work (e.g., first 8 characters)
 
 ### Progress Visualization
 

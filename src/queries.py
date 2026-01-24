@@ -726,3 +726,52 @@ def get_run_by_id(run_id: str) -> Optional[Run]:
 
     session.close()
     return run
+
+
+def get_successful_questions_for_run(run_id: str) -> List[str]:
+    """
+    Get list of question names that were successfully processed in a run.
+
+    Args:
+        run_id: The run ID
+
+    Returns:
+        List of question names that completed successfully
+    """
+    session = _get_session()
+    problems = (
+        session.query(Problem.question_name)
+        .filter(Problem.run_id == run_id, Problem.status == "success")
+        .all()
+    )
+    session.close()
+    return [p.question_name for p in problems]
+
+
+def get_successful_problems_with_results(run_id: str) -> List[Dict[str, Any]]:
+    """
+    Get successful problems with their final card data for a run.
+
+    Args:
+        run_id: The run ID
+
+    Returns:
+        List of card data dictionaries from successful problems
+    """
+    session = _get_session()
+    problems = (
+        session.query(Problem)
+        .filter(Problem.run_id == run_id, Problem.status == "success")
+        .all()
+    )
+    session.close()
+
+    results = []
+    for problem in problems:
+        if problem.final_result:
+            try:
+                card_data = json.loads(problem.final_result)
+                results.append(card_data)
+            except json.JSONDecodeError:
+                pass
+    return results

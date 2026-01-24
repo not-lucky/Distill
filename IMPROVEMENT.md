@@ -17,14 +17,16 @@ Improvement ideas for LLM2Deck - features, quality of life enhancements, and tec
 
 *Implementation: See `src/progress.py`, integrated in `src/orchestrator.py`*
 
-### 2. Resume Failed Runs
+### 2. Resume Failed Runs ✅ IMPLEMENTED
 **Problem:** If generation crashes mid-way, all progress is lost.
 
 **Improvements:**
-- [ ] Add `--resume <run_id>` flag to continue from last successful question
-- [ ] Store question processing status in database
-- [ ] Skip already-processed questions on resume
-- [ ] Merge partial results with resumed results
+- [x] Add `--resume <run_id>` flag to continue from last successful question
+- [x] Store question processing status in database
+- [x] Skip already-processed questions on resume
+- [x] Merge partial results with resumed results
+
+*Implementation: See `src/orchestrator.py`, `src/repositories.py`, `src/queries.py`*
 
 ### 3. Selective Question Generation
 **Problem:** Currently generates all questions in a subject. No way to pick specific ones.

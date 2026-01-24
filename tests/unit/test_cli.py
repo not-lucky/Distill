@@ -751,6 +751,7 @@ class TestHandleGenerateExtended:
         args.label = None
         args.dry_run = True
         args.no_cache = False
+        args.resume = None
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -774,6 +775,7 @@ class TestHandleGenerateExtended:
                     run_label=None,
                     dry_run=True,
                     bypass_cache_lookup=False,
+                    resume_run_id=None,
                 )
 
     @pytest.mark.asyncio
@@ -789,6 +791,7 @@ class TestHandleGenerateExtended:
         args.label = "test-mcq"
         args.dry_run = False
         args.no_cache = False
+        args.resume = None
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -812,6 +815,7 @@ class TestHandleGenerateExtended:
                     run_label="test-mcq",
                     dry_run=False,
                     bypass_cache_lookup=False,
+                    resume_run_id=None,
                 )
 
     @pytest.mark.asyncio
