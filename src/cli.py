@@ -102,6 +102,13 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Bypass cache lookup (still stores new results)",
     )
+    generate_parser.add_argument(
+        "--resume",
+        type=str,
+        default=None,
+        metavar="RUN_ID",
+        help="Resume a failed/interrupted run (skips already-processed questions)",
+    )
 
     # ====== convert command ======
     convert_parser = subparsers.add_parser(
@@ -373,6 +380,7 @@ async def handle_generate(args: argparse.Namespace) -> int:
     is_mcq = args.card_type == "mcq"
     dry_run = getattr(args, "dry_run", False)
     no_cache = getattr(args, "no_cache", False)
+    resume_run_id = getattr(args, "resume", None)
 
     # Get subject configuration using registry
     registry = SubjectRegistry()
@@ -393,6 +401,8 @@ async def handle_generate(args: argparse.Namespace) -> int:
         logger.info(f"Run Label: {args.label}")
     if no_cache:
         logger.info("Cache lookup disabled (--no-cache)")
+    if resume_run_id:
+        logger.info(f"Resuming run: {resume_run_id}")
 
     orchestrator = Orchestrator(
         subject_config=subject_config,
@@ -400,6 +410,7 @@ async def handle_generate(args: argparse.Namespace) -> int:
         run_label=args.label,
         dry_run=dry_run,
         bypass_cache_lookup=no_cache,
+        resume_run_id=resume_run_id,
     )
 
     if not await orchestrator.initialize():

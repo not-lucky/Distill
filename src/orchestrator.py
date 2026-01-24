@@ -28,6 +28,7 @@ class Orchestrator:
         run_label: Optional[str] = None,
         dry_run: bool = False,
         bypass_cache_lookup: bool = False,
+        resume_run_id: Optional[str] = None,
     ):
         """
         Initialize the orchestrator.
@@ -38,16 +39,20 @@ class Orchestrator:
             run_label: Optional user-provided label for the run
             dry_run: If True, show what would be done without making changes
             bypass_cache_lookup: If True, skip cache lookup but still store results
+            resume_run_id: Optional run ID to resume (skips already-processed questions)
         """
         self.subject_config = subject_config
         self.is_mcq = is_mcq
         self.run_label = run_label
         self.dry_run = dry_run
         self.bypass_cache_lookup = bypass_cache_lookup
+        self.resume_run_id = resume_run_id
         self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
         self.progress_tracker: Optional[ProgressTracker] = None
         self._llm_providers: List = []  # Store for progress tracking
+        self._processed_questions: set[str] = set()  # For resume mode
+        self._existing_results: List[Dict[str, Any]] = []  # For resume mode
 
         # Load generation config
         config = load_config()
@@ -73,6 +78,60 @@ class Orchestrator:
             return self.subject_config.deck_prefix_mcq
         return self.subject_config.deck_prefix
 
+    def _initialize_for_resume(self) -> bool:
+        """
+        Initialize for resume mode by loading existing run data.
+
+        Returns:
+            True if resume initialization successful, False otherwise.
+        """
+        if not self.resume_run_id:
+            return False
+
+        # Initialize database if not already initialized
+        if not self.run_repo.db_manager.is_initialized:
+            self.run_repo.initialize_database()
+
+        # Load existing run
+        run_data = self.run_repo.load_existing_run(self.resume_run_id)
+        if not run_data:
+            logger.error(f"Run not found: {self.resume_run_id}")
+            return False
+
+        # Validate run can be resumed
+        if run_data["status"] == "completed":
+            logger.error(
+                f"Cannot resume completed run {run_data['id']}. "
+                "Only 'failed' or 'running' runs can be resumed."
+            )
+            return False
+
+        # Validate subject/mode match
+        expected_mode = self.generation_mode
+        if run_data["mode"] != expected_mode:
+            logger.error(
+                f"Mode mismatch: run {run_data['id']} has mode '{run_data['mode']}', "
+                f"but current mode is '{expected_mode}'"
+            )
+            return False
+
+        # Set the run ID and update status to running
+        full_run_id = run_data["id"]
+        self.run_repo.set_run_id(full_run_id)
+        self.run_repo.update_run_status("running")
+
+        # Load already-processed questions
+        self._processed_questions = self.run_repo.get_processed_questions(full_run_id)
+        self._existing_results = self.run_repo.get_existing_results(full_run_id)
+
+        logger.info(f"Resuming run {full_run_id}")
+        logger.info(
+            f"Found {len(self._processed_questions)} already-processed questions, "
+            f"{len(self._existing_results)} existing results"
+        )
+
+        return True
+
     async def initialize(self) -> bool:
         """
         Initialize database and providers.
@@ -82,6 +141,10 @@ class Orchestrator:
         """
         if self.dry_run:
             logger.info("[DRY RUN] Would initialize database and create run")
+        elif self.resume_run_id:
+            # Resume mode: load existing run
+            if not self._initialize_for_resume():
+                return False
         else:
             # Initialize database and create run
             self.run_repo.initialize_database()
@@ -161,9 +224,21 @@ class Orchestrator:
         card_generator = self.card_generator
 
         # Build question list with metadata
-        questions_with_metadata: List[Tuple] = get_indexed_questions(
+        all_questions_with_metadata: List[Tuple] = get_indexed_questions(
             self.subject_config.target_questions
         )
+
+        # Filter out already-processed questions in resume mode
+        if self._processed_questions:
+            original_count = len(all_questions_with_metadata)
+            questions_with_metadata = [
+                q for q in all_questions_with_metadata
+                if q[3] not in self._processed_questions  # q[3] is question name
+            ]
+            skipped = original_count - len(questions_with_metadata)
+            logger.info(f"Resume mode: skipping {skipped} already-processed questions")
+        else:
+            questions_with_metadata = all_questions_with_metadata
 
         if self.dry_run:
             logger.info(f"[DRY RUN] Would process {len(questions_with_metadata)} questions")
@@ -173,6 +248,21 @@ class Orchestrator:
                 logger.info(f"[DRY RUN]   - {cat_name}/{question}")
             if len(questions_with_metadata) > preview_count:
                 logger.info(f"[DRY RUN]   ... and {len(questions_with_metadata) - preview_count} more")
+            return []
+
+        # Handle case where all questions already processed
+        if not questions_with_metadata:
+            logger.info("All questions already processed. Nothing to do.")
+            # In resume mode, return existing results
+            if self._existing_results:
+                self.run_repo.mark_run_completed(
+                    RunStats(
+                        total_problems=len(all_questions_with_metadata),
+                        successful_problems=len(self._existing_results),
+                        failed_problems=len(all_questions_with_metadata) - len(self._existing_results),
+                    )
+                )
+                return self._existing_results
             return []
 
         # Collect all providers for progress tracking
@@ -266,17 +356,31 @@ class Orchestrator:
             self.progress_tracker.print_summary()
 
         # Extract successful results
-        all_generated_problems: List[Dict[str, Any]] = []
+        newly_generated_problems: List[Dict[str, Any]] = []
         for result in results:
             if isinstance(result, Success) and result.value is not None:
-                all_generated_problems.append(result.value)  # type: ignore[arg-type]
+                newly_generated_problems.append(result.value)  # type: ignore[arg-type]
+
+        # In resume mode, merge with existing results
+        if self._existing_results:
+            all_generated_problems = self._existing_results + newly_generated_problems
+            logger.info(
+                f"Merged {len(self._existing_results)} existing + "
+                f"{len(newly_generated_problems)} new = {len(all_generated_problems)} total problems"
+            )
+        else:
+            all_generated_problems = newly_generated_problems
+
+        # Calculate total problems across all questions (original + resumed)
+        total_questions = len(all_questions_with_metadata)
+        total_successful = len(all_generated_problems)
 
         # Update run status
         self.run_repo.mark_run_completed(
             RunStats(
-                total_problems=len(questions_with_metadata),
-                successful_problems=len(all_generated_problems),
-                failed_problems=len(questions_with_metadata) - len(all_generated_problems),
+                total_problems=total_questions,
+                successful_problems=total_successful,
+                failed_problems=total_questions - total_successful,
             )
         )
 
@@ -307,8 +411,12 @@ class Orchestrator:
 
         save_final_deck(problems, output_filename)
 
+        resume_info = ""
+        if self.resume_run_id:
+            resume_info = f" (resumed from {self.resume_run_id[:8]}...)"
+
         logger.info(
-            f"Run completed successfully! Run ID: {self.run_id}, "
+            f"Run completed successfully{resume_info}! Run ID: {self.run_id}, "
             f"Database: {DATABASE_PATH}, Generated {len(problems)} problems, "
             f"Final deck: {output_filename}_<timestamp>.json"
         )

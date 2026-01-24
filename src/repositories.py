@@ -146,6 +146,85 @@ class RunRepository:
             raise RuntimeError("No active run. Call create_new_run() first.")
         return CardRepository(run_id=self._run_id, db_manager=self._db_manager)
 
+    def set_run_id(self, run_id: str) -> None:
+        """
+        Set the run ID for resume mode.
+
+        Args:
+            run_id: The existing run ID to resume.
+        """
+        self._run_id = run_id
+
+    def load_existing_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Load an existing run by ID for resumption.
+
+        Args:
+            run_id: The run ID (can be partial, will match prefix).
+
+        Returns:
+            Dictionary with run metadata, or None if not found.
+        """
+        from src.queries import get_run_by_id
+
+        run = get_run_by_id(run_id)
+        if not run:
+            return None
+
+        return {
+            "id": run.id,
+            "mode": run.mode,
+            "subject": run.subject,
+            "card_type": run.card_type,
+            "status": run.status,
+            "user_label": run.user_label,
+            "total_problems": run.total_problems,
+            "successful_problems": run.successful_problems,
+            "failed_problems": run.failed_problems,
+        }
+
+    def get_processed_questions(self, run_id: str) -> set[str]:
+        """
+        Get set of question names that were successfully processed in a run.
+
+        Args:
+            run_id: The run ID.
+
+        Returns:
+            Set of question names that completed successfully.
+        """
+        from src.queries import get_successful_questions_for_run
+
+        return set(get_successful_questions_for_run(run_id))
+
+    def get_existing_results(self, run_id: str) -> List[Dict[str, Any]]:
+        """
+        Get existing successful results from a run.
+
+        Args:
+            run_id: The run ID.
+
+        Returns:
+            List of card data dictionaries from successful problems.
+        """
+        from src.queries import get_successful_problems_with_results
+
+        return get_successful_problems_with_results(run_id)
+
+    def update_run_status(self, status: str) -> None:
+        """
+        Update the status of the current run.
+
+        Args:
+            status: New status ("running", "completed", "failed").
+        """
+        if not self._run_id:
+            raise RuntimeError("No active run to update")
+
+        with self.db_manager.session_scope() as session:
+            update_run(session, self._run_id, status=status)
+        logger.info(f"Updated run {self._run_id} status to {status}")
+
 
 class CardRepository:
     """
