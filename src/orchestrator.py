@@ -10,12 +10,13 @@ logger = logging.getLogger(__name__)
 from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
-from src.repositories import RunRepository, RunStats
+from src.repositories import RunRepository, RunStats, RunCostData
 from src.task_runner import ConcurrentTaskRunner, Success, TaskInfo
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions, filter_indexed_questions, QuestionFilter
 from src.progress import ProgressTracker, ProviderStatus
 from src.providers.base import TokenUsage
+from src.services.cost import CostEstimator, CostEstimate
 
 
 class Orchestrator:
@@ -30,6 +31,8 @@ class Orchestrator:
         bypass_cache_lookup: bool = False,
         resume_run_id: Optional[str] = None,
         question_filter: Optional[QuestionFilter] = None,
+        budget_limit_usd: Optional[float] = None,
+        estimate_only: bool = False,
     ):
         """
         Initialize the orchestrator.
@@ -42,6 +45,8 @@ class Orchestrator:
             bypass_cache_lookup: If True, skip cache lookup but still store results
             resume_run_id: Optional run ID to resume (skips already-processed questions)
             question_filter: Optional filter to limit which questions are processed
+            budget_limit_usd: Optional maximum budget in USD (stops generation when exceeded)
+            estimate_only: If True, show cost estimate and exit without generating
         """
         self.subject_config = subject_config
         self.is_mcq = is_mcq
@@ -50,12 +55,21 @@ class Orchestrator:
         self.bypass_cache_lookup = bypass_cache_lookup
         self.resume_run_id = resume_run_id
         self.question_filter = question_filter
+        self.budget_limit_usd = budget_limit_usd
+        self.estimate_only = estimate_only
         self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
         self.progress_tracker: Optional[ProgressTracker] = None
         self._llm_providers: List = []  # Store for progress tracking
         self._processed_questions: set[str] = set()  # For resume mode
         self._existing_results: List[Dict[str, Any]] = []  # For resume mode
+
+        # Cost tracking
+        self.cost_estimator = CostEstimator()
+        self._current_cost_usd: float = 0.0
+        self._total_input_tokens: int = 0
+        self._total_output_tokens: int = 0
+        self._budget_exceeded: bool = False
 
         # Load generation config
         config = load_config()
@@ -142,7 +156,7 @@ class Orchestrator:
         Returns:
             True if initialization successful, False otherwise.
         """
-        if self.dry_run:
+        if self.dry_run or self.estimate_only:
             logger.info("[DRY RUN] Would initialize database and create run")
         elif self.resume_run_id:
             # Resume mode: load existing run
@@ -158,6 +172,10 @@ class Orchestrator:
                 user_label=self.run_label,
             )
             logger.info(f"Run ID: {self.run_id}")
+
+            # Set budget limit if provided
+            if self.budget_limit_usd is not None:
+                self.run_repo.set_budget_limit(self.budget_limit_usd)
 
         # Initialize providers - returns (generators, combiner, formatter)
         llm_providers, combiner, formatter = await initialize_providers()
@@ -213,6 +231,53 @@ class Orchestrator:
 
         return True
 
+    def _get_all_provider_tuples(self) -> List[Tuple[str, str]]:
+        """Get list of (provider_name, model) tuples for all providers."""
+        all_providers: List[Tuple[str, str]] = []
+        for p in self._llm_providers:
+            all_providers.append((p.name, p.model))
+        if self._combiner:
+            all_providers.append((self._combiner.name, self._combiner.model))
+        if self._formatter and self._formatter != self._combiner:
+            all_providers.append((self._formatter.name, self._formatter.model))
+        return all_providers
+
+    def _display_cost_estimate(self, estimate: CostEstimate) -> None:
+        """Display cost estimate to the user."""
+        logger.info("")
+        logger.info("=" * 60)
+        logger.info("COST ESTIMATE")
+        logger.info("=" * 60)
+        logger.info(f"Questions to process: {estimate.total_questions}")
+        logger.info(f"Estimated tokens: {estimate.estimated_input_tokens:,} in / {estimate.estimated_output_tokens:,} out")
+        logger.info(f"Estimated total cost: ${estimate.total_estimated_cost_usd:.4f}")
+        logger.info("")
+        logger.info("Per provider:")
+        for provider in estimate.providers:
+            logger.info(
+                f"  {provider.provider_name}/{provider.model}: "
+                f"${provider.estimated_cost_usd:.4f}"
+            )
+        logger.info("=" * 60)
+        if self.budget_limit_usd is not None:
+            logger.info(f"Budget limit: ${self.budget_limit_usd:.2f}")
+            if estimate.total_estimated_cost_usd > self.budget_limit_usd:
+                logger.warning(
+                    f"⚠️  Estimated cost (${estimate.total_estimated_cost_usd:.4f}) "
+                    f"exceeds budget (${self.budget_limit_usd:.2f})"
+                )
+        logger.info("")
+
+    def _get_cost_data(self) -> RunCostData:
+        """Build RunCostData from current tracking state."""
+        return RunCostData(
+            total_input_tokens=self._total_input_tokens,
+            total_output_tokens=self._total_output_tokens,
+            total_estimated_cost_usd=self._current_cost_usd,
+            budget_limit_usd=self.budget_limit_usd,
+            budget_exceeded=self._budget_exceeded,
+        )
+
     async def run(self) -> List[Dict[str, Any]]:
         """
         Execute the card generation workflow.
@@ -252,6 +317,21 @@ class Orchestrator:
         else:
             questions_with_metadata = all_questions_with_metadata
 
+        # Get all provider tuples for cost estimation
+        all_providers = self._get_all_provider_tuples()
+
+        # Show cost estimate
+        cost_estimate = self.cost_estimator.estimate_run_cost(
+            providers=all_providers,
+            question_count=len(questions_with_metadata),
+        )
+        self._display_cost_estimate(cost_estimate)
+
+        # Handle estimate-only mode
+        if self.estimate_only:
+            logger.info("[ESTIMATE ONLY] Exiting without generating cards")
+            return []
+
         if self.dry_run:
             logger.info(f"[DRY RUN] Would process {len(questions_with_metadata)} questions")
             # Show first few questions as preview
@@ -277,23 +357,22 @@ class Orchestrator:
                 return self._existing_results
             return []
 
-        # Collect all providers for progress tracking
-        all_providers: List[Tuple[str, str]] = []
-        for p in self._llm_providers:
-            all_providers.append((p.name, p.model))
-        if self._combiner:
-            all_providers.append((self._combiner.name, self._combiner.model))
-        if self._formatter and self._formatter != self._combiner:
-            all_providers.append((self._formatter.name, self._formatter.model))
-
         # Initialize progress tracker
         self.progress_tracker = ProgressTracker(
             total_questions=len(questions_with_metadata),
             provider_names=all_providers,
         )
 
-        # Set up token usage callback for all providers
+        # Set up token usage callback for all providers (also tracks costs)
         def on_token_usage(provider_name: str, model: str, usage: TokenUsage, success: bool):
+            # Update cost tracking
+            self._total_input_tokens += usage.input_tokens
+            self._total_output_tokens += usage.output_tokens
+            cost = self.cost_estimator.calculate_cost(
+                provider_name, usage.input_tokens, usage.output_tokens
+            )
+            self._current_cost_usd += cost
+
             if self.progress_tracker:
                 status = ProviderStatus.SUCCESS if success else ProviderStatus.FAILED
                 self.progress_tracker.update_provider_status(
@@ -387,14 +466,27 @@ class Orchestrator:
         total_questions = len(all_questions_with_metadata)
         total_successful = len(all_generated_problems)
 
-        # Update run status
+        # Update run status with cost data
         self.run_repo.mark_run_completed(
             RunStats(
                 total_problems=total_questions,
                 successful_problems=total_successful,
                 failed_problems=total_questions - total_successful,
-            )
+            ),
+            cost_data=self._get_cost_data(),
         )
+
+        # Log cost summary
+        logger.info("")
+        logger.info("=" * 60)
+        logger.info("ACTUAL COST SUMMARY")
+        logger.info("=" * 60)
+        logger.info(f"Total tokens: {self._total_input_tokens:,} in / {self._total_output_tokens:,} out")
+        logger.info(f"Total cost: ${self._current_cost_usd:.4f}")
+        if self.budget_limit_usd is not None:
+            remaining = self.budget_limit_usd - self._current_cost_usd
+            logger.info(f"Budget remaining: ${remaining:.4f}")
+        logger.info("=" * 60)
 
         return all_generated_problems
 
@@ -409,6 +501,10 @@ class Orchestrator:
             Output filename if saved, None if no problems to save.
         """
         output_filename = f"{self.generation_mode}_anki_deck"
+
+        if self.estimate_only:
+            # Nothing to save in estimate-only mode
+            return None
 
         if self.dry_run:
             if problems:
@@ -427,9 +523,13 @@ class Orchestrator:
         if self.resume_run_id:
             resume_info = f" (resumed from {self.resume_run_id[:8]}...)"
 
+        cost_info = ""
+        if self._current_cost_usd > 0:
+            cost_info = f", Cost: ${self._current_cost_usd:.4f}"
+
         logger.info(
             f"Run completed successfully{resume_info}! Run ID: {self.run_id}, "
-            f"Database: {DATABASE_PATH}, Generated {len(problems)} problems, "
+            f"Database: {DATABASE_PATH}, Generated {len(problems)} problems{cost_info}, "
             f"Final deck: {output_filename}_<timestamp>.json"
         )
 

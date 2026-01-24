@@ -1,205 +1,167 @@
-# PLAN.md - Selective Question Generation (Priority 3) ✅ COMPLETED
+# Priority 4: Cost Estimation & Budgeting - Implementation Plan
 
 ## Overview
 
-Implement selective question generation allowing users to filter which questions are processed.
+Implement cost estimation and budgeting features for LLM2Deck to provide visibility into API costs before, during, and after generation runs.
 
-**Features to implement:**
-1. `--category "Arrays"` - Generate only specific categories
-2. `--question "Two Sum"` - Single question generation
-3. `--limit N` - Generate first N questions (for testing)
-4. `--skip-until "Binary Search"` - Skip questions until reaching a specific one
+## Features from IMPROVEMENT.md
 
-## Architecture Analysis
+1. **Pre-run cost estimation** based on question count and provider token rates
+2. **`--budget <amount>` flag** to stop generation when budget exceeded
+3. **Post-run cost summary** per provider (already partially implemented in progress.py)
+4. **Track cumulative costs in database** across runs
 
-### Current Flow
-1. `cli.py` parses args → creates `Orchestrator`
-2. `Orchestrator.run()` calls `get_indexed_questions()` to get all questions
-3. Questions are filtered for resume mode (`_processed_questions`)
-4. Questions are processed in parallel via `ConcurrentTaskRunner`
+## Design Decisions
 
-### Key Files to Modify
-- `src/cli.py` - Add new CLI arguments to generate subparser
-- `src/orchestrator.py` - Accept filter parameters and apply them
-- `src/questions.py` - Add filtering functions
+### Token Estimation Model
 
-### Key Files for Tests
-- `tests/unit/test_cli.py` - Test CLI argument parsing
-- `tests/unit/test_questions.py` - Test filtering functions
-- `tests/unit/test_orchestrator.py` - Test filter integration
+Since we can't know exact token counts before running, we'll use historical averages:
+- Default estimate: ~2000 input tokens + ~1500 output tokens per question per provider
+- Configurable via `config.yaml` under `cost_estimation` section
+- Can be refined based on historical data in database
 
-## Implementation Details
+### Budget Enforcement
 
-### 1. CLI Arguments (`src/cli.py`)
+- Budget is a soft limit - we check before starting each question
+- If estimated remaining cost would exceed budget, stop gracefully
+- Already-processed questions are saved; can resume later
 
-Add to `generate_parser`:
+### Cost Tracking Schema
+
+Add new fields to the `Run` model and create a new `RunCost` table:
+- `total_input_tokens` - sum across all providers
+- `total_output_tokens` - sum across all providers  
+- `total_estimated_cost_usd` - calculated cost
+
+## Implementation Plan
+
+### Phase 1: Cost Estimation Service (`src/services/cost.py`)
+
+Create a dedicated service for cost calculations:
+
 ```python
-generate_parser.add_argument(
-    "--category",
-    type=str,
-    default=None,
-    help="Only generate cards for specific category (e.g., 'Arrays and Hashing')",
-)
-generate_parser.add_argument(
-    "--question",
-    type=str,
-    default=None,
-    help="Generate cards for a single question by name",
-)
-generate_parser.add_argument(
-    "--limit",
-    type=int,
-    default=None,
-    help="Maximum number of questions to process (for testing)",
-)
-generate_parser.add_argument(
-    "--skip-until",
-    type=str,
-    default=None,
-    metavar="QUESTION",
-    help="Skip questions until reaching the specified question name",
-)
+class CostEstimator:
+    """Estimates API costs based on provider pricing and token estimates."""
+    
+    def estimate_run_cost(providers, question_count) -> CostEstimate
+    def calculate_actual_cost(provider_name, model, input_tokens, output_tokens) -> float
+    def get_provider_pricing(provider_name) -> tuple[float, float]
 ```
 
-### 2. Question Filtering (`src/questions.py`)
+Move `TOKEN_PRICING` from `progress.py` to this service and extend it.
 
-Add new functions:
+### Phase 2: Database Schema Changes
+
+Add columns to `Run` table:
+- `total_input_tokens: int` 
+- `total_output_tokens: int`
+- `total_estimated_cost_usd: float`
+- `budget_limit_usd: float` (if budget was set)
+- `budget_exceeded: bool` (if stopped due to budget)
+
+### Phase 3: CLI Changes
+
+Add to `generate` command:
+- `--budget <amount>` - Stop when cost exceeds this amount (USD)
+- `--estimate-only` - Show cost estimate without generating
+
+Update existing commands:
+- `query stats` - Include cost summaries
+- `query run <id>` - Show cost breakdown
+
+### Phase 4: Orchestrator Integration
+
+1. Before generation:
+   - Calculate and display cost estimate
+   - If `--estimate-only`, exit after showing estimate
+   
+2. During generation:
+   - Track running costs via existing token callbacks
+   - Check budget before each question
+   - Stop gracefully if budget exceeded
+
+3. After generation:
+   - Save final costs to database
+   - Display cost summary (enhanced version of current)
+
+### Phase 5: Query Enhancements
+
+Add `query costs` subcommand:
+- Show cumulative costs across runs
+- Filter by date range, subject
+- Group by provider for cost analysis
+
+## File Changes
+
+### New Files
+- `src/services/cost.py` - CostEstimator service
+- `tests/unit/services/test_cost.py` - Unit tests
+
+### Modified Files
+- `src/database.py` - Add cost columns to Run model
+- `src/repositories.py` - Add cost tracking methods
+- `src/cli.py` - Add --budget, --estimate-only flags
+- `src/orchestrator.py` - Integrate cost estimation and budget checking
+- `src/progress.py` - Move TOKEN_PRICING to cost service, import from there
+- `src/services/query.py` - Add cost queries
+- `src/queries.py` - Add cost query functions
+
+### Test Files
+- `tests/unit/services/test_cost.py` - CostEstimator tests
+- `tests/unit/test_orchestrator_budget.py` - Budget enforcement tests
+- `tests/integration/test_cost_tracking.py` - End-to-end cost tracking
+
+## API Changes
+
+### CostEstimate Dataclass
 ```python
 @dataclass
-class QuestionFilter:
-    """Configuration for filtering questions."""
-    category: Optional[str] = None
-    question_name: Optional[str] = None
-    limit: Optional[int] = None
-    skip_until: Optional[str] = None
-
-def filter_indexed_questions(
-    questions: List[Tuple[int, str, int, str]],
-    filter_config: QuestionFilter,
-) -> List[Tuple[int, str, int, str]]:
-    """Apply filters to indexed questions."""
-    # Implementation
+class CostEstimate:
+    """Estimated cost for a generation run."""
+    total_questions: int
+    providers: List[ProviderCostEstimate]
+    total_estimated_cost_usd: float
+    estimated_input_tokens: int
+    estimated_output_tokens: int
+    confidence: str  # "low", "medium", "high" based on historical data
 ```
 
-### 3. Orchestrator Integration (`src/orchestrator.py`)
-
-Modify `__init__` to accept `QuestionFilter`:
+### ProviderCostEstimate Dataclass
 ```python
-def __init__(
-    self,
-    subject_config: SubjectConfig,
-    is_mcq: bool = False,
-    run_label: Optional[str] = None,
-    dry_run: bool = False,
-    bypass_cache_lookup: bool = False,
-    resume_run_id: Optional[str] = None,
-    question_filter: Optional[QuestionFilter] = None,  # NEW
-):
+@dataclass  
+class ProviderCostEstimate:
+    """Per-provider cost estimate."""
+    provider_name: str
+    model: str
+    estimated_input_tokens: int
+    estimated_output_tokens: int
+    input_price_per_million: float
+    output_price_per_million: float
+    estimated_cost_usd: float
 ```
 
-Apply filter in `run()`:
-```python
-all_questions_with_metadata = get_indexed_questions(
-    self.subject_config.target_questions
-)
-if self.question_filter:
-    all_questions_with_metadata = filter_indexed_questions(
-        all_questions_with_metadata, self.question_filter
-    )
-```
+## Testing Strategy
 
-### 4. Handler Update (`src/cli.py`)
+1. **Unit Tests** (fast, isolated):
+   - CostEstimator calculations
+   - Budget checking logic
+   - Database cost field updates
 
-Update `handle_generate`:
-```python
-from src.questions import QuestionFilter
+2. **Integration Tests**:
+   - Cost tracking through full generation flow
+   - Budget enforcement stopping generation
+   - Query service cost summaries
 
-question_filter = QuestionFilter(
-    category=getattr(args, "category", None),
-    question_name=getattr(args, "question", None),
-    limit=getattr(args, "limit", None),
-    skip_until=getattr(args, "skip_until", None),
-)
+3. **Mock Strategy**:
+   - Use MockLLMProvider with configurable token counts
+   - No real API calls in tests
 
-orchestrator = Orchestrator(
-    ...
-    question_filter=question_filter if question_filter.has_filters() else None,
-)
-```
+## Rollout
 
-## Filter Behavior
-
-### `--category "Arrays"`
-- Case-insensitive partial match on category names
-- Example: `--category "arrays"` matches "Arrays and Hashing"
-
-### `--question "Two Sum"`
-- Case-insensitive partial match on question names
-- Returns only matching questions
-- Example: `--question "sum"` matches "Two Sum", "3Sum", etc.
-
-### `--limit N`
-- Applied after other filters
-- Takes first N questions from the filtered set
-
-### `--skip-until "Binary Search"`
-- Skips all questions until finding a match (inclusive)
-- Case-insensitive partial match
-- Useful for resuming from a specific point without using `--resume`
-
-### Combination
-Filters are applied in this order:
-1. `--category` (filter by category)
-2. `--question` (filter by question name)
-3. `--skip-until` (skip until question)
-4. `--limit` (take first N)
-
-## Test Plan
-
-### Unit Tests for `questions.py`
-- Test `filter_indexed_questions` with each filter type
-- Test filter combinations
-- Test case-insensitive matching
-- Test partial matching
-- Test empty results handling
-- Test `--skip-until` with non-existent question
-
-### Unit Tests for `cli.py`
-- Test parsing of new arguments
-- Test argument validation
-- Test help text includes new options
-
-### Unit Tests for `orchestrator.py`
-- Test filter passed to orchestrator
-- Test filter applied before resume filter
-- Test dry-run mode shows filtered count
-
-### Integration Tests
-- Test full flow with `--limit 1`
-- Test `--category` with real question data
-
-## Error Handling
-
-- `--category` with no match: Warning, continue with 0 questions
-- `--question` with no match: Warning, continue with 0 questions
-- `--skip-until` with no match: Error, abort with clear message
-- `--limit 0` or negative: Error, must be positive integer
-
-## Documentation Updates
-
-- Update AGENTS.md with new CLI options
-- Update README.md with usage examples
-- Add to IMPROVEMENT.md checklist
-
-## Files Changed Summary
-
-| File | Change Type |
-|------|-------------|
-| `src/cli.py` | Add CLI arguments + update handler |
-| `src/questions.py` | Add `QuestionFilter` class and filter function |
-| `src/orchestrator.py` | Accept and apply `QuestionFilter` |
-| `tests/unit/test_cli.py` | Add tests for new arguments |
-| `tests/unit/test_questions.py` | Add tests for filtering |
-| `tests/unit/test_orchestrator.py` | Add tests for filter integration |
-| `AGENTS.md` | Document new options |
-| `README.md` | Usage examples |
+1. Implement CostEstimator service with tests
+2. Add database schema changes
+3. Add CLI flags and pre-run estimation
+4. Add budget enforcement
+5. Add post-run cost tracking
+6. Add query enhancements
+7. Update documentation

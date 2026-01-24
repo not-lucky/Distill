@@ -3,7 +3,7 @@
 import json
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -27,6 +27,21 @@ class RunStats:
     total_problems: int
     successful_problems: int
     failed_problems: int
+
+
+@dataclass
+class RunCostData:
+    """Cost data for a run.
+
+    Tracks token usage and costs across all providers.
+    """
+
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_estimated_cost_usd: float = 0.0
+    budget_limit_usd: Optional[float] = None
+    budget_exceeded: bool = False
+    provider_costs: Dict[str, Dict[str, float]] = field(default_factory=dict)
 
 
 class RunRepository:
@@ -111,26 +126,86 @@ class RunRepository:
             update_run(session, self._run_id, status="failed")
         logger.info(f"Marked run {self._run_id} as failed")
 
-    def mark_run_completed(self, stats: RunStats) -> None:
+    def mark_run_completed(
+        self,
+        stats: RunStats,
+        cost_data: Optional[RunCostData] = None,
+    ) -> None:
         """
-        Mark the current run as completed with statistics.
+        Mark the current run as completed with statistics and cost data.
 
         Args:
             stats: Run statistics including problem counts.
+            cost_data: Optional cost tracking data.
         """
         if not self._run_id:
             raise RuntimeError("No active run to mark as completed")
+
+        update_kwargs: Dict[str, Any] = {
+            "status": "completed",
+            "total_problems": stats.total_problems,
+            "successful_problems": stats.successful_problems,
+            "failed_problems": stats.failed_problems,
+        }
+
+        # Add cost data if provided
+        if cost_data:
+            update_kwargs.update({
+                "total_input_tokens": cost_data.total_input_tokens,
+                "total_output_tokens": cost_data.total_output_tokens,
+                "total_estimated_cost_usd": cost_data.total_estimated_cost_usd,
+                "budget_limit_usd": cost_data.budget_limit_usd,
+                "budget_exceeded": cost_data.budget_exceeded,
+            })
 
         with self.db_manager.session_scope() as session:
             update_run(
                 session=session,
                 run_id=self._run_id,
-                status="completed",
-                total_problems=stats.total_problems,
-                successful_problems=stats.successful_problems,
-                failed_problems=stats.failed_problems,
+                **update_kwargs,
             )
         logger.info(f"Marked run {self._run_id} as completed")
+
+    def set_budget_limit(self, budget_limit_usd: float) -> None:
+        """
+        Set the budget limit for the current run.
+
+        Args:
+            budget_limit_usd: Maximum allowed budget in USD.
+        """
+        if not self._run_id:
+            raise RuntimeError("No active run to set budget for")
+
+        with self.db_manager.session_scope() as session:
+            update_run(
+                session=session,
+                run_id=self._run_id,
+                budget_limit_usd=budget_limit_usd,
+            )
+        logger.info(f"Set budget limit ${budget_limit_usd:.4f} for run {self._run_id}")
+
+    def mark_budget_exceeded(self, cost_data: RunCostData) -> None:
+        """
+        Mark the current run as stopped due to budget exceeded.
+
+        Args:
+            cost_data: Final cost data for the run.
+        """
+        if not self._run_id:
+            raise RuntimeError("No active run to mark budget exceeded")
+
+        with self.db_manager.session_scope() as session:
+            update_run(
+                session=session,
+                run_id=self._run_id,
+                status="failed",
+                total_input_tokens=cost_data.total_input_tokens,
+                total_output_tokens=cost_data.total_output_tokens,
+                total_estimated_cost_usd=cost_data.total_estimated_cost_usd,
+                budget_limit_usd=cost_data.budget_limit_usd,
+                budget_exceeded=True,
+            )
+        logger.info(f"Marked run {self._run_id} as budget exceeded")
 
     def get_card_repository(self) -> "CardRepository":
         """

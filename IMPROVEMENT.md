@@ -39,14 +39,16 @@ Improvement ideas for LLM2Deck - features, quality of life enhancements, and tec
 
 *Implementation: See `src/questions.py` (QuestionFilter, filter_indexed_questions), `src/cli.py`, `src/orchestrator.py`*
 
-### 4. Cost Estimation & Budgeting
+### 4. Cost Estimation & Budgeting ✅ IMPLEMENTED
 **Problem:** No visibility into API costs before or during generation.
 
 **Improvements:**
-- [ ] Pre-run cost estimation based on question count and provider token rates
-- [ ] `--budget <amount>` flag to stop generation when budget exceeded
-- [ ] Post-run cost summary per provider
-- [ ] Track cumulative costs in database across runs
+- [x] Pre-run cost estimation based on question count and provider token rates
+- [x] `--budget <amount>` flag to stop generation when budget exceeded
+- [x] Post-run cost summary per provider
+- [x] Track cumulative costs in database across runs
+
+*Implementation: See `src/services/cost.py`, `src/orchestrator.py`, `src/repositories.py`, `src/queries.py`*
 
 ---
 

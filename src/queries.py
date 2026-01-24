@@ -281,6 +281,12 @@ def get_run_statistics(run_id: str) -> Dict[str, Any]:
         / len(problems)
         if problems
         else 0,
+        # Cost tracking fields
+        "total_input_tokens": run.total_input_tokens or 0,
+        "total_output_tokens": run.total_output_tokens or 0,
+        "total_estimated_cost_usd": run.total_estimated_cost_usd or 0.0,
+        "budget_limit_usd": run.budget_limit_usd,
+        "budget_exceeded": run.budget_exceeded or False,
         "provider_results": {
             "total": len(provider_results),
             "successful": sum(1 for pr in provider_results if pr.success),
@@ -612,11 +618,14 @@ def get_global_statistics(subject: Optional[str] = None) -> Dict[str, Any]:
     """
     session = _get_session()
 
-    # Run statistics
+    # Run statistics with cost totals
     run_query = session.query(
         func.count(Run.id).label("total_runs"),
         func.sum(func.cast(Run.status == "completed", Integer)).label("completed_runs"),
         func.sum(func.cast(Run.status == "failed", Integer)).label("failed_runs"),
+        func.sum(Run.total_input_tokens).label("total_input_tokens"),
+        func.sum(Run.total_output_tokens).label("total_output_tokens"),
+        func.sum(Run.total_estimated_cost_usd).label("total_cost_usd"),
     )
 
     if subject:
@@ -676,6 +685,9 @@ def get_global_statistics(subject: Optional[str] = None) -> Dict[str, Any]:
     successful_problems = problem_stats.successful or 0 if problem_stats else 0
     avg_time = problem_stats.avg_time or 0 if problem_stats else 0
     total_cards = card_stats.total_cards or 0 if card_stats else 0
+    total_input_tokens = run_stats.total_input_tokens or 0 if run_stats else 0
+    total_output_tokens = run_stats.total_output_tokens or 0 if run_stats else 0
+    total_cost_usd = run_stats.total_cost_usd or 0.0 if run_stats else 0.0
 
     return {
         "filter_subject": subject,
@@ -700,6 +712,12 @@ def get_global_statistics(subject: Optional[str] = None) -> Dict[str, Any]:
             "avg_per_problem": round(total_cards / successful_problems, 1)
             if successful_problems > 0
             else 0,
+        },
+        "costs": {
+            "total_input_tokens": total_input_tokens,
+            "total_output_tokens": total_output_tokens,
+            "total_cost_usd": round(total_cost_usd, 4),
+            "avg_cost_per_run": round(total_cost_usd / completed_runs, 4) if completed_runs > 0 else 0,
         },
         "by_subject": subject_breakdown,
     }

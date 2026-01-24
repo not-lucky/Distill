@@ -20,6 +20,7 @@ from rich.table import Table
 from rich.text import Text
 
 from src.logging_config import console as default_console
+from src.services.cost import TOKEN_PRICING, CostEstimator
 
 
 class ProviderStatus(Enum):
@@ -75,15 +76,7 @@ class QuestionProgress:
     providers_total: int = 0
 
 
-# Token pricing per 1M tokens (input, output) in USD
-# Sources: Provider pricing pages as of Jan 2026
-TOKEN_PRICING: Dict[str, tuple[float, float]] = {
-    "cerebras": (0.60, 0.60),
-    "nvidia": (0.50, 0.50),  # varies by model
-    "openrouter": (0.50, 0.50),  # varies by model  
-    "google_genai": (0.10, 0.40),  # Gemini 2.0 Flash
-    "google_antigravity": (0.0, 0.0),  # Local proxy, free
-}
+# Re-export TOKEN_PRICING for backward compatibility (actual definition in services/cost.py)
 
 
 class ProgressTracker:

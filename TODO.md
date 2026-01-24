@@ -1,103 +1,58 @@
-# TODO.md - Selective Question Generation Implementation Checklist
+# Priority 4: Cost Estimation & Budgeting - Implementation Checklist
 
-## Phase 1: Core Implementation ✅ COMPLETED
+## Phase 1: Cost Estimation Service ✅
 
-### Questions Module (`src/questions.py`)
-- [x] Add `QuestionFilter` dataclass
-- [x] Add `filter_indexed_questions()` function
-- [x] Handle category filtering (case-insensitive partial match)
-- [x] Handle question name filtering (case-insensitive partial match)
-- [x] Handle skip-until filtering
-- [x] Handle limit filtering
-- [x] Add `has_filters()` method to `QuestionFilter`
+- [x] Create `src/services/cost.py` with CostEstimator class
+- [x] Define CostEstimate and ProviderCostEstimate dataclasses
+- [x] Move TOKEN_PRICING from progress.py to cost service
+- [x] Implement `estimate_run_cost()` method
+- [x] Implement `calculate_actual_cost()` method
+- [x] Update progress.py to import TOKEN_PRICING from cost service
+- [x] Create `tests/unit/services/test_cost.py`
 
-### CLI (`src/cli.py`)
-- [x] Add `--category` argument
-- [x] Add `--question` argument
-- [x] Add `--limit` argument to generate
-- [x] Add `--skip-until` argument
-- [x] Update `handle_generate()` to create `QuestionFilter`
-- [x] Pass filter to `Orchestrator`
+## Phase 2: Database Schema Changes ✅
 
-### Orchestrator (`src/orchestrator.py`)
-- [x] Add `question_filter` parameter to `__init__`
-- [x] Apply filter in `run()` before resume filter
-- [x] Log filter information in dry-run mode
-- [x] Handle empty filtered questions gracefully
+- [x] Add cost columns to Run model in `src/database.py`:
+  - [x] `total_input_tokens` (Integer)
+  - [x] `total_output_tokens` (Integer)
+  - [x] `total_estimated_cost_usd` (Float)
+  - [x] `budget_limit_usd` (Float, nullable)
+  - [x] `budget_exceeded` (Boolean)
+- [x] Add cost tracking methods to repositories.py
+- [x] Create tests for database changes
 
-## Phase 2: Testing ✅ COMPLETED
+## Phase 3: CLI Changes ✅
 
-### Unit Tests for Questions (`tests/unit/test_questions.py`)
-- [x] Test `QuestionFilter` dataclass creation
-- [x] Test `has_filters()` returns True when any filter set
-- [x] Test `has_filters()` returns False when no filters
-- [x] Test category filter - exact match
-- [x] Test category filter - partial match (case insensitive)
-- [x] Test category filter - no match returns empty
-- [x] Test question filter - exact match
-- [x] Test question filter - partial match (case insensitive)
-- [x] Test question filter - no match returns empty
-- [x] Test skip-until - skips until match
-- [x] Test skip-until - includes matched question
-- [x] Test skip-until - no match returns empty
-- [x] Test limit - returns first N questions
-- [x] Test limit - returns all if limit > total
-- [x] Test combined filters (category + limit)
-- [x] Test combined filters (question + skip-until)
-- [x] Test filter order (category → question → skip-until → limit)
+- [x] Add `--budget <amount>` flag to generate command
+- [x] Add `--estimate-only` flag to generate command
+- [x] Display cost estimate before generation starts
+- [x] Create tests for CLI argument parsing
 
-### Unit Tests for CLI (`tests/unit/test_cli.py`)
-- [x] Test `--category` argument parsing
-- [x] Test `--question` argument parsing
-- [x] Test `--limit` argument parsing (positive integer)
-- [x] Test `--skip-until` argument parsing
-- [x] Test all filter args together
-- [x] Test help text includes filter options
-- [x] Test filter passed to Orchestrator
-- [x] Test no filter results in None
+## Phase 4: Orchestrator Integration ✅
 
-### Unit Tests for Orchestrator (`tests/unit/test_orchestrator.py`)
-- [x] Test filter parameter accepted
-- [x] Test filter applied to questions
-- [x] Test dry-run logs filtered count
-- [x] Test empty filter not applied
-- [x] Test filter + no filter mode
+- [x] Integrate CostEstimator into Orchestrator
+- [x] Show pre-run cost estimate
+- [x] Implement budget checking before each question
+- [x] Stop generation gracefully when budget exceeded
+- [x] Track running costs during generation
+- [x] Save final costs to database on completion
+- [x] Update progress summary to show actual vs estimated
+- [x] Create tests for budget enforcement
 
-## Phase 3: Documentation ✅ COMPLETED
+## Phase 5: Query Enhancements ✅
 
-### AGENTS.md
-- [x] Add filter options to Quick Reference
-- [x] Add usage examples
-- [x] Document filter behavior and combination
+- [x] Add cost fields to `query run` output
+- [x] Add cumulative cost to `query stats` output
+- [x] Create tests for query enhancements
 
-### README.md
-- [x] Add filter options to usage section
-- [x] Add examples for common use cases
+## Phase 6: Documentation ✅
 
-### IMPROVEMENT.md
-- [x] Mark Priority 3 items as completed
+- [x] Update README.md with cost estimation features
+- [x] Update AGENTS.md with new CLI options
+- [x] Add examples for budget usage
 
-## Completion Tracking
+## Final Verification
 
-| Component | Status |
-|-----------|--------|
-| `src/questions.py` | ✅ Complete |
-| `src/cli.py` | ✅ Complete |
-| `src/orchestrator.py` | ✅ Complete |
-| Unit Tests - questions | ✅ Complete (34 new tests) |
-| Unit Tests - cli | ✅ Complete (8 new tests) |
-| Unit Tests - orchestrator | ✅ Complete (6 new tests) |
-| AGENTS.md | ✅ Complete |
-| README.md | ✅ Complete |
-| IMPROVEMENT.md | ✅ Complete |
-
-## Summary
-
-All items for Priority 3 (Selective Question Generation) have been implemented:
-
-1. **QuestionFilter dataclass** - Holds filter configuration with category, question_name, limit, skip_until
-2. **filter_indexed_questions()** - Applies filters in order: category → question → skip-until → limit
-3. **CLI arguments** - `--category`, `--question`, `--limit`, `--skip-until`
-4. **Orchestrator integration** - Applies filter before resume mode filtering
-5. **48 new tests** - Comprehensive coverage of all filter functionality
-6. **Documentation** - Updated AGENTS.md, README.md, and IMPROVEMENT.md
+- [x] All tests pass
+- [x] Type checking passes (ty check src/)
+- [x] Documentation complete

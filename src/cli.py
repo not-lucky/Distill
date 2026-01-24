@@ -137,6 +137,18 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="NAME",
         help="Skip questions until reaching this one (case-insensitive partial match)",
     )
+    generate_parser.add_argument(
+        "--budget",
+        type=float,
+        default=None,
+        metavar="AMOUNT",
+        help="Maximum budget in USD - stops generation when exceeded",
+    )
+    generate_parser.add_argument(
+        "--estimate-only",
+        action="store_true",
+        help="Show cost estimate without generating cards",
+    )
 
     # ====== convert command ======
     convert_parser = subparsers.add_parser(
@@ -410,6 +422,8 @@ async def handle_generate(args: argparse.Namespace) -> int:
     dry_run = getattr(args, "dry_run", False)
     no_cache = getattr(args, "no_cache", False)
     resume_run_id = getattr(args, "resume", None)
+    budget_limit = getattr(args, "budget", None)
+    estimate_only = getattr(args, "estimate_only", False)
 
     # Build question filter from CLI args
     question_filter = QuestionFilter(
@@ -430,7 +444,9 @@ async def handle_generate(args: argparse.Namespace) -> int:
 
     subject_config = registry.get_config(args.subject, is_mcq)
 
-    if dry_run:
+    if estimate_only:
+        logger.info(f"[ESTIMATE] Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
+    elif dry_run:
         logger.info(f"[DRY RUN] Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
     else:
         logger.info(f"Running: Subject={args.subject.upper()}, Card Type={args.card_type.upper()}")
@@ -440,6 +456,8 @@ async def handle_generate(args: argparse.Namespace) -> int:
         logger.info("Cache lookup disabled (--no-cache)")
     if resume_run_id:
         logger.info(f"Resuming run: {resume_run_id}")
+    if budget_limit is not None and isinstance(budget_limit, (int, float)):
+        logger.info(f"Budget limit: ${budget_limit:.2f}")
     if question_filter.has_filters():
         filter_parts = []
         if question_filter.category:
@@ -460,6 +478,8 @@ async def handle_generate(args: argparse.Namespace) -> int:
         bypass_cache_lookup=no_cache,
         resume_run_id=resume_run_id,
         question_filter=question_filter if question_filter.has_filters() else None,
+        budget_limit_usd=budget_limit,
+        estimate_only=estimate_only,
     )
 
     if not await orchestrator.initialize():
