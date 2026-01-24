@@ -115,10 +115,16 @@ uv run main.py generate cs mcq --label "test"    # With run label
 # Custom subjects: defined in config.yaml
 
 # Options
---label TEXT     Optional label for this run (stored in database)
---dry-run        Show what would be done without making API calls
---no-cache       Bypass cache lookup (still stores new results)
---resume RUN_ID  Resume a failed/interrupted run (skips already-processed questions)
+--label TEXT       Optional label for this run (stored in database)
+--dry-run          Show what would be done without making API calls
+--no-cache         Bypass cache lookup (still stores new results)
+--resume RUN_ID    Resume a failed/interrupted run (skips already-processed questions)
+
+# Question Filters (selective generation)
+--category TEXT    Only generate for specific category (partial match)
+--question TEXT    Only generate for matching questions (partial match)
+--limit N          Maximum number of questions to process
+--skip-until TEXT  Skip questions until reaching this one
 ```
 
 **Examples:**
@@ -135,6 +141,21 @@ uv run main.py generate physics --dry-run
 
 # Resume a failed run (use partial run ID from query runs)
 uv run main.py generate leetcode --resume abc12345
+
+# Generate only from "Arrays and Hashing" category
+uv run main.py generate leetcode --category "Arrays"
+
+# Generate only questions matching "Binary Search"
+uv run main.py generate cs --question "Binary Search"
+
+# Quick test with only 3 questions
+uv run main.py generate leetcode --limit 3
+
+# Start from a specific question
+uv run main.py generate physics --skip-until "Quantum Mechanics"
+
+# Combine filters: Trees category, first 5 questions
+uv run main.py generate leetcode --category "Trees" --limit 5
 ```
 
 ### Resume Failed Runs

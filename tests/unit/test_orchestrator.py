@@ -1228,3 +1228,243 @@ class TestOrchestratorEdgeCases:
                 assert len(orch.card_generator.llm_providers) == 2
                 assert orch.card_generator.card_combiner.name == "combiner"
                 assert orch.card_generator.formatter.name == "formatter"
+
+
+class TestOrchestratorQuestionFilter:
+    """Tests for Orchestrator question filtering functionality."""
+
+    @pytest.fixture
+    def subject_config(self):
+        """Create a SubjectConfig with multiple categories."""
+        return create_subject_config(
+            questions={
+                "Arrays": ["Two Sum", "Three Sum", "Valid Anagram"],
+                "Trees": ["Binary Tree", "BST"],
+                "Graphs": ["DFS", "BFS"],
+            }
+        )
+
+    @pytest.mark.asyncio
+    async def test_filter_passed_to_orchestrator(self, subject_config, in_memory_db):
+        """
+        Given a question_filter
+        When Orchestrator is created
+        Then the filter is stored
+        """
+        from src.questions import QuestionFilter
+
+        filter_config = QuestionFilter(category="Arrays", limit=2)
+
+        with patch("src.orchestrator.RunRepository") as MockRunRepo:
+            mock_run_repo = create_mock_run_repo()
+            MockRunRepo.return_value = mock_run_repo
+
+            orch = Orchestrator(
+                subject_config=subject_config,
+                question_filter=filter_config,
+            )
+
+            assert_that(orch.question_filter).is_equal_to(filter_config)
+            assert_that(orch.question_filter.category).is_equal_to("Arrays")
+            assert_that(orch.question_filter.limit).is_equal_to(2)
+
+    @pytest.mark.asyncio
+    async def test_filter_applied_in_run(self, subject_config, in_memory_db):
+        """
+        Given a question_filter with limit=2
+        When run() is called
+        Then only 2 questions are processed
+        """
+        from src.questions import QuestionFilter
+
+        filter_config = QuestionFilter(limit=2)
+
+        with patch("src.orchestrator.RunRepository") as MockRunRepo:
+            mock_run_repo = create_mock_run_repo()
+            mock_run_repo.db_manager.is_initialized = True
+            MockRunRepo.return_value = mock_run_repo
+
+            with patch("src.orchestrator.initialize_providers") as mock_init:
+                mock_providers = [MockLLMProvider()]
+                mock_combiner = MockLLMProvider(name="combiner")
+                mock_init.return_value = (mock_providers, mock_combiner, None)
+
+                with patch("src.orchestrator.CardGenerator") as MockGenerator:
+                    mock_gen = MagicMock()
+                    mock_gen.process_question = AsyncMock(return_value={"title": "Test"})
+                    MockGenerator.return_value = mock_gen
+
+                    with patch("src.orchestrator.ConcurrentTaskRunner") as MockRunner:
+                        mock_runner = AsyncMock()
+                        # Capture the tasks to count them
+                        captured_tasks = []
+                        async def capture_run_all(tasks, **kwargs):
+                            captured_tasks.extend(tasks)
+                            return [Success({"title": f"Test{i}"}) for i in range(len(tasks))]
+                        mock_runner.run_all = capture_run_all
+                        MockRunner.return_value = mock_runner
+
+                        with patch("src.orchestrator.ProgressTracker"):
+                            orch = Orchestrator(
+                                subject_config=subject_config,
+                                question_filter=filter_config,
+                            )
+                            await orch.initialize()
+                            results = await orch.run()
+
+                            # Only 2 questions should be processed
+                            assert_that(captured_tasks).is_length(2)
+
+    @pytest.mark.asyncio
+    async def test_filter_by_category(self, subject_config, in_memory_db):
+        """
+        Given a question_filter with category="Trees"
+        When run() is called
+        Then only questions from Trees category are processed
+        """
+        from src.questions import QuestionFilter
+
+        filter_config = QuestionFilter(category="Trees")
+
+        with patch("src.orchestrator.RunRepository") as MockRunRepo:
+            mock_run_repo = create_mock_run_repo()
+            mock_run_repo.db_manager.is_initialized = True
+            MockRunRepo.return_value = mock_run_repo
+
+            with patch("src.orchestrator.initialize_providers") as mock_init:
+                mock_providers = [MockLLMProvider()]
+                mock_combiner = MockLLMProvider(name="combiner")
+                mock_init.return_value = (mock_providers, mock_combiner, None)
+
+                with patch("src.orchestrator.CardGenerator") as MockGenerator:
+                    mock_gen = MagicMock()
+                    mock_gen.process_question = AsyncMock(return_value={"title": "Test"})
+                    MockGenerator.return_value = mock_gen
+
+                    with patch("src.orchestrator.ConcurrentTaskRunner") as MockRunner:
+                        mock_runner = AsyncMock()
+                        captured_task_names = []
+                        async def capture_run_all(tasks, task_names=None, **kwargs):
+                            if task_names:
+                                captured_task_names.extend(task_names)
+                            return [Success({"title": name}) for name in (task_names or [])]
+                        mock_runner.run_all = capture_run_all
+                        MockRunner.return_value = mock_runner
+
+                        with patch("src.orchestrator.ProgressTracker"):
+                            orch = Orchestrator(
+                                subject_config=subject_config,
+                                question_filter=filter_config,
+                            )
+                            await orch.initialize()
+                            await orch.run()
+
+                            # Only Trees questions should be processed
+                            assert_that(captured_task_names).is_length(2)
+                            assert_that(captured_task_names).contains("Binary Tree", "BST")
+
+    @pytest.mark.asyncio
+    async def test_empty_filter_returns_early(self, subject_config, in_memory_db):
+        """
+        Given a question_filter that matches no questions
+        When run() is called
+        Then an empty list is returned early
+        """
+        from src.questions import QuestionFilter
+
+        filter_config = QuestionFilter(category="Nonexistent")
+
+        with patch("src.orchestrator.RunRepository") as MockRunRepo:
+            mock_run_repo = create_mock_run_repo()
+            MockRunRepo.return_value = mock_run_repo
+
+            with patch("src.orchestrator.initialize_providers") as mock_init:
+                mock_providers = [MockLLMProvider()]
+                mock_combiner = MockLLMProvider(name="combiner")
+                mock_init.return_value = (mock_providers, mock_combiner, None)
+
+                with patch("src.orchestrator.CardGenerator"):
+                    orch = Orchestrator(
+                        subject_config=subject_config,
+                        question_filter=filter_config,
+                    )
+                    await orch.initialize()
+                    results = await orch.run()
+
+                    assert_that(results).is_empty()
+
+    @pytest.mark.asyncio
+    async def test_dry_run_with_filter(self, subject_config, in_memory_db):
+        """
+        Given dry_run=True and a question_filter with limit=2
+        When run() is called
+        Then correct filtered count is logged
+        """
+        from src.questions import QuestionFilter
+
+        filter_config = QuestionFilter(limit=2)
+
+        with patch("src.orchestrator.RunRepository") as MockRunRepo:
+            mock_run_repo = create_mock_run_repo()
+            MockRunRepo.return_value = mock_run_repo
+
+            with patch("src.orchestrator.initialize_providers") as mock_init:
+                mock_providers = [MockLLMProvider()]
+                mock_combiner = MockLLMProvider(name="combiner")
+                mock_init.return_value = (mock_providers, mock_combiner, None)
+
+                with patch("src.orchestrator.logger") as mock_logger:
+                    orch = Orchestrator(
+                        subject_config=subject_config,
+                        question_filter=filter_config,
+                        dry_run=True,
+                    )
+                    await orch.initialize()
+                    results = await orch.run()
+
+                    # Should log about processing 2 questions
+                    info_calls = [str(c) for c in mock_logger.info.call_args_list]
+                    assert_that(any("2 questions" in c for c in info_calls)).is_true()
+
+    @pytest.mark.asyncio
+    async def test_no_filter_processes_all_questions(self, subject_config, in_memory_db):
+        """
+        Given no question_filter
+        When run() is called
+        Then all questions are processed
+        """
+        with patch("src.orchestrator.RunRepository") as MockRunRepo:
+            mock_run_repo = create_mock_run_repo()
+            mock_run_repo.db_manager.is_initialized = True
+            MockRunRepo.return_value = mock_run_repo
+
+            with patch("src.orchestrator.initialize_providers") as mock_init:
+                mock_providers = [MockLLMProvider()]
+                mock_combiner = MockLLMProvider(name="combiner")
+                mock_init.return_value = (mock_providers, mock_combiner, None)
+
+                with patch("src.orchestrator.CardGenerator") as MockGenerator:
+                    mock_gen = MagicMock()
+                    mock_gen.process_question = AsyncMock(return_value={"title": "Test"})
+                    MockGenerator.return_value = mock_gen
+
+                    with patch("src.orchestrator.ConcurrentTaskRunner") as MockRunner:
+                        mock_runner = AsyncMock()
+                        captured_tasks = []
+                        async def capture_run_all(tasks, **kwargs):
+                            captured_tasks.extend(tasks)
+                            return [Success({"title": f"Test{i}"}) for i in range(len(tasks))]
+                        mock_runner.run_all = capture_run_all
+                        MockRunner.return_value = mock_runner
+
+                        with patch("src.orchestrator.ProgressTracker"):
+                            orch = Orchestrator(
+                                subject_config=subject_config,
+                                question_filter=None,  # No filter
+                            )
+                            await orch.initialize()
+                            await orch.run()
+
+                            # All 7 questions should be processed
+                            assert_that(captured_tasks).is_length(7)
+

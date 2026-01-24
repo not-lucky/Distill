@@ -12,6 +12,8 @@ from src.questions import (
     load_questions,
     flatten_categorized_questions,
     get_indexed_questions,
+    filter_indexed_questions,
+    QuestionFilter,
     CategorizedQuestions,
 )
 from src.logging_config import setup_logging, console, custom_logging_theme
@@ -519,3 +521,402 @@ class TestEdgeCases:
         categorized = {"": ["problem1"]}
         result = get_indexed_questions(categorized)
         assert_that(result[0]).is_equal_to((1, "", 1, "problem1"))
+
+
+class TestQuestionFilter:
+    """Tests for QuestionFilter dataclass."""
+
+    def test_question_filter_defaults(self):
+        """
+        Given a QuestionFilter with no arguments
+        When created
+        Then all fields are None
+        """
+        filter_config = QuestionFilter()
+        assert_that(filter_config.category).is_none()
+        assert_that(filter_config.question_name).is_none()
+        assert_that(filter_config.limit).is_none()
+        assert_that(filter_config.skip_until).is_none()
+
+    def test_has_filters_when_empty(self):
+        """
+        Given a QuestionFilter with no fields set
+        When has_filters is called
+        Then it returns False
+        """
+        filter_config = QuestionFilter()
+        assert_that(filter_config.has_filters()).is_false()
+
+    def test_has_filters_with_category(self):
+        """
+        Given a QuestionFilter with only category set
+        When has_filters is called
+        Then it returns True
+        """
+        filter_config = QuestionFilter(category="Arrays")
+        assert_that(filter_config.has_filters()).is_true()
+
+    def test_has_filters_with_question_name(self):
+        """
+        Given a QuestionFilter with only question_name set
+        When has_filters is called
+        Then it returns True
+        """
+        filter_config = QuestionFilter(question_name="Two Sum")
+        assert_that(filter_config.has_filters()).is_true()
+
+    def test_has_filters_with_limit(self):
+        """
+        Given a QuestionFilter with only limit set
+        When has_filters is called
+        Then it returns True
+        """
+        filter_config = QuestionFilter(limit=5)
+        assert_that(filter_config.has_filters()).is_true()
+
+    def test_has_filters_with_skip_until(self):
+        """
+        Given a QuestionFilter with only skip_until set
+        When has_filters is called
+        Then it returns True
+        """
+        filter_config = QuestionFilter(skip_until="Binary Search")
+        assert_that(filter_config.has_filters()).is_true()
+
+    def test_has_filters_with_multiple_fields(self):
+        """
+        Given a QuestionFilter with multiple fields set
+        When has_filters is called
+        Then it returns True
+        """
+        filter_config = QuestionFilter(category="Arrays", limit=10)
+        assert_that(filter_config.has_filters()).is_true()
+
+
+class TestFilterIndexedQuestions:
+    """Tests for filter_indexed_questions function."""
+
+    @pytest.fixture
+    def sample_questions(self):
+        """Sample indexed questions for testing."""
+        return [
+            (1, "Arrays and Hashing", 1, "Contains Duplicate"),
+            (1, "Arrays and Hashing", 2, "Valid Anagram"),
+            (1, "Arrays and Hashing", 3, "Two Sum"),
+            (2, "Two Pointers", 1, "Valid Palindrome"),
+            (2, "Two Pointers", 2, "3Sum"),
+            (3, "Sliding Window", 1, "Best Time to Buy and Sell Stock"),
+            (3, "Sliding Window", 2, "Longest Substring Without Repeating Characters"),
+        ]
+
+    # ========== Category Filter Tests ==========
+
+    def test_filter_by_category_exact_match(self, sample_questions):
+        """
+        Given a category filter matching exactly
+        When filter_indexed_questions is called
+        Then only questions from that category are returned
+        """
+        filter_config = QuestionFilter(category="Two Pointers")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(2)
+        assert_that([q[3] for q in result]).contains("Valid Palindrome", "3Sum")
+
+    def test_filter_by_category_partial_match(self, sample_questions):
+        """
+        Given a partial category filter
+        When filter_indexed_questions is called
+        Then questions from matching categories are returned
+        """
+        filter_config = QuestionFilter(category="Arrays")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(3)
+        assert_that([q[1] for q in result]).contains_only("Arrays and Hashing")
+
+    def test_filter_by_category_case_insensitive(self, sample_questions):
+        """
+        Given a lowercase category filter
+        When filter_indexed_questions is called
+        Then matching is case-insensitive
+        """
+        filter_config = QuestionFilter(category="sliding window")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(2)
+
+    def test_filter_by_category_no_match(self, sample_questions):
+        """
+        Given a category filter with no matches
+        When filter_indexed_questions is called
+        Then an empty list is returned
+        """
+        filter_config = QuestionFilter(category="Nonexistent Category")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_empty()
+
+    # ========== Question Name Filter Tests ==========
+
+    def test_filter_by_question_exact_match(self, sample_questions):
+        """
+        Given an exact question name filter
+        When filter_indexed_questions is called
+        Then only that question is returned
+        """
+        filter_config = QuestionFilter(question_name="Two Sum")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(1)
+        assert_that(result[0][3]).is_equal_to("Two Sum")
+
+    def test_filter_by_question_partial_match(self, sample_questions):
+        """
+        Given a partial question name filter
+        When filter_indexed_questions is called
+        Then all matching questions are returned
+        """
+        filter_config = QuestionFilter(question_name="Sum")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(2)
+        assert_that([q[3] for q in result]).contains("Two Sum", "3Sum")
+
+    def test_filter_by_question_case_insensitive(self, sample_questions):
+        """
+        Given a lowercase question filter
+        When filter_indexed_questions is called
+        Then matching is case-insensitive
+        """
+        filter_config = QuestionFilter(question_name="valid")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(2)
+        assert_that([q[3] for q in result]).contains("Valid Anagram", "Valid Palindrome")
+
+    def test_filter_by_question_no_match(self, sample_questions):
+        """
+        Given a question filter with no matches
+        When filter_indexed_questions is called
+        Then an empty list is returned
+        """
+        filter_config = QuestionFilter(question_name="Nonexistent Question")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_empty()
+
+    # ========== Skip Until Filter Tests ==========
+
+    def test_skip_until_match(self, sample_questions):
+        """
+        Given a skip_until filter
+        When filter_indexed_questions is called
+        Then questions are skipped until the match (inclusive)
+        """
+        filter_config = QuestionFilter(skip_until="Valid Palindrome")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(4)
+        assert_that(result[0][3]).is_equal_to("Valid Palindrome")
+
+    def test_skip_until_partial_match(self, sample_questions):
+        """
+        Given a partial skip_until filter
+        When filter_indexed_questions is called
+        Then skip until first partial match
+        """
+        filter_config = QuestionFilter(skip_until="Pointers")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        # Should match "Two Pointers" category but look at question name
+        # Skip until will look at question names, not categories
+        assert_that(result).is_empty()  # No question name contains "Pointers"
+
+    def test_skip_until_case_insensitive(self, sample_questions):
+        """
+        Given a lowercase skip_until filter
+        When filter_indexed_questions is called
+        Then matching is case-insensitive
+        """
+        filter_config = QuestionFilter(skip_until="best time")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(2)
+        assert_that(result[0][3]).is_equal_to("Best Time to Buy and Sell Stock")
+
+    def test_skip_until_no_match(self, sample_questions):
+        """
+        Given a skip_until filter with no matches
+        When filter_indexed_questions is called
+        Then an empty list is returned
+        """
+        filter_config = QuestionFilter(skip_until="Nonexistent")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_empty()
+
+    def test_skip_until_first_question(self, sample_questions):
+        """
+        Given a skip_until matching the first question
+        When filter_indexed_questions is called
+        Then all questions are returned
+        """
+        filter_config = QuestionFilter(skip_until="Contains Duplicate")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(7)
+
+    def test_skip_until_last_question(self, sample_questions):
+        """
+        Given a skip_until matching the last question
+        When filter_indexed_questions is called
+        Then only the last question is returned
+        """
+        filter_config = QuestionFilter(skip_until="Longest Substring")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(1)
+        assert_that(result[0][3]).is_equal_to("Longest Substring Without Repeating Characters")
+
+    # ========== Limit Filter Tests ==========
+
+    def test_limit_fewer_than_total(self, sample_questions):
+        """
+        Given a limit smaller than total questions
+        When filter_indexed_questions is called
+        Then first N questions are returned
+        """
+        filter_config = QuestionFilter(limit=3)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(3)
+        assert_that([q[3] for q in result]).is_equal_to([
+            "Contains Duplicate", "Valid Anagram", "Two Sum"
+        ])
+
+    def test_limit_greater_than_total(self, sample_questions):
+        """
+        Given a limit larger than total questions
+        When filter_indexed_questions is called
+        Then all questions are returned
+        """
+        filter_config = QuestionFilter(limit=100)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(7)
+
+    def test_limit_equal_to_total(self, sample_questions):
+        """
+        Given a limit equal to total questions
+        When filter_indexed_questions is called
+        Then all questions are returned
+        """
+        filter_config = QuestionFilter(limit=7)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(7)
+
+    def test_limit_one(self, sample_questions):
+        """
+        Given a limit of 1
+        When filter_indexed_questions is called
+        Then only the first question is returned
+        """
+        filter_config = QuestionFilter(limit=1)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(1)
+        assert_that(result[0][3]).is_equal_to("Contains Duplicate")
+
+    def test_limit_zero(self, sample_questions):
+        """
+        Given a limit of 0
+        When filter_indexed_questions is called
+        Then an empty list is returned
+        """
+        filter_config = QuestionFilter(limit=0)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_empty()
+
+    def test_limit_negative(self, sample_questions):
+        """
+        Given a negative limit
+        When filter_indexed_questions is called
+        Then an empty list is returned
+        """
+        filter_config = QuestionFilter(limit=-5)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_empty()
+
+    # ========== Combined Filter Tests ==========
+
+    def test_category_and_limit(self, sample_questions):
+        """
+        Given category and limit filters
+        When filter_indexed_questions is called
+        Then category is applied first, then limit
+        """
+        filter_config = QuestionFilter(category="Arrays", limit=2)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(2)
+        assert_that([q[3] for q in result]).is_equal_to(["Contains Duplicate", "Valid Anagram"])
+
+    def test_question_and_limit(self, sample_questions):
+        """
+        Given question name and limit filters
+        When filter_indexed_questions is called
+        Then question filter is applied first, then limit
+        """
+        filter_config = QuestionFilter(question_name="Valid", limit=1)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(1)
+        assert_that(result[0][3]).is_equal_to("Valid Anagram")
+
+    def test_category_and_question(self, sample_questions):
+        """
+        Given category and question filters
+        When filter_indexed_questions is called
+        Then both filters are applied (category first)
+        """
+        filter_config = QuestionFilter(category="Arrays", question_name="Sum")
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(1)
+        assert_that(result[0][3]).is_equal_to("Two Sum")
+
+    def test_skip_until_and_limit(self, sample_questions):
+        """
+        Given skip_until and limit filters
+        When filter_indexed_questions is called
+        Then skip_until is applied first, then limit
+        """
+        filter_config = QuestionFilter(skip_until="Two Sum", limit=2)
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(2)
+        assert_that([q[3] for q in result]).is_equal_to(["Two Sum", "Valid Palindrome"])
+
+    def test_all_filters_combined(self, sample_questions):
+        """
+        Given all filters
+        When filter_indexed_questions is called
+        Then filters are applied in order: category → question → skip_until → limit
+        """
+        # Limit the sample to test complex combinations
+        questions = [
+            (1, "Arrays", 1, "A-One"),
+            (1, "Arrays", 2, "A-Two"),
+            (1, "Arrays", 3, "A-Three"),
+            (2, "Trees", 1, "T-One"),
+            (2, "Trees", 2, "T-Two"),
+        ]
+        filter_config = QuestionFilter(
+            category="Arrays",
+            skip_until="A-Two",
+            limit=1
+        )
+        result = filter_indexed_questions(questions, filter_config)
+        assert_that(result).is_length(1)
+        assert_that(result[0][3]).is_equal_to("A-Two")
+
+    def test_filter_on_empty_list(self):
+        """
+        Given an empty question list
+        When filter_indexed_questions is called
+        Then an empty list is returned
+        """
+        filter_config = QuestionFilter(limit=5)
+        result = filter_indexed_questions([], filter_config)
+        assert_that(result).is_empty()
+
+    def test_no_filters_returns_all(self, sample_questions):
+        """
+        Given a QuestionFilter with no filters
+        When filter_indexed_questions is called
+        Then all questions are returned unchanged
+        """
+        filter_config = QuestionFilter()
+        result = filter_indexed_questions(sample_questions, filter_config)
+        assert_that(result).is_length(7)
+        assert_that(result).is_equal_to(sample_questions)

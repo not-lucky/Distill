@@ -178,6 +178,72 @@ class TestCreateParser:
         args = parser.parse_args(["generate", "--dry-run"])
         assert_that(args.dry_run).is_true()
 
+    def test_generate_command_category_filter(self, parser):
+        """
+        Given generate command with category filter
+        When parsed
+        Then category is set correctly
+        """
+        args = parser.parse_args(["generate", "--category", "Arrays and Hashing"])
+        assert_that(args.category).is_equal_to("Arrays and Hashing")
+
+    def test_generate_command_question_filter(self, parser):
+        """
+        Given generate command with question filter
+        When parsed
+        Then question is set correctly
+        """
+        args = parser.parse_args(["generate", "--question", "Two Sum"])
+        assert_that(args.question).is_equal_to("Two Sum")
+
+    def test_generate_command_limit_filter(self, parser):
+        """
+        Given generate command with limit filter
+        When parsed
+        Then limit is set correctly
+        """
+        args = parser.parse_args(["generate", "--limit", "5"])
+        assert_that(args.limit).is_equal_to(5)
+
+    def test_generate_command_skip_until_filter(self, parser):
+        """
+        Given generate command with skip-until filter
+        When parsed
+        Then skip_until is set correctly
+        """
+        args = parser.parse_args(["generate", "--skip-until", "Binary Search"])
+        assert_that(args.skip_until).is_equal_to("Binary Search")
+
+    def test_generate_command_all_filters(self, parser):
+        """
+        Given generate command with all filter arguments
+        When parsed
+        Then all filters are set correctly
+        """
+        args = parser.parse_args([
+            "generate", "cs", "mcq",
+            "--category", "Trees",
+            "--question", "BST",
+            "--limit", "10",
+            "--skip-until", "AVL",
+        ])
+        assert_that(args.category).is_equal_to("Trees")
+        assert_that(args.question).is_equal_to("BST")
+        assert_that(args.limit).is_equal_to(10)
+        assert_that(args.skip_until).is_equal_to("AVL")
+
+    def test_generate_command_filters_default_to_none(self, parser):
+        """
+        Given generate command without filter arguments
+        When parsed
+        Then filter arguments default to None
+        """
+        args = parser.parse_args(["generate"])
+        assert_that(args.category).is_none()
+        assert_that(args.question).is_none()
+        assert_that(args.limit).is_none()
+        assert_that(args.skip_until).is_none()
+
     def test_convert_command(self, parser):
         """
         Given convert command with json file
@@ -319,6 +385,88 @@ class TestHandleGenerate:
                 result = await handle_generate(args)
 
                 assert_that(result).is_equal_to(1)
+
+    @pytest.mark.asyncio
+    async def test_handle_generate_with_question_filter(self):
+        """
+        Given generate arguments with question filters
+        When handle_generate is called
+        Then QuestionFilter is created and passed to Orchestrator
+        """
+        args = MagicMock()
+        args.subject = "leetcode"
+        args.card_type = "standard"
+        args.label = None
+        args.dry_run = False
+        args.no_cache = False
+        args.resume = None
+        args.category = "Arrays"
+        args.question = "Two Sum"
+        args.limit = 5
+        args.skip_until = None
+
+        with patch("src.cli.SubjectRegistry") as MockRegistry:
+            mock_registry = MagicMock()
+            mock_registry.is_valid_subject.return_value = True
+            mock_registry.get_config.return_value = MagicMock()
+            MockRegistry.return_value = mock_registry
+
+            with patch("src.orchestrator.Orchestrator") as MockOrch:
+                mock_orch = AsyncMock()
+                mock_orch.initialize = AsyncMock(return_value=True)
+                mock_orch.run = AsyncMock(return_value=[{"title": "Test"}])
+                mock_orch.save_results = MagicMock(return_value="output.json")
+                MockOrch.return_value = mock_orch
+
+                result = await handle_generate(args)
+
+                # Verify Orchestrator was called with question_filter
+                call_kwargs = MockOrch.call_args.kwargs
+                assert_that(call_kwargs).contains_key("question_filter")
+                filter_arg = call_kwargs["question_filter"]
+                assert_that(filter_arg).is_not_none()
+                assert_that(filter_arg.category).is_equal_to("Arrays")
+                assert_that(filter_arg.question_name).is_equal_to("Two Sum")
+                assert_that(filter_arg.limit).is_equal_to(5)
+
+    @pytest.mark.asyncio
+    async def test_handle_generate_without_filters(self):
+        """
+        Given generate arguments without filters
+        When handle_generate is called
+        Then question_filter is None
+        """
+        args = MagicMock()
+        args.subject = "leetcode"
+        args.card_type = "standard"
+        args.label = None
+        args.dry_run = False
+        args.no_cache = False
+        args.resume = None
+        args.category = None
+        args.question = None
+        args.limit = None
+        args.skip_until = None
+
+        with patch("src.cli.SubjectRegistry") as MockRegistry:
+            mock_registry = MagicMock()
+            mock_registry.is_valid_subject.return_value = True
+            mock_registry.get_config.return_value = MagicMock()
+            MockRegistry.return_value = mock_registry
+
+            with patch("src.orchestrator.Orchestrator") as MockOrch:
+                mock_orch = AsyncMock()
+                mock_orch.initialize = AsyncMock(return_value=True)
+                mock_orch.run = AsyncMock(return_value=[])
+                mock_orch.save_results = MagicMock()
+                MockOrch.return_value = mock_orch
+
+                await handle_generate(args)
+
+                # Verify Orchestrator was called with question_filter=None
+                call_kwargs = MockOrch.call_args.kwargs
+                assert_that(call_kwargs).contains_key("question_filter")
+                assert_that(call_kwargs["question_filter"]).is_none()
 
 
 class TestHandleConvert:
@@ -752,6 +900,10 @@ class TestHandleGenerateExtended:
         args.dry_run = True
         args.no_cache = False
         args.resume = None
+        args.category = None
+        args.question = None
+        args.limit = None
+        args.skip_until = None
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -776,6 +928,7 @@ class TestHandleGenerateExtended:
                     dry_run=True,
                     bypass_cache_lookup=False,
                     resume_run_id=None,
+                    question_filter=None,
                 )
 
     @pytest.mark.asyncio
@@ -792,6 +945,10 @@ class TestHandleGenerateExtended:
         args.dry_run = False
         args.no_cache = False
         args.resume = None
+        args.category = None
+        args.question = None
+        args.limit = None
+        args.skip_until = None
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -816,6 +973,7 @@ class TestHandleGenerateExtended:
                     dry_run=False,
                     bypass_cache_lookup=False,
                     resume_run_id=None,
+                    question_filter=None,
                 )
 
     @pytest.mark.asyncio

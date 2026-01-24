@@ -13,7 +13,7 @@ from src.generator import CardGenerator
 from src.repositories import RunRepository, RunStats
 from src.task_runner import ConcurrentTaskRunner, Success, TaskInfo
 from src.utils import save_final_deck
-from src.questions import get_indexed_questions
+from src.questions import get_indexed_questions, filter_indexed_questions, QuestionFilter
 from src.progress import ProgressTracker, ProviderStatus
 from src.providers.base import TokenUsage
 
@@ -29,6 +29,7 @@ class Orchestrator:
         dry_run: bool = False,
         bypass_cache_lookup: bool = False,
         resume_run_id: Optional[str] = None,
+        question_filter: Optional[QuestionFilter] = None,
     ):
         """
         Initialize the orchestrator.
@@ -40,6 +41,7 @@ class Orchestrator:
             dry_run: If True, show what would be done without making changes
             bypass_cache_lookup: If True, skip cache lookup but still store results
             resume_run_id: Optional run ID to resume (skips already-processed questions)
+            question_filter: Optional filter to limit which questions are processed
         """
         self.subject_config = subject_config
         self.is_mcq = is_mcq
@@ -47,6 +49,7 @@ class Orchestrator:
         self.dry_run = dry_run
         self.bypass_cache_lookup = bypass_cache_lookup
         self.resume_run_id = resume_run_id
+        self.question_filter = question_filter
         self.run_repo = RunRepository(DATABASE_PATH)
         self.card_generator: Optional[CardGenerator] = None
         self.progress_tracker: Optional[ProgressTracker] = None
@@ -227,6 +230,15 @@ class Orchestrator:
         all_questions_with_metadata: List[Tuple] = get_indexed_questions(
             self.subject_config.target_questions
         )
+
+        # Apply question filter if provided (before resume filter)
+        if self.question_filter:
+            all_questions_with_metadata = filter_indexed_questions(
+                all_questions_with_metadata, self.question_filter
+            )
+            if not all_questions_with_metadata:
+                logger.warning("No questions match the specified filters")
+                return []
 
         # Filter out already-processed questions in resume mode
         if self._processed_questions:
