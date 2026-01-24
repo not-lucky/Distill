@@ -28,14 +28,16 @@ Improvement ideas for LLM2Deck - features, quality of life enhancements, and tec
 
 *Implementation: See `src/orchestrator.py`, `src/repositories.py`, `src/queries.py`*
 
-### 3. Selective Question Generation
+### 3. Selective Question Generation ✅ IMPLEMENTED
 **Problem:** Currently generates all questions in a subject. No way to pick specific ones.
 
 **Improvements:**
-- [ ] Add `--category "Arrays"` flag to generate only specific categories
-- [ ] Add `--question "Two Sum"` flag for single question generation
-- [ ] Add `--limit N` to generate first N questions (for testing)
-- [ ] Add `--skip-until "Binary Search"` for partial runs
+- [x] Add `--category "Arrays"` flag to generate only specific categories
+- [x] Add `--question "Two Sum"` flag for single question generation
+- [x] Add `--limit N` to generate first N questions (for testing)
+- [x] Add `--skip-until "Binary Search"` for partial runs
+
+*Implementation: See `src/questions.py` (QuestionFilter, filter_indexed_questions), `src/cli.py`, `src/orchestrator.py`*
 
 ### 4. Cost Estimation & Budgeting
 **Problem:** No visibility into API costs before or during generation.

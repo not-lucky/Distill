@@ -109,6 +109,34 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="RUN_ID",
         help="Resume a failed/interrupted run (skips already-processed questions)",
     )
+    generate_parser.add_argument(
+        "--category",
+        type=str,
+        default=None,
+        metavar="CATEGORY",
+        help="Only generate cards for specific category (case-insensitive partial match)",
+    )
+    generate_parser.add_argument(
+        "--question",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Generate cards for questions matching this name (case-insensitive partial match)",
+    )
+    generate_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Maximum number of questions to process (for testing)",
+    )
+    generate_parser.add_argument(
+        "--skip-until",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Skip questions until reaching this one (case-insensitive partial match)",
+    )
 
     # ====== convert command ======
     convert_parser = subparsers.add_parser(
@@ -376,11 +404,20 @@ def create_parser() -> argparse.ArgumentParser:
 async def handle_generate(args: argparse.Namespace) -> int:
     """Handle the generate subcommand."""
     from src.orchestrator import Orchestrator
+    from src.questions import QuestionFilter
 
     is_mcq = args.card_type == "mcq"
     dry_run = getattr(args, "dry_run", False)
     no_cache = getattr(args, "no_cache", False)
     resume_run_id = getattr(args, "resume", None)
+
+    # Build question filter from CLI args
+    question_filter = QuestionFilter(
+        category=getattr(args, "category", None),
+        question_name=getattr(args, "question", None),
+        limit=getattr(args, "limit", None),
+        skip_until=getattr(args, "skip_until", None),
+    )
 
     # Get subject configuration using registry
     registry = SubjectRegistry()
@@ -403,6 +440,17 @@ async def handle_generate(args: argparse.Namespace) -> int:
         logger.info("Cache lookup disabled (--no-cache)")
     if resume_run_id:
         logger.info(f"Resuming run: {resume_run_id}")
+    if question_filter.has_filters():
+        filter_parts = []
+        if question_filter.category:
+            filter_parts.append(f"category='{question_filter.category}'")
+        if question_filter.question_name:
+            filter_parts.append(f"question='{question_filter.question_name}'")
+        if question_filter.skip_until:
+            filter_parts.append(f"skip-until='{question_filter.skip_until}'")
+        if question_filter.limit:
+            filter_parts.append(f"limit={question_filter.limit}")
+        logger.info(f"Question filters: {', '.join(filter_parts)}")
 
     orchestrator = Orchestrator(
         subject_config=subject_config,
@@ -411,6 +459,7 @@ async def handle_generate(args: argparse.Namespace) -> int:
         dry_run=dry_run,
         bypass_cache_lookup=no_cache,
         resume_run_id=resume_run_id,
+        question_filter=question_filter if question_filter.has_filters() else None,
     )
 
     if not await orchestrator.initialize():
