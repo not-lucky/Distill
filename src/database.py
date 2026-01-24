@@ -149,6 +149,13 @@ class Run(Base):
     completed_at = Column(DateTime, nullable=True)
     run_metadata = Column(Text, nullable=True)  # JSON blob
 
+    # Cost tracking columns (Priority 4: Cost Estimation & Budgeting)
+    total_input_tokens = Column(Integer, default=0)
+    total_output_tokens = Column(Integer, default=0)
+    total_estimated_cost_usd = Column(Float, default=0.0)
+    budget_limit_usd = Column(Float, nullable=True)  # NULL if no budget set
+    budget_exceeded = Column(Boolean, default=False)
+
     # Relationships
     problems = relationship(
         "Problem", back_populates="run", cascade="all, delete-orphan"

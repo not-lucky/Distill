@@ -23,6 +23,7 @@ LLM2Deck is a powerful tool that generates comprehensive Anki flashcard decks by
 - **Parallel LLM Generation** — Query multiple providers simultaneously (Cerebras, OpenRouter, NVIDIA NIM, Google Gemini, and more)
 - **Two-Stage Quality Pipeline** — Generate → Combine workflow produces higher-quality cards than single-model approaches
 - **Real-Time Progress Visualization** — Rich progress bar with ETA, provider status indicators, and live token/cost tracking
+- **Cost Estimation & Budgeting** — Pre-run cost estimates, budget limits, and cumulative cost tracking across runs
 - **Built-in Subjects** — LeetCode algorithms, Computer Science fundamentals, and Physics concepts ready to go
 - **Custom Subjects** — Define your own subjects with custom prompts and question sets
 - **Multiple Card Formats** — Standard Q&A and Multiple Choice Question (MCQ) modes
@@ -119,6 +120,8 @@ uv run main.py generate cs mcq --label "test"    # With run label
 --dry-run          Show what would be done without making API calls
 --no-cache         Bypass cache lookup (still stores new results)
 --resume RUN_ID    Resume a failed/interrupted run (skips already-processed questions)
+--budget AMOUNT    Maximum budget in USD (stops generation when exceeded)
+--estimate-only    Show cost estimate without generating cards
 
 # Question Filters (selective generation)
 --category TEXT    Only generate for specific category (partial match)
@@ -207,6 +210,51 @@ Features:
 - **Provider status table** showing success/fail counts, tokens used, and estimated cost
 - **ETA estimation** based on rolling average of processing times
 - **Live cost tracking** per provider with automatic pricing lookup
+
+### Cost Estimation & Budgeting
+
+LLM2Deck provides visibility into API costs before, during, and after generation:
+
+```bash
+# Pre-run cost estimation without generating
+uv run main.py generate leetcode --estimate-only
+
+# Set a budget limit (stops when exceeded)
+uv run main.py generate leetcode --budget 1.00
+
+# View cost for a completed run
+uv run main.py query run abc12345
+
+# View cumulative costs across all runs
+uv run main.py query stats
+```
+
+**Example cost estimate output:**
+```
+============================================================
+COST ESTIMATE
+============================================================
+Questions to process: 50
+Estimated tokens: 100,000 in / 75,000 out
+Estimated total cost: $0.1050
+
+Per provider:
+  cerebras/gpt-oss-120b: $0.0420
+  google_genai/gemini-2.0-flash: $0.0175
+  google_antigravity/gemini-3-pro: $0.0000
+============================================================
+```
+
+**Budget enforcement:**
+- Use `--budget <amount>` to set a maximum spend in USD
+- LLM2Deck checks the budget before starting each question
+- If continuing would exceed the budget, generation stops gracefully
+- Already-processed questions are saved; use `--resume` to continue later
+
+**Cost tracking in database:**
+- Each run stores: total input/output tokens, estimated cost, budget limit (if set)
+- Query with `uv run main.py query stats` to see cumulative costs
+- Run details include full cost breakdown
 
 ### Convert to Anki
 

@@ -904,6 +904,8 @@ class TestHandleGenerateExtended:
         args.question = None
         args.limit = None
         args.skip_until = None
+        args.budget = None
+        args.estimate_only = False
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
@@ -929,6 +931,8 @@ class TestHandleGenerateExtended:
                     bypass_cache_lookup=False,
                     resume_run_id=None,
                     question_filter=None,
+                    budget_limit_usd=None,
+                    estimate_only=False,
                 )
 
     @pytest.mark.asyncio
@@ -947,6 +951,10 @@ class TestHandleGenerateExtended:
         args.resume = None
         args.category = None
         args.question = None
+        args.limit = None
+        args.skip_until = None
+        args.budget = None
+        args.estimate_only = False
         args.limit = None
         args.skip_until = None
 
@@ -974,6 +982,8 @@ class TestHandleGenerateExtended:
                     bypass_cache_lookup=False,
                     resume_run_id=None,
                     question_filter=None,
+                    budget_limit_usd=None,
+                    estimate_only=False,
                 )
 
     @pytest.mark.asyncio
@@ -989,6 +999,13 @@ class TestHandleGenerateExtended:
         args.label = "my-run-label"
         args.dry_run = False
         args.no_cache = False
+        args.resume = None
+        args.category = None
+        args.question = None
+        args.limit = None
+        args.skip_until = None
+        args.budget = None
+        args.estimate_only = False
 
         with patch("src.cli.SubjectRegistry") as MockRegistry:
             mock_registry = MagicMock()
