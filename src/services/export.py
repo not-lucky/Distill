@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from src.utils import unescape_newlines
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,7 +84,7 @@ class ExportService:
     def _export_file(self, json_path: Path) -> None:
         """Export a single JSON file to Markdown."""
         with open(json_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            data = unescape_newlines(json.load(f))
 
         md_filename = json_path.stem + ".md"
         md_path = self.target_dir / md_filename

@@ -65,11 +65,11 @@ providers:
   google_antigravity:
     enabled: true
     models:
-      - "gemini-3-pro-preview"
-      - "gemini-claude-opus-4-5-thinking"
+      - "gemini-3-flash-preview"
+      # - "gemini-claude-opus-4-5-thinking"
     timeout: 900
     max_tokens: 16384
-    # base_url: "http://127.0.0.1:8317/v1"  # Optional, has default
+    base_url: "http://127.0.0.1:8317/v1"  # Optional, has default
 
 # Generation Settings
 generation:
@@ -83,7 +83,7 @@ generation:
   # If not set, the first enabled provider is used as combiner.
   combiner:
     provider: google_antigravity   # Provider name from providers section
-    model: gemini-claude-opus-4-5-thinking  # Model to use for combining
+    model: gemini-3-flash-preview  # Model to use for combining
     also_generate: true            # If true, combiner also does initial generation
                                    # If false, combiner only combines (not used for generation)
 

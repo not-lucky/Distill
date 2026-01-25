@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional
 
 from src.anki.models import AnkiModelFactory
 from src.anki.renderer import render_markdown
+from src.utils import unescape_newlines
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,8 @@ def load_card_data(json_file_path: str) -> List[Dict[str, Any]]:
     """
     try:
         with open(json_file_path, 'r', encoding='utf-8') as input_file:
-            return json.load(input_file)
+            data = json.load(input_file)
+            return unescape_newlines(data)
     except Exception as error:
         logger.error(f"Failed to load data from {json_file_path}: {error}")
         raise

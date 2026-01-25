@@ -1,5 +1,4 @@
 
-import re
 import bleach
 import markdown
 
@@ -16,19 +15,9 @@ def render_markdown(markdown_text: str) -> str:
     if not markdown_text:
         return ""
 
-    # Fix double-escaped newlines inside code blocks only using regex split
-    # This splits by code blocks (capturing the delimiters so we keep them)
-    text_parts = re.split(r'(```.*?```)', markdown_text, flags=re.DOTALL)
-    for part_index in range(len(text_parts)):
-        # If it starts and ends with ```, it's a code block
-        if text_parts[part_index].startswith('```') and text_parts[part_index].endswith('```'):
-            text_parts[part_index] = text_parts[part_index].replace('\\n', '\n')
-    
-    processed_text = "".join(text_parts)
-        
     # Configure extensions
     html_content = markdown.markdown(
-        processed_text,
+        markdown_text,
         extensions=['fenced_code', 'codehilite', 'tables', 'nl2br', 'sane_lists'],
         extension_configs={
             'codehilite': {

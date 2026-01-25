@@ -2,11 +2,22 @@ import json
 import re
 import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Any
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def unescape_newlines(obj: Any) -> Any:
+    """Recursively unescape literal \\n in strings."""
+    if isinstance(obj, str):
+        return obj.replace('\\n', '\n')
+    elif isinstance(obj, list):
+        return [unescape_newlines(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: unescape_newlines(value) for key, value in obj.items()}
+    return obj
 
 
 def sanitize_filename(original_name: str) -> str:
