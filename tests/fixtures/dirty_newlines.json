@@ -1,0 +1,19 @@
+[
+  {
+    "title": "Problem with Newlines",
+    "topic": "Algorithms",
+    "difficulty": "Easy",
+    "category_index": 1,
+    "category_name": "Testing",
+    "problem_index": 1,
+    "cards": [
+      {
+        "front": "What is a newline?\\nIt is a character.",
+        "back": "Literal backslash n: \\\\n\\nActual newline: \nDone.",
+        "explanation": "This is an explanation with \\n nested newlines.",
+        "tags": ["test\\ntag", "newline"],
+        "card_type": "Basic"
+      }
+    ]
+  }
+]
