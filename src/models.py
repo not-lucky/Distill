@@ -59,3 +59,11 @@ class MCQProblem(BaseModel):
 class GenericProblem(BaseProblem):
     """Generic problem model for user-defined custom subjects."""
     pass
+
+
+class DocumentProblem(BaseProblem):
+    """Problem model for document-based card generation."""
+    title: str = Field(..., description="Title of the document or section")
+    topic: str = Field(..., description="Topic path (e.g., 'React::Hooks::useState')")
+    difficulty: str = Field(..., description="Difficulty level (Basic, Intermediate, Advanced)")
+    source_file: str = Field(default="", description="Original source file path")
