@@ -723,27 +723,41 @@ def get_global_statistics(subject: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
-def get_run_by_id(run_id: str) -> Optional[Run]:
+def get_run_by_id(run_id: str, session: Optional[Session] = None) -> Optional[Run]:
     """
     Get a single run by ID.
 
     Args:
         run_id: The run ID (can be partial, will match prefix)
+        session: Optional SQLAlchemy session. If provided, caller must close it.
 
     Returns:
         Run object or None if not found
     """
-    session = _get_session()
+    close_session = False
+    if session is None:
+        session = _get_session()
+        close_session = True
 
-    # Try exact match first
-    run = session.query(Run).filter(Run.id == run_id).first()
+    try:
+        # Try exact match first
+        run = session.query(Run).filter(Run.id == run_id).first()
 
-    # If not found, try prefix match
-    if not run:
-        run = session.query(Run).filter(Run.id.like(f"{run_id}%")).first()
+        # If not found, try prefix match
+        if not run:
+            run = session.query(Run).filter(Run.id.like(f"{run_id}%")).first()
 
-    session.close()
-    return run
+        return run
+    finally:
+        if close_session:
+            # We need to expunge the object from the session if we are closing it,
+            # so that it can be used detached without triggering refresh errors
+            # BUT if we expunge, lazy loading relationships will fail.
+            # For Run, we mostly access columns.
+            if locals().get("run"):
+                session.refresh(run)
+                session.expunge(run)
+            session.close()
 
 
 def get_successful_questions_for_run(run_id: str) -> List[str]:

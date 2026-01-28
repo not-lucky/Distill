@@ -21,7 +21,7 @@ from src.providers.base import (
 )
 from src.prompts import prompts
 from src.utils import strip_json_block
-from src.cache import generate_cache_key, CacheRepository
+from src.cache import generate_cache_key, get_cached_response, put_cached_response
 from src.database import DatabaseManager
 import logging
 
@@ -163,8 +163,7 @@ class OpenAICompatibleProvider(LLMProvider):
                     # Only do cache lookup if not bypassing
                     if not self.bypass_cache_lookup:
                         with db_manager.session_scope() as session:
-                            cache_repo = CacheRepository(session)
-                            cached = cache_repo.get(cache_key)
+                            cached = get_cached_response(session, cache_key)
                             if cached is not None:
                                 logger.info(f"[CACHE HIT] {self.name}/{self.model_name}")
                                 return cached
@@ -241,8 +240,8 @@ class OpenAICompatibleProvider(LLMProvider):
                             )
                             prompt_preview = first_user_msg[:200] if first_user_msg else ""
                         with db_manager.session_scope() as session:
-                            cache_repo = CacheRepository(session)
-                            cache_repo.put(
+                            put_cached_response(
+                                session,
                                 cache_key=cache_key,
                                 provider_name=self.name,
                                 model=self.model_name,

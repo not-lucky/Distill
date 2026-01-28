@@ -1,6 +1,7 @@
 """Document ingestion orchestrator for LLM2Deck."""
 
 import logging
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -17,11 +18,11 @@ from src.models import DocumentProblem
 from src.progress import ProgressTracker, ProviderStatus
 from src.prompts import PromptLoader
 from src.providers.base import TokenUsage
-from src.repositories import RunRepository, RunStats, RunCostData
-from src.services.cost import CostEstimator, CostEstimate
+from src.services.cost import CostEstimator, CostEstimate, RunCostData
 from src.setup import initialize_providers
 from src.task_runner import ConcurrentTaskRunner, Success, TaskInfo
 from src.utils import save_final_deck
+from src.database import DatabaseManager, create_run, update_run
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,8 @@ class DocumentOrchestrator:
         self.estimate_only = estimate_only
         self.extensions = extensions or SUPPORTED_EXTENSIONS
 
-        self.run_repo = RunRepository(DATABASE_PATH)
+        self._run_id: Optional[str] = None
+
         self.card_generator: Optional[CardGenerator] = None
         self.progress_tracker: Optional[ProgressTracker] = None
         self._llm_providers: List = []
@@ -87,10 +89,13 @@ class DocumentOrchestrator:
         self.concurrent_requests = config.generation.concurrent_requests
         self.request_delay = config.generation.request_delay
 
+        # Database manager
+        self.db_manager = DatabaseManager.get_default()
+
     @property
     def run_id(self) -> Optional[str]:
         """Get the current run ID."""
-        return self.run_repo.run_id
+        return self._run_id
 
     @property
     def generation_mode(self) -> str:
@@ -135,17 +140,28 @@ class DocumentOrchestrator:
             logger.info("[DRY RUN] Would initialize database and create run")
         else:
             # Initialize database and create run
-            self.run_repo.initialize_database()
-            self.run_repo.create_new_run(
-                mode=self.generation_mode,
-                subject="document",
-                card_type="standard",
-                user_label=self.run_label,
-            )
-            logger.info(f"Run ID: {self.run_id}")
+            self.db_manager.initialize(DATABASE_PATH)
+
+            self._run_id = str(uuid.uuid4())
+            with self.db_manager.session_scope() as session:
+                create_run(
+                    session=session,
+                    id=self._run_id,
+                    mode=self.generation_mode,
+                    subject="document",
+                    card_type="standard",
+                    user_label=self.run_label,
+                    status="running",
+                )
+            logger.info(f"Run ID: {self._run_id}")
 
             if self.budget_limit_usd is not None:
-                self.run_repo.set_budget_limit(self.budget_limit_usd)
+                with self.db_manager.session_scope() as session:
+                    update_run(
+                        session=session,
+                        run_id=self._run_id,
+                        budget_limit_usd=self.budget_limit_usd
+                    )
 
         # Initialize providers
         llm_providers, combiner, formatter = await initialize_providers()
@@ -163,15 +179,17 @@ class DocumentOrchestrator:
         # If no explicit combiner, use first provider
         if combiner is None:
             if not llm_providers:
-                if not self.dry_run:
-                    self.run_repo.mark_run_failed()
+                if not self.dry_run and self._run_id:
+                    with self.db_manager.session_scope() as session:
+                        update_run(session, self._run_id, status="failed")
                 return False
             combiner = llm_providers[0]
             llm_providers = llm_providers[1:]
 
         if combiner is None:
-            if not self.dry_run:
-                self.run_repo.mark_run_failed()
+            if not self.dry_run and self._run_id:
+                with self.db_manager.session_scope() as session:
+                    update_run(session, self._run_id, status="failed")
             return False
 
         self._llm_providers = llm_providers
@@ -184,15 +202,12 @@ class DocumentOrchestrator:
                 logger.info(f"[DRY RUN] Formatter: {formatter.name} ({formatter.model})")
             logger.info(f"[DRY RUN] Generators: {[(p.name, p.model) for p in llm_providers]}")
 
-        # Get repository for card operations (None in dry run or estimate-only mode)
-        repository = None if (self.dry_run or self.estimate_only) else self.run_repo.get_card_repository()
-
         # Initialize generator with document-specific combine prompt
         self.card_generator = CardGenerator(
             providers=llm_providers,
             combiner=combiner,
             formatter=formatter,
-            repository=repository,
+            run_id=self._run_id,
             combine_prompt=self.combine_prompt,
             dry_run=self.dry_run or self.estimate_only,
         )
@@ -260,6 +275,32 @@ class DocumentOrchestrator:
         prompt = prompt.replace("{document_content}", doc.content)
         prompt = prompt.replace("{schema}", json_schema)
         return prompt
+
+    def _mark_run_completed(self, total_problems: int, successful_problems: int, failed_problems: int, cost_data: Optional[RunCostData] = None) -> None:
+        """Mark the run as completed with statistics."""
+        if self.dry_run or not self._run_id:
+            return
+
+        update_kwargs = {
+            "status": "completed",
+            "total_problems": total_problems,
+            "successful_problems": successful_problems,
+            "failed_problems": failed_problems,
+        }
+
+        if cost_data:
+            update_kwargs.update({
+                "total_input_tokens": cost_data.total_input_tokens,
+                "total_output_tokens": cost_data.total_output_tokens,
+                "total_estimated_cost_usd": cost_data.total_estimated_cost_usd,
+                "budget_limit_usd": cost_data.budget_limit_usd,
+                "budget_exceeded": cost_data.budget_exceeded,
+            })
+
+        with self.db_manager.session_scope() as session:
+            update_run(session, self._run_id, **update_kwargs)
+
+        logger.info(f"Marked run {self._run_id} as completed")
 
     async def run(self) -> List[Dict[str, Any]]:
         """
@@ -407,12 +448,10 @@ class DocumentOrchestrator:
                 generated_problems.append(result.value)
 
         # Update run status
-        self.run_repo.mark_run_completed(
-            RunStats(
-                total_problems=len(documents),
-                successful_problems=len(generated_problems),
-                failed_problems=len(documents) - len(generated_problems),
-            ),
+        self._mark_run_completed(
+            total_problems=len(documents),
+            successful_problems=len(generated_problems),
+            failed_problems=len(documents) - len(generated_problems),
             cost_data=self._get_cost_data(),
         )
 

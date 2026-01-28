@@ -3,7 +3,7 @@
 import pytest
 from assertpy import assert_that
 
-from src.cache import generate_cache_key, CacheRepository
+from src.cache import generate_cache_key, get_cached_response, put_cached_response, clear_cache, get_cache_stats
 
 
 class TestGenerateCacheKey:
@@ -81,67 +81,67 @@ class TestGenerateCacheKey:
         assert_that(key1).is_not_equal_to(key3)
 
 
-class TestCacheRepository:
-    """Tests for CacheRepository."""
+class TestCacheFunctions:
+    """Tests for cache functions."""
 
     @pytest.fixture
-    def cache_repo(self, in_memory_db):
-        """Create a CacheRepository with an in-memory database."""
+    def session(self, in_memory_db):
+        """Get a session from the in-memory database."""
         with in_memory_db.session_scope() as session:
-            yield CacheRepository(session)
+            yield session
 
-    def test_get_missing_key_returns_none(self, cache_repo):
+    def test_get_missing_key_returns_none(self, session):
         """Getting a non-existent key should return None."""
-        result = cache_repo.get("nonexistent")
+        result = get_cached_response(session, "nonexistent")
         assert_that(result).is_none()
 
-    def test_put_and_get(self, cache_repo):
+    def test_put_and_get(self, session):
         """Put should store data that get can retrieve."""
-        cache_repo.put("key1", "provider", "model", "preview", "response data")
-        result = cache_repo.get("key1")
+        put_cached_response(session, "key1", "provider", "model", "preview", "response data")
+        result = get_cached_response(session, "key1")
         assert_that(result).is_equal_to("response data")
 
-    def test_put_upserts_existing_key(self, cache_repo):
+    def test_put_upserts_existing_key(self, session):
         """Put should update existing entries."""
-        cache_repo.put("key1", "provider", "model", "preview", "original")
-        cache_repo.put("key1", "provider", "model", "preview", "updated")
-        result = cache_repo.get("key1")
+        put_cached_response(session, "key1", "provider", "model", "preview", "original")
+        put_cached_response(session, "key1", "provider", "model", "preview", "updated")
+        result = get_cached_response(session, "key1")
         assert_that(result).is_equal_to("updated")
 
-    def test_get_increments_hit_count(self, cache_repo):
+    def test_get_increments_hit_count(self, session):
         """Each get should increment the hit count."""
-        cache_repo.put("key1", "provider", "model", "preview", "response")
-        cache_repo.get("key1")
-        cache_repo.get("key1")
-        stats = cache_repo.stats()
+        put_cached_response(session, "key1", "provider", "model", "preview", "response")
+        get_cached_response(session, "key1")
+        get_cached_response(session, "key1")
+        stats = get_cache_stats(session)
         assert_that(stats["total_hits"]).is_equal_to(2)
 
-    def test_clear_removes_all_entries(self, cache_repo):
+    def test_clear_removes_all_entries(self, session):
         """Clear should remove all entries and return the count."""
-        cache_repo.put("key1", "p", "m", "", "r1")
-        cache_repo.put("key2", "p", "m", "", "r2")
-        count = cache_repo.clear()
+        put_cached_response(session, "key1", "p", "m", "", "r1")
+        put_cached_response(session, "key2", "p", "m", "", "r2")
+        count = clear_cache(session)
         assert_that(count).is_equal_to(2)
-        assert_that(cache_repo.stats()["total_entries"]).is_equal_to(0)
+        assert_that(get_cache_stats(session)["total_entries"]).is_equal_to(0)
 
-    def test_stats_on_empty_cache(self, cache_repo):
+    def test_stats_on_empty_cache(self, session):
         """Stats on empty cache should return zeros."""
-        stats = cache_repo.stats()
+        stats = get_cache_stats(session)
         assert_that(stats["total_entries"]).is_equal_to(0)
         assert_that(stats["total_hits"]).is_equal_to(0)
 
-    def test_stats_counts_entries_correctly(self, cache_repo):
+    def test_stats_counts_entries_correctly(self, session):
         """Stats should count entries correctly."""
-        cache_repo.put("key1", "p", "m", "", "r1")
-        cache_repo.put("key2", "p", "m", "", "r2")
-        cache_repo.put("key3", "p", "m", "", "r3")
-        stats = cache_repo.stats()
+        put_cached_response(session, "key1", "p", "m", "", "r1")
+        put_cached_response(session, "key2", "p", "m", "", "r2")
+        put_cached_response(session, "key3", "p", "m", "", "r3")
+        stats = get_cache_stats(session)
         assert_that(stats["total_entries"]).is_equal_to(3)
 
-    def test_prompt_preview_truncated(self, cache_repo):
+    def test_prompt_preview_truncated(self, session):
         """Prompt preview should be truncated to 200 chars."""
         long_preview = "x" * 500
-        cache_repo.put("key1", "p", "m", long_preview, "response")
+        put_cached_response(session, "key1", "p", "m", long_preview, "response")
         # The put method truncates internally
-        result = cache_repo.get("key1")
+        result = get_cached_response(session, "key1")
         assert_that(result).is_equal_to("response")
