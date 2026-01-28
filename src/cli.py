@@ -700,7 +700,7 @@ def handle_cache(args: argparse.Namespace) -> int:
     """Handle the cache subcommand."""
     from src.config import DATABASE_PATH
     from src.database import DatabaseManager
-    from src.cache import CacheRepository
+    from src.cache import clear_cache, get_cache_stats
 
     if args.cache_command is None:
         print("Usage: llm2deck cache {clear,stats}")
@@ -713,15 +713,13 @@ def handle_cache(args: argparse.Namespace) -> int:
 
     if args.cache_command == "clear":
         with db_manager.session_scope() as session:
-            repo = CacheRepository(session)
-            count = repo.clear()
+            count = clear_cache(session)
             print(f"Cleared {count} cache entries.")
         return 0
 
     elif args.cache_command == "stats":
         with db_manager.session_scope() as session:
-            repo = CacheRepository(session)
-            stats = repo.stats()
+            stats = get_cache_stats(session)
             print(f"Cache entries: {stats['total_entries']}")
             print(f"Total hits: {stats['total_hits']}")
         return 0

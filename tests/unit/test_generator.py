@@ -1,14 +1,4 @@
-"""Tests for CardGenerator in src/generator.py.
-
-Comprehensive tests covering:
-- CardGenerator initialization and configuration
-- Provider coordination and parallel generation
-- Result combining and formatting
-- Post-processing of cards (tags, types, metadata)
-- Database operations (save results, update status)
-- Error handling and edge cases
-- Dry run mode
-"""
+"""Tests for CardGenerator in src/generator.py."""
 
 import asyncio
 import json
@@ -20,8 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch, call
 
 from src.generator import CardGenerator
 from src.models import LeetCodeProblem, CSProblem, PhysicsProblem, GenericProblem
-from src.database import DatabaseManager
-from src.repositories import RunRepository
+from src.database import DatabaseManager, create_run, create_problem
 from src.providers.base import LLMProvider
 
 from conftest import (
@@ -60,41 +49,25 @@ SINGLE_CARD_RESPONSE = json.dumps({
 })
 
 
-def create_generator(
-    providers=None,
-    combiner=None,
-    formatter=None,
-    repository=None,
-    combine_prompt=None,
-    dry_run=False,
-):
-    """Helper to create CardGenerator with defaults."""
-    return CardGenerator(
-        providers=providers or [],
-        combiner=combiner or MockLLMProvider(),
-        formatter=formatter,
-        repository=repository,
-        combine_prompt=combine_prompt,
-        dry_run=dry_run,
-    )
-
-
 class TestCardGenerator:
     """Tests for CardGenerator class."""
 
     @pytest.fixture
-    def card_repo(self, in_memory_db):
-        """Create a CardRepository with an active run."""
-        run_repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        run_repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard"
-        )
-        return run_repo.get_card_repository()
+    def run_id(self, in_memory_db):
+        """Create a run in the database and return its ID."""
+        run_id = "test-run-123"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
+        return run_id
 
     @pytest.fixture
-    def generator_with_mocks(self, card_repo):
+    def generator_with_mocks(self, run_id):
         """Create a CardGenerator with mock providers."""
         providers = [
             MockLLMProvider(name="provider1", model="model1"),
@@ -106,7 +79,7 @@ class TestCardGenerator:
             providers=providers,
             combiner=combiner,
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
             combine_prompt="Test combine prompt",
         )
 
@@ -114,7 +87,7 @@ class TestCardGenerator:
     # Initialization Tests
     # -------------------------------------------------------------------------
 
-    def test_init_stores_providers(self, card_repo):
+    def test_init_stores_providers(self, run_id):
         """Test that providers are stored correctly."""
         providers = [MockLLMProvider(), MockLLMProvider()]
         combiner = MockLLMProvider(name="combiner", model="c-model")
@@ -123,13 +96,13 @@ class TestCardGenerator:
             providers=providers,
             combiner=combiner,
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert_that(generator.llm_providers).is_equal_to(providers)
         assert_that(generator.llm_providers).is_length(2)
 
-    def test_init_stores_combiner(self, card_repo):
+    def test_init_stores_combiner(self, run_id):
         """Test that combiner is stored correctly."""
         combiner = MockLLMProvider(name="combiner", model="c-model")
 
@@ -137,13 +110,13 @@ class TestCardGenerator:
             providers=[],
             combiner=combiner,
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert_that(generator.card_combiner).is_equal_to(combiner)
         assert_that(generator.card_combiner.name).is_equal_to("combiner")
 
-    def test_init_stores_formatter(self, card_repo):
+    def test_init_stores_formatter(self, run_id):
         """Test that formatter is stored correctly."""
         formatter = MockLLMProvider(name="formatter", model="f-model")
 
@@ -151,42 +124,42 @@ class TestCardGenerator:
             providers=[],
             combiner=MockLLMProvider(),
             formatter=formatter,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert_that(generator.formatter).is_equal_to(formatter)
         assert_that(generator.formatter.name).is_equal_to("formatter")
 
-    def test_init_stores_repository(self, card_repo):
-        """Test that repository is stored correctly."""
+    def test_init_stores_run_id(self, run_id):
+        """Test that run_id is stored correctly."""
         generator = CardGenerator(
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
-        assert_that(generator.repository).is_equal_to(card_repo)
+        assert_that(generator.run_id).is_equal_to(run_id)
 
-    def test_init_stores_combine_prompt(self, card_repo):
+    def test_init_stores_combine_prompt(self, run_id):
         """Test that combine_prompt is stored correctly."""
         generator = CardGenerator(
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
             combine_prompt="Custom combine prompt",
         )
 
         assert_that(generator.combine_prompt).is_equal_to("Custom combine prompt")
 
-    def test_init_default_dry_run_is_false(self, card_repo):
+    def test_init_default_dry_run_is_false(self, run_id):
         """Test that dry_run defaults to False."""
         generator = CardGenerator(
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert_that(generator.dry_run).is_false()
@@ -197,25 +170,25 @@ class TestCardGenerator:
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
             dry_run=True,
         )
 
         assert_that(generator.dry_run).is_true()
-        assert_that(generator.repository).is_none()
+        assert_that(generator.run_id).is_none()
 
-    def test_init_with_empty_providers(self, card_repo):
+    def test_init_with_empty_providers(self, run_id):
         """Test initialization with empty provider list."""
         generator = CardGenerator(
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert_that(generator.llm_providers).is_equal_to([])
 
-    def test_init_with_single_provider(self, card_repo):
+    def test_init_with_single_provider(self, run_id):
         """Test initialization with single provider."""
         provider = MockLLMProvider(name="single", model="single-model")
 
@@ -223,13 +196,13 @@ class TestCardGenerator:
             providers=[provider],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert_that(generator.llm_providers).is_length(1)
         assert generator.llm_providers[0].name == "single"
 
-    def test_init_with_many_providers(self, card_repo):
+    def test_init_with_many_providers(self, run_id):
         """Test initialization with many providers."""
         providers = [
             MockLLMProvider(name=f"p{i}", model=f"m{i}")
@@ -240,35 +213,35 @@ class TestCardGenerator:
             providers=providers,
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert_that(generator.llm_providers).is_length(10)
 
-    def test_init_with_none_combine_prompt(self, card_repo):
+    def test_init_with_none_combine_prompt(self, run_id):
         """Test initialization with None combine_prompt."""
         generator = CardGenerator(
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
             combine_prompt=None,
         )
 
         assert_that(generator.combine_prompt).is_none()
 
-    def test_init_without_formatter(self, card_repo):
+    def test_init_without_formatter(self, run_id):
         """Test initialization without formatter."""
         generator = CardGenerator(
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert_that(generator.formatter).is_none()
 
-    def test_init_with_same_combiner_and_formatter(self, card_repo):
+    def test_init_with_same_combiner_and_formatter(self, run_id):
         """Test initialization where combiner and formatter are same provider."""
         provider = MockLLMProvider(name="dual", model="dual-model")
 
@@ -276,7 +249,7 @@ class TestCardGenerator:
             providers=[],
             combiner=provider,
             formatter=provider,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         assert generator.card_combiner is generator.formatter
@@ -346,7 +319,7 @@ class TestCardGenerator:
         assert_that(result).contains("cards")
 
     @pytest.mark.asyncio
-    async def test_process_question_all_providers_fail(self, card_repo):
+    async def test_process_question_all_providers_fail(self, run_id):
         """Test when all providers fail."""
         providers = [
             FailingMockProvider(name="fail1", model="f1"),
@@ -358,7 +331,7 @@ class TestCardGenerator:
             providers=providers,
             combiner=combiner,
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(
@@ -369,7 +342,7 @@ class TestCardGenerator:
         assert_that(result).is_none()
 
     @pytest.mark.asyncio
-    async def test_process_question_some_providers_fail(self, card_repo):
+    async def test_process_question_some_providers_fail(self, run_id):
         """Test when some providers fail but not all."""
         providers = [
             MockLLMProvider(name="success1", model="s1"),
@@ -382,7 +355,7 @@ class TestCardGenerator:
             providers=providers,
             combiner=combiner,
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(
@@ -395,7 +368,7 @@ class TestCardGenerator:
         assert_that(result).contains("cards")
 
     @pytest.mark.asyncio
-    async def test_process_question_combiner_fails(self, card_repo):
+    async def test_process_question_combiner_fails(self, run_id):
         """Test when combiner fails."""
         providers = [MockLLMProvider(name="p1", model="m1")]
         combiner = MockLLMProvider(
@@ -408,7 +381,7 @@ class TestCardGenerator:
             providers=providers,
             combiner=combiner,
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(
@@ -419,7 +392,7 @@ class TestCardGenerator:
         assert_that(result).is_none()
 
     @pytest.mark.asyncio
-    async def test_process_question_with_formatter(self, card_repo):
+    async def test_process_question_with_formatter(self, run_id):
         """Test question processing with a formatter."""
         providers = [MockLLMProvider(name="p1", model="m1")]
         combiner = MockLLMProvider(name="combiner", model="c-model")
@@ -433,7 +406,7 @@ class TestCardGenerator:
             providers=providers,
             combiner=combiner,
             formatter=formatter,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(
@@ -446,7 +419,7 @@ class TestCardGenerator:
         assert_that(formatter.format_call_count).is_equal_to(1)
 
     @pytest.mark.asyncio
-    async def test_process_question_formatter_same_as_combiner(self, card_repo):
+    async def test_process_question_formatter_same_as_combiner(self, run_id):
         """Test when formatter is same provider as combiner."""
         providers = [MockLLMProvider(name="p1", model="m1")]
         same_provider = MockLLMProvider(name="dual", model="d-model")
@@ -455,7 +428,7 @@ class TestCardGenerator:
             providers=providers,
             combiner=same_provider,
             formatter=same_provider,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(
@@ -497,7 +470,7 @@ class TestCardGenerator:
         assert "problem_index" not in result
 
     @pytest.mark.asyncio
-    async def test_process_question_saves_to_repository(self, card_repo):
+    async def test_process_question_saves_to_repository(self, run_id):
         """Test that results are saved to repository."""
         providers = [MockLLMProvider(name="p1", model="m1")]
         combiner = MockLLMProvider(name="combiner", model="c-model")
@@ -506,7 +479,7 @@ class TestCardGenerator:
             providers=providers,
             combiner=combiner,
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(
@@ -560,7 +533,7 @@ class TestPostProcessCards:
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
     # -------------------------------------------------------------------------
@@ -862,15 +835,17 @@ class TestSaveProviderResults:
     """Tests for _save_provider_results method."""
 
     @pytest.fixture
-    def generator_with_repo(self, in_memory_db):
-        """Create a generator with repository."""
-        run_repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        run_repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard"
-        )
-        card_repo = run_repo.get_card_repository()
+    def generator_with_db(self, in_memory_db):
+        """Create a generator with database."""
+        run_id = "test-run-123"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
 
         providers = [
             MockLLMProvider(name="p1", model="m1"),
@@ -881,21 +856,25 @@ class TestSaveProviderResults:
             providers=providers,
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
-        return generator, card_repo
+        return generator, in_memory_db
 
     # -------------------------------------------------------------------------
     # Filtering Tests
     # -------------------------------------------------------------------------
 
-    def test_filters_empty_results(self, generator_with_repo):
+    def test_filters_empty_results(self, generator_with_db):
         """Test that empty results are filtered out."""
-        generator, card_repo = generator_with_repo
+        generator, db = generator_with_db
 
-        problem_id = card_repo.create_initial_problem(
-            question_name="Test"
-        )
+        with db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=generator.run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         provider_results = [
             SAMPLE_CARD_RESPONSE,
@@ -907,13 +886,17 @@ class TestSaveProviderResults:
         assert_that(valid).is_length(1)
         assert_that(valid[0]).is_equal_to(SAMPLE_CARD_RESPONSE)
 
-    def test_filters_none_results(self, generator_with_repo):
+    def test_filters_none_results(self, generator_with_db):
         """Test that None results are filtered out."""
-        generator, card_repo = generator_with_repo
+        generator, db = generator_with_db
 
-        problem_id = card_repo.create_initial_problem(
-            question_name="Test"
-        )
+        with db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=generator.run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         provider_results = [
             SAMPLE_CARD_RESPONSE,
@@ -925,13 +908,17 @@ class TestSaveProviderResults:
         assert_that(valid).is_length(1)
         assert_that(valid[0]).is_equal_to(SAMPLE_CARD_RESPONSE)
 
-    def test_filters_all_empty_results(self, generator_with_repo):
+    def test_filters_all_empty_results(self, generator_with_db):
         """Test when all results are empty."""
-        generator, card_repo = generator_with_repo
+        generator, db = generator_with_db
 
-        problem_id = card_repo.create_initial_problem(
-            question_name="Test"
-        )
+        with db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=generator.run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         provider_results = ["", ""]
 
@@ -943,13 +930,17 @@ class TestSaveProviderResults:
     # Saving Tests
     # -------------------------------------------------------------------------
 
-    def test_saves_all_valid_results(self, generator_with_repo):
+    def test_saves_all_valid_results(self, generator_with_db):
         """Test that all valid results are saved."""
-        generator, card_repo = generator_with_repo
+        generator, db = generator_with_db
 
-        problem_id = card_repo.create_initial_problem(
-            question_name="Test"
-        )
+        with db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=generator.run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         provider_results = [
             SAMPLE_CARD_RESPONSE,
@@ -960,13 +951,17 @@ class TestSaveProviderResults:
 
         assert_that(valid).is_length(2)
 
-    def test_handles_invalid_json_gracefully(self, generator_with_repo):
+    def test_handles_invalid_json_gracefully(self, generator_with_db):
         """Test handling of invalid JSON in results."""
-        generator, card_repo = generator_with_repo
+        generator, db = generator_with_db
 
-        problem_id = card_repo.create_initial_problem(
-            question_name="Test"
-        )
+        with db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=generator.run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         provider_results = [
             "not valid json",
@@ -978,13 +973,17 @@ class TestSaveProviderResults:
         # Both should be saved (invalid JSON is still saved, just without card_count)
         assert_that(valid).is_length(2)
 
-    def test_counts_cards_in_valid_json(self, generator_with_repo):
+    def test_counts_cards_in_valid_json(self, generator_with_db):
         """Test that cards are counted for valid JSON."""
-        generator, card_repo = generator_with_repo
+        generator, db = generator_with_db
 
-        problem_id = card_repo.create_initial_problem(
-            question_name="Test"
-        )
+        with db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=generator.run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         two_cards = json.dumps({
             "cards": [
@@ -999,13 +998,17 @@ class TestSaveProviderResults:
 
         assert_that(valid).is_length(2)
 
-    def test_handles_missing_cards_key(self, generator_with_repo):
+    def test_handles_missing_cards_key(self, generator_with_db):
         """Test handling JSON without cards key."""
-        generator, card_repo = generator_with_repo
+        generator, db = generator_with_db
 
-        problem_id = card_repo.create_initial_problem(
-            question_name="Test"
-        )
+        with db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=generator.run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         no_cards = json.dumps({"data": "something"})
 
@@ -1016,13 +1019,17 @@ class TestSaveProviderResults:
         # Still saved, just card_count = None or 0
         assert_that(valid).is_length(2)
 
-    def test_returns_valid_results_in_order(self, generator_with_repo):
+    def test_returns_valid_results_in_order(self, generator_with_db):
         """Test that valid results maintain order."""
-        generator, card_repo = generator_with_repo
+        generator, db = generator_with_db
 
-        problem_id = card_repo.create_initial_problem(
-            question_name="Test"
-        )
+        with db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=generator.run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         response_a = json.dumps({"cards": [{"id": "A"}]})
         response_b = json.dumps({"cards": [{"id": "B"}]})
@@ -1040,22 +1047,30 @@ class TestSaveProviderResults:
 
     def test_handles_empty_provider_list(self, in_memory_db):
         """Test with empty provider list."""
-        run_repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        run_repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard"
-        )
-        card_repo = run_repo.get_card_repository()
+        run_id = "test-run-123"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
 
         generator = CardGenerator(
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
-        problem_id = card_repo.create_initial_problem(question_name="Test")
+        with in_memory_db.session_scope() as session:
+            problem = create_problem(
+                session=session,
+                run_id=run_id,
+                question_name="Test"
+            )
+            problem_id = int(problem.id)
 
         valid = generator._save_provider_results(problem_id, [])
 
@@ -1072,7 +1087,7 @@ class TestIsSameProvider:
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
     # -------------------------------------------------------------------------
@@ -1186,7 +1201,7 @@ class TestGenerateInitialCards:
             providers=providers,
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         results = await generator._generate_initial_cards(
@@ -1209,7 +1224,7 @@ class TestGenerateInitialCards:
             providers=[provider],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         results = await generator._generate_initial_cards(
@@ -1228,7 +1243,7 @@ class TestGenerateInitialCards:
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         results = await generator._generate_initial_cards(
@@ -1251,7 +1266,7 @@ class TestGenerateInitialCards:
             providers=providers,
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         results = await generator._generate_initial_cards(
@@ -1275,7 +1290,7 @@ class TestGenerateInitialCards:
             providers=[provider],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         await generator._generate_initial_cards(
@@ -1296,7 +1311,7 @@ class TestGenerateInitialCards:
             providers=[provider],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         schema = {"type": "object", "properties": {"cards": {}}}
@@ -1318,7 +1333,7 @@ class TestGenerateInitialCards:
             providers=[provider],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         await generator._generate_initial_cards(
@@ -1338,7 +1353,7 @@ class TestGenerateInitialCards:
             providers=[provider],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         results = await generator._generate_initial_cards(
@@ -1366,7 +1381,7 @@ class TestGenerateInitialCards:
             providers=providers,
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         results = await generator._generate_initial_cards(
@@ -1391,7 +1406,7 @@ class TestGenerateInitialCards:
             providers=providers,
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         results = await generator._generate_initial_cards(
@@ -1419,7 +1434,7 @@ class TestCombineResults:
             providers=[],
             combiner=combiner,
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         result = await generator._combine_results(
@@ -1440,7 +1455,7 @@ class TestCombineResults:
             providers=[],
             combiner=combiner,
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         result = await generator._combine_results(
@@ -1461,7 +1476,7 @@ class TestCombineResults:
             providers=[],
             combiner=combiner,
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         results = [f"result{i}" for i in range(5)]
@@ -1492,7 +1507,7 @@ class TestCombineResults:
             providers=[],
             combiner=combiner,
             formatter=formatter,
-            repository=None,
+            run_id=None,
         )
 
         result = await generator._combine_results(
@@ -1513,7 +1528,7 @@ class TestCombineResults:
             providers=[],
             combiner=same_provider,
             formatter=same_provider,
-            repository=None,
+            run_id=None,
         )
 
         result = await generator._combine_results(
@@ -1540,7 +1555,7 @@ class TestCombineResults:
             providers=[],
             combiner=combiner,
             formatter=formatter,
-            repository=None,
+            run_id=None,
         )
 
         result = await generator._combine_results(
@@ -1566,7 +1581,7 @@ class TestCombineResults:
             providers=[],
             combiner=combiner,
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         result = await generator._combine_results(
@@ -1590,7 +1605,7 @@ class TestCombineResults:
             providers=[],
             combiner=combiner,
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         result = await generator._combine_results(
@@ -1615,7 +1630,7 @@ class TestCombineResults:
             providers=[],
             combiner=combiner,
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         await generator._combine_results(
@@ -1638,13 +1653,15 @@ class TestCardGeneratorWorkflow:
     @pytest.fixture
     def full_generator(self, in_memory_db):
         """Create a fully configured generator."""
-        run_repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        run_repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard"
-        )
-        card_repo = run_repo.get_card_repository()
+        run_id = "test-run-workflow"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
 
         providers = [
             MockLLMProvider(name="p1", model="m1"),
@@ -1656,15 +1673,15 @@ class TestCardGeneratorWorkflow:
             providers=providers,
             combiner=combiner,
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
             combine_prompt="Combine the results",
         )
-        return generator, card_repo
+        return generator, run_id
 
     @pytest.mark.asyncio
     async def test_full_workflow_success(self, full_generator):
         """Test complete successful workflow."""
-        generator, card_repo = full_generator
+        generator, run_id = full_generator
 
         result = await generator.process_question(
             question="Binary Search",
@@ -1683,19 +1700,21 @@ class TestCardGeneratorWorkflow:
     @pytest.mark.asyncio
     async def test_workflow_with_all_failures(self, in_memory_db):
         """Test workflow when all providers fail."""
-        run_repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        run_repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard"
-        )
-        card_repo = run_repo.get_card_repository()
+        run_id = "test-run-fail"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
 
         generator = CardGenerator(
             providers=[FailingMockProvider(name="f1", model="m1")],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(
@@ -1763,7 +1782,7 @@ class TestParametrizedGenerator:
             providers=providers,
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
         )
 
         assert len(generator.llm_providers) == num_providers
@@ -1779,19 +1798,21 @@ class TestParametrizedGenerator:
     @pytest.mark.asyncio
     async def test_various_question_formats(self, in_memory_db, question):
         """Test processing various question formats."""
-        run_repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        run_repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard"
-        )
-        card_repo = run_repo.get_card_repository()
+        run_id = "test-run-params"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard"
+            )
 
         generator = CardGenerator(
             providers=[MockLLMProvider()],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(
@@ -1812,19 +1833,21 @@ class TestParametrizedGenerator:
         self, in_memory_db, model_class, expected_type
     ):
         """Test with various Pydantic model classes."""
-        run_repo = RunRepository(Path(":memory:"), db_manager=in_memory_db)
-        run_repo.create_new_run(
-            mode="test",
-            subject="test",
-            card_type="standard"
-        )
-        card_repo = run_repo.get_card_repository()
+        run_id = "test-run-models"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="test",
+                subject="test",
+                card_type="standard"
+            )
 
         generator = CardGenerator(
             providers=[MockLLMProvider()],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=card_repo,
+            run_id=run_id,
         )
 
         result = await generator.process_question(

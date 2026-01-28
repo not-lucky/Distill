@@ -1,22 +1,28 @@
 """Orchestrator for LLM2Deck card generation workflow."""
 
 import logging
+import uuid
 from typing import Any, List, Dict, Optional, Tuple
 
 from src.config import DATABASE_PATH
 from src.config.loader import load_config
-
-logger = logging.getLogger(__name__)
 from src.config.subjects import SubjectConfig
 from src.setup import initialize_providers
 from src.generator import CardGenerator
-from src.repositories import RunRepository, RunStats, RunCostData
 from src.task_runner import ConcurrentTaskRunner, Success, TaskInfo
 from src.utils import save_final_deck
 from src.questions import get_indexed_questions, filter_indexed_questions, QuestionFilter
 from src.progress import ProgressTracker, ProviderStatus
 from src.providers.base import TokenUsage
-from src.services.cost import CostEstimator, CostEstimate
+from src.services.cost import CostEstimator, CostEstimate, RunCostData
+from src.database import DatabaseManager, create_run, update_run
+from src.queries import (
+    get_run_by_id,
+    get_successful_questions_for_run,
+    get_successful_problems_with_results
+)
+
+logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
@@ -57,7 +63,8 @@ class Orchestrator:
         self.question_filter = question_filter
         self.budget_limit_usd = budget_limit_usd
         self.estimate_only = estimate_only
-        self.run_repo = RunRepository(DATABASE_PATH)
+        self._run_id: Optional[str] = None
+
         self.card_generator: Optional[CardGenerator] = None
         self.progress_tracker: Optional[ProgressTracker] = None
         self._llm_providers: List = []  # Store for progress tracking
@@ -76,10 +83,13 @@ class Orchestrator:
         self.concurrent_requests = config.generation.concurrent_requests
         self.request_delay = config.generation.request_delay
 
+        # Database manager
+        self.db_manager = DatabaseManager.get_default()
+
     @property
     def run_id(self) -> Optional[str]:
         """Get the current run ID."""
-        return self.run_repo.run_id
+        return self._run_id
 
     @property
     def generation_mode(self) -> str:
@@ -106,42 +116,44 @@ class Orchestrator:
             return False
 
         # Initialize database if not already initialized
-        if not self.run_repo.db_manager.is_initialized:
-            self.run_repo.initialize_database()
+        if not self.db_manager.is_initialized:
+            self.db_manager.initialize(DATABASE_PATH)
 
         # Load existing run
-        run_data = self.run_repo.load_existing_run(self.resume_run_id)
-        if not run_data:
+        run = get_run_by_id(self.resume_run_id)
+        if not run:
             logger.error(f"Run not found: {self.resume_run_id}")
             return False
 
         # Validate run can be resumed
-        if run_data["status"] == "completed":
+        if run.status == "completed":
             logger.error(
-                f"Cannot resume completed run {run_data['id']}. "
+                f"Cannot resume completed run {run.id}. "
                 "Only 'failed' or 'running' runs can be resumed."
             )
             return False
 
         # Validate subject/mode match
         expected_mode = self.generation_mode
-        if run_data["mode"] != expected_mode:
+        if run.mode != expected_mode:
             logger.error(
-                f"Mode mismatch: run {run_data['id']} has mode '{run_data['mode']}', "
+                f"Mode mismatch: run {run.id} has mode '{run.mode}', "
                 f"but current mode is '{expected_mode}'"
             )
             return False
 
         # Set the run ID and update status to running
-        full_run_id = run_data["id"]
-        self.run_repo.set_run_id(full_run_id)
-        self.run_repo.update_run_status("running")
+        self._run_id = str(run.id)
+
+        with self.db_manager.session_scope() as session:
+            update_run(session, self._run_id, status="running")
 
         # Load already-processed questions
-        self._processed_questions = self.run_repo.get_processed_questions(full_run_id)
-        self._existing_results = self.run_repo.get_existing_results(full_run_id)
+        processed_list = get_successful_questions_for_run(self._run_id)
+        self._processed_questions = set(processed_list)
+        self._existing_results = get_successful_problems_with_results(self._run_id)
 
-        logger.info(f"Resuming run {full_run_id}")
+        logger.info(f"Resuming run {self._run_id}")
         logger.info(
             f"Found {len(self._processed_questions)} already-processed questions, "
             f"{len(self._existing_results)} existing results"
@@ -164,18 +176,29 @@ class Orchestrator:
                 return False
         else:
             # Initialize database and create run
-            self.run_repo.initialize_database()
-            self.run_repo.create_new_run(
-                mode=self.generation_mode,
-                subject=self.subject_config.name,
-                card_type="mcq" if self.is_mcq else "standard",
-                user_label=self.run_label,
-            )
-            logger.info(f"Run ID: {self.run_id}")
+            self.db_manager.initialize(DATABASE_PATH)
+
+            self._run_id = str(uuid.uuid4())
+            with self.db_manager.session_scope() as session:
+                create_run(
+                    session=session,
+                    id=self._run_id,
+                    mode=self.generation_mode,
+                    subject=self.subject_config.name,
+                    card_type="mcq" if self.is_mcq else "standard",
+                    user_label=self.run_label,
+                    status="running",
+                )
+            logger.info(f"Run ID: {self._run_id}")
 
             # Set budget limit if provided
             if self.budget_limit_usd is not None:
-                self.run_repo.set_budget_limit(self.budget_limit_usd)
+                with self.db_manager.session_scope() as session:
+                    update_run(
+                        session=session,
+                        run_id=self._run_id,
+                        budget_limit_usd=self.budget_limit_usd
+                    )
 
         # Initialize providers - returns (generators, combiner, formatter)
         llm_providers, combiner, formatter = await initialize_providers()
@@ -193,16 +216,18 @@ class Orchestrator:
         # If no explicit combiner configured, use first provider as combiner
         if combiner is None:
             if not llm_providers:
-                if not self.dry_run:
-                    self.run_repo.mark_run_failed()
+                if not self.dry_run and self._run_id:
+                    with self.db_manager.session_scope() as session:
+                        update_run(session, self._run_id, status="failed")
                 return False
             combiner = llm_providers[0]
             llm_providers = llm_providers[1:]
 
         # Need at least the combiner to function
         if combiner is None:
-            if not self.dry_run:
-                self.run_repo.mark_run_failed()
+            if not self.dry_run and self._run_id:
+                with self.db_manager.session_scope() as session:
+                    update_run(session, self._run_id, status="failed")
             return False
 
         # Store providers for progress tracking
@@ -216,15 +241,12 @@ class Orchestrator:
                 logger.info(f"[DRY RUN] Formatter: {formatter.name} ({formatter.model})")
             logger.info(f"[DRY RUN] Generators: {[(p.name, p.model) for p in llm_providers]}")
 
-        # Get repository for card operations (None in dry run mode)
-        repository = None if self.dry_run else self.run_repo.get_card_repository()
-
-        # Initialize generator with repository and combine_prompt from subject config
+        # Initialize generator with combine_prompt from subject config
         self.card_generator = CardGenerator(
             providers=llm_providers,
             combiner=combiner,
             formatter=formatter,
-            repository=repository,
+            run_id=self._run_id,  # Pass run_id instead of repository
             combine_prompt=self.subject_config.combine_prompt,
             dry_run=self.dry_run,
         )
@@ -277,6 +299,32 @@ class Orchestrator:
             budget_limit_usd=self.budget_limit_usd,
             budget_exceeded=self._budget_exceeded,
         )
+
+    def _mark_run_completed(self, total_problems: int, successful_problems: int, failed_problems: int, cost_data: Optional[RunCostData] = None) -> None:
+        """Mark the run as completed with statistics."""
+        if self.dry_run or not self._run_id:
+            return
+
+        update_kwargs = {
+            "status": "completed",
+            "total_problems": total_problems,
+            "successful_problems": successful_problems,
+            "failed_problems": failed_problems,
+        }
+
+        if cost_data:
+            update_kwargs.update({
+                "total_input_tokens": cost_data.total_input_tokens,
+                "total_output_tokens": cost_data.total_output_tokens,
+                "total_estimated_cost_usd": cost_data.total_estimated_cost_usd,
+                "budget_limit_usd": cost_data.budget_limit_usd,
+                "budget_exceeded": cost_data.budget_exceeded,
+            })
+
+        with self.db_manager.session_scope() as session:
+            update_run(session, self._run_id, **update_kwargs)
+
+        logger.info(f"Marked run {self._run_id} as completed")
 
     async def run(self) -> List[Dict[str, Any]]:
         """
@@ -347,12 +395,10 @@ class Orchestrator:
             logger.info("All questions already processed. Nothing to do.")
             # In resume mode, return existing results
             if self._existing_results:
-                self.run_repo.mark_run_completed(
-                    RunStats(
-                        total_problems=len(all_questions_with_metadata),
-                        successful_problems=len(self._existing_results),
-                        failed_problems=len(all_questions_with_metadata) - len(self._existing_results),
-                    )
+                self._mark_run_completed(
+                    total_problems=len(all_questions_with_metadata),
+                    successful_problems=len(self._existing_results),
+                    failed_problems=len(all_questions_with_metadata) - len(self._existing_results),
                 )
                 return self._existing_results
             return []
@@ -467,12 +513,10 @@ class Orchestrator:
         total_successful = len(all_generated_problems)
 
         # Update run status with cost data
-        self.run_repo.mark_run_completed(
-            RunStats(
-                total_problems=total_questions,
-                successful_problems=total_successful,
-                failed_problems=total_questions - total_successful,
-            ),
+        self._mark_run_completed(
+            total_problems=total_questions,
+            successful_problems=total_successful,
+            failed_problems=total_questions - total_successful,
             cost_data=self._get_cost_data(),
         )
 

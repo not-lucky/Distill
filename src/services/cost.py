@@ -69,6 +69,17 @@ class RunCostSummary:
     budget_exceeded: bool = False
 
 
+@dataclass
+class RunCostData:
+    """Cost data for a run (used for passing data around)."""
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_estimated_cost_usd: float = 0.0
+    budget_limit_usd: Optional[float] = None
+    budget_exceeded: bool = False
+    provider_costs: Dict[str, Dict[str, float]] = field(default_factory=dict)
+
+
 class CostEstimator:
     """Estimates and tracks API costs for LLM2Deck generation runs.
 

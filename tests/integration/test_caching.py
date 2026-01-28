@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from assertpy import assert_that
 
-from src.cache import generate_cache_key, CacheRepository
+from src.cache import generate_cache_key
 from src.database import DatabaseManager
 
 

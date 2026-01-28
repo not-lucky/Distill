@@ -4,8 +4,8 @@ import json
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 
-from src.repositories import RunRepository, RunStats, CardRepository
-from src.database import create_problem, update_problem
+from src.database import DatabaseManager, create_run, update_run, create_problem, update_problem
+from src.queries import get_run_by_id, get_successful_questions_for_run, get_successful_problems_with_results
 
 
 class TestResumeWorkflow:
@@ -29,16 +29,18 @@ class TestResumeWorkflow:
     def test_create_run_process_some_fail_resume_complete(self, in_memory_db, mock_subject_config):
         """Test the full workflow: create run, process some questions, fail, then resume."""
         # Phase 1: Create initial run and process some questions
-        repo1 = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo1.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-            user_label="test-run",
-        )
+        run_id = "test-run-1"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+                user_label="test-run",
+            )
 
         # Simulate processing "Two Sum" successfully
-        card_repo = repo1.get_card_repository()
         with in_memory_db.session_scope() as session:
             p1 = create_problem(session, run_id, "Two Sum", status="success")
             update_problem(
@@ -55,32 +57,31 @@ class TestResumeWorkflow:
             p2 = create_problem(session, run_id, "Three Sum", status="failed")
 
         # Mark run as failed
-        repo1.update_run_status("failed")
+        with in_memory_db.session_scope() as session:
+            update_run(session, run_id, status="failed")
 
-        # Phase 2: Resume the run
-        repo2 = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
+        # Phase 2: Resume the run (Simulate Orchestrator loading it)
         # Load existing run
-        run_data = repo2.load_existing_run(run_id)
+        run_data = get_run_by_id(run_id)
         assert run_data is not None
-        assert run_data["status"] == "failed"
+        assert run_data.status == "failed"
 
         # Get processed questions
-        processed = repo2.get_processed_questions(run_id)
+        processed = set(get_successful_questions_for_run(run_id))
         assert processed == {"Two Sum"}
 
         # Get existing results
-        existing_results = repo2.get_existing_results(run_id)
+        existing_results = get_successful_problems_with_results(run_id)
         assert len(existing_results) == 1
         assert existing_results[0]["title"] == "Two Sum"
 
-        # Set up for resume
-        repo2.set_run_id(run_id)
-        repo2.update_run_status("running")
+        # Set up for resume (update status)
+        with in_memory_db.session_scope() as session:
+            update_run(session, run_id, status="running")
 
         # Verify status updated
-        run_data = repo2.load_existing_run(run_id)
-        assert run_data["status"] == "running"
+        run_data = get_run_by_id(run_id)
+        assert run_data.status == "running"
 
         # Phase 3: Process remaining questions (simulated)
         with in_memory_db.session_scope() as session:
@@ -104,45 +105,54 @@ class TestResumeWorkflow:
             )
 
         # Mark run as completed
-        repo2.mark_run_completed(RunStats(
-            total_problems=3,
-            successful_problems=3,
-            failed_problems=0,
-        ))
+        with in_memory_db.session_scope() as session:
+            update_run(
+                session,
+                run_id,
+                status="completed",
+                total_problems=3,
+                successful_problems=3,
+                failed_problems=0,
+            )
 
         # Verify final state
-        run_data = repo2.load_existing_run(run_id)
-        assert run_data["status"] == "completed"
-        assert run_data["total_problems"] == 3
-        assert run_data["successful_problems"] == 3
+        run_data = get_run_by_id(run_id)
+        assert run_data.status == "completed"
+        assert run_data.total_problems == 3
+        assert run_data.successful_problems == 3
 
     def test_partial_id_matching_for_resume(self, in_memory_db):
         """Test that partial run IDs work for resume."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
         # Create a run
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        repo.update_run_status("failed")
+        run_id = "test-run-partial-matching"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+                status="failed"
+            )
 
         # Try loading with various partial ID lengths
         for length in [8, 12, 16, 20]:
             partial = run_id[:length]
-            result = repo.load_existing_run(partial)
+            result = get_run_by_id(partial)
             assert result is not None, f"Failed to match with {length} char ID"
-            assert result["id"] == run_id
+            assert result.id == run_id
 
     def test_result_merging(self, in_memory_db):
         """Test that existing and new results are properly merged."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
+        run_id = "test-run-merge"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+            )
 
         # Add existing successful results
         with in_memory_db.session_scope() as session:
@@ -157,10 +167,11 @@ class TestResumeWorkflow:
                     }),
                 )
 
-        repo.update_run_status("failed")
+        with in_memory_db.session_scope() as session:
+            update_run(session, run_id, status="failed")
 
         # Get existing results
-        existing = repo.get_existing_results(run_id)
+        existing = get_successful_problems_with_results(run_id)
         assert len(existing) == 2
 
         # Simulate new results from resumed generation
@@ -182,48 +193,59 @@ class TestResumeValidation:
 
     def test_cannot_resume_completed_run(self, in_memory_db):
         """Test that completed runs cannot be resumed."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        repo.mark_run_completed(RunStats(
-            total_problems=1,
-            successful_problems=1,
-            failed_problems=0,
-        ))
+        run_id = "test-run-complete"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+                status="completed",
+            )
+            update_run(
+                session=session,
+                run_id=run_id,
+                total_problems=1,
+                successful_problems=1
+            )
 
-        run_data = repo.load_existing_run(run_id)
-        assert run_data["status"] == "completed"
-        # Validation would happen in orchestrator
+        run_data = get_run_by_id(run_id)
+        assert run_data.status == "completed"
+        # Validation would happen in orchestrator (tested in unit tests)
 
     def test_can_resume_failed_run(self, in_memory_db):
         """Test that failed runs can be resumed."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        repo.update_run_status("failed")
+        run_id = "test-run-failed"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+                status="failed"
+            )
 
-        run_data = repo.load_existing_run(run_id)
-        assert run_data["status"] == "failed"
+        run_data = get_run_by_id(run_id)
+        assert run_data.status == "failed"
         # This run should be resumable
 
     def test_can_resume_running_run(self, in_memory_db):
         """Test that running (interrupted) runs can be resumed."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        # Status is "running" by default (simulating crash/interrupt)
+        run_id = "test-run-running"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+                status="running"
+            )
 
-        run_data = repo.load_existing_run(run_id)
-        assert run_data["status"] == "running"
+        run_data = get_run_by_id(run_id)
+        assert run_data.status == "running"
         # This run should be resumable
 
 
@@ -232,17 +254,17 @@ class TestResumeQueries:
 
     def test_get_successful_questions_for_run(self, in_memory_db):
         """Test get_successful_questions_for_run query function."""
-        from src.queries import get_successful_questions_for_run
-
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-
-        # Add problems with various statuses
+        run_id = "test-run-queries"
         with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+            )
+
+            # Add problems with various statuses
             create_problem(session, run_id, "Success 1", status="success")
             create_problem(session, run_id, "Success 2", status="success")
             create_problem(session, run_id, "Failed 1", status="failed")
@@ -258,17 +280,17 @@ class TestResumeQueries:
 
     def test_get_successful_problems_with_results(self, in_memory_db):
         """Test get_successful_problems_with_results query function."""
-        from src.queries import get_successful_problems_with_results
-
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-
-        # Add successful problem with result
+        run_id = "test-run-results"
         with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+            )
+
+            # Add successful problem with result
             p = create_problem(session, run_id, "Two Sum", status="success")
             update_problem(
                 session,

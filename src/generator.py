@@ -10,7 +10,13 @@ from pydantic import BaseModel
 
 from src.models import LeetCodeProblem
 from src.providers.base import LLMProvider
-from src.repositories import CardRepository
+from src.database import (
+    DatabaseManager,
+    create_problem,
+    update_problem,
+    create_provider_result,
+    create_cards,
+)
 from src.logging_utils import log_section, log_status
 from src.types import CardResult
 
@@ -25,7 +31,7 @@ class CardGenerator:
         providers: List[LLMProvider],
         combiner: LLMProvider,
         formatter: Optional[LLMProvider],
-        repository: Optional[CardRepository],
+        run_id: Optional[str] = None,
         combine_prompt: Optional[str] = None,
         dry_run: bool = False,
     ):
@@ -36,16 +42,19 @@ class CardGenerator:
             providers: List of LLM providers for initial generation.
             combiner: LLM provider used to combine results.
             formatter: Optional LLM provider for formatting combined output to JSON.
-            repository: Repository for database operations (None in dry run mode).
+            run_id: Run ID for database operations (None in dry run mode).
             combine_prompt: Optional prompt template for combining.
             dry_run: If True, skip API calls and database operations.
         """
         self.llm_providers = providers
         self.card_combiner = combiner
         self.formatter = formatter
-        self.repository = repository
+        self.run_id = run_id
         self.combine_prompt = combine_prompt
         self.dry_run = dry_run
+
+        # Database manager
+        self.db_manager = DatabaseManager.get_default()
 
     def _save_provider_results(
         self,
@@ -62,8 +71,8 @@ class CardGenerator:
         Returns:
             List of valid (non-empty) results.
         """
-        if self.repository is None:
-            raise RuntimeError("CardGenerator requires a repository for non-dry-run mode")
+        if self.run_id is None:
+            raise RuntimeError("CardGenerator requires a run_id for non-dry-run mode")
         
         valid_results = []
 
@@ -79,13 +88,17 @@ class CardGenerator:
             except (json.JSONDecodeError, KeyError, TypeError):
                 pass
 
-            self.repository.save_provider_result(
-                problem_id=problem_id,
-                provider_name=provider.name,
-                provider_model=provider.model,
-                raw_output=result,
-                card_count=card_count,
-            )
+            with self.db_manager.session_scope() as session:
+                create_provider_result(
+                    session=session,
+                    problem_id=problem_id,
+                    run_id=self.run_id,
+                    provider_name=provider.name,
+                    provider_model=provider.model,
+                    success=True,
+                    raw_output=result,
+                    card_count=card_count,
+                )
             valid_results.append(result)
 
         return valid_results
@@ -222,20 +235,24 @@ class CardGenerator:
         Returns:
             CardResult with card data including category metadata if provided.
         """
-        if self.repository is None:
-            raise RuntimeError("CardGenerator requires a repository for non-dry-run mode")
+        if self.run_id is None:
+            raise RuntimeError("CardGenerator requires a run_id for non-dry-run mode")
         
         start_time = time.time()
         json_schema = model_class.model_json_schema()
 
         with log_section(f"Processing: {question}"):
             # Create problem entry
-            problem_id = self.repository.create_initial_problem(
-                question_name=question,
-                category_name=category_name,
-                category_index=category_index,
-                problem_index=problem_index,
-            )
+            with self.db_manager.session_scope() as session:
+                problem = create_problem(
+                    session=session,
+                    run_id=self.run_id,
+                    question_name=question,
+                    category_name=category_name,
+                    category_index=category_index,
+                    problem_index=problem_index,
+                )
+                problem_id = int(problem.id)  # type: ignore[arg-type]
 
             # Generate initial cards in parallel
             with log_status(f"Generating initial ideas for '{question}'..."):
@@ -248,9 +265,13 @@ class CardGenerator:
 
         if not valid_results:
             logger.error(f"All providers failed for '{question}'. Skipping.")
-            self.repository.update_problem_failed(
-                problem_id, time.time() - start_time
-            )
+            with self.db_manager.session_scope() as session:
+                update_problem(
+                    session=session,
+                    problem_id=problem_id,
+                    status="failed",
+                    processing_time_seconds=time.time() - start_time
+                )
             return None
 
         # Combine results
@@ -260,17 +281,41 @@ class CardGenerator:
 
         if not final_card_data:
             logger.error(f"Failed to generate final JSON for '{question}'.")
-            self.repository.update_problem_failed(
-                problem_id, time.time() - start_time
-            )
+            with self.db_manager.session_scope() as session:
+                update_problem(
+                    session=session,
+                    problem_id=problem_id,
+                    status="failed",
+                    processing_time_seconds=time.time() - start_time
+                )
             return None
 
         # Post-process and save
         final_card_data = self._post_process_cards(
             final_card_data, category_index, category_name, problem_index
         )
-        self.repository.save_final_result(
-            problem_id, final_card_data, time.time() - start_time
+
+        with self.db_manager.session_scope() as session:
+            # Update problem with final result
+            update_problem(
+                session=session,
+                problem_id=problem_id,
+                status="success",
+                final_result=json.dumps(final_card_data),
+                final_card_count=len(final_card_data.get("cards", [])),
+                processing_time_seconds=time.time() - start_time,
+            )
+
+            # Save individual cards
+            create_cards(
+                session=session,
+                problem_id=problem_id,
+                run_id=self.run_id,
+                cards_data=final_card_data.get("cards", []),
+            )
+
+        logger.info(
+            f"Saved {len(final_card_data.get('cards', []))} cards to database for problem {problem_id}"
         )
 
         # Cast to CardResult (the dict has the right structure after post-processing)

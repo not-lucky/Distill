@@ -350,7 +350,7 @@ def create_run(
         run_metadata=json.dumps(run_metadata) if run_metadata else None,
     )
     session.add(run)
-    session.commit()
+    session.flush()
     logger.info(f"Created run: {id} ({mode})")
     return run
 
@@ -369,7 +369,7 @@ def update_run(session: Session, run_id: str, **kwargs) -> Run:
         if hasattr(run, key):
             setattr(run, key, value)
 
-    session.commit()
+    session.flush()
     return run
 
 
@@ -395,7 +395,7 @@ def create_problem(
         status=status,
     )
     session.add(problem)
-    session.commit()
+    session.flush()
     logger.debug(f"Created problem: {question_name} (ID: {problem.id})")
     return problem
 
@@ -410,7 +410,7 @@ def update_problem(session: Session, problem_id: int, **kwargs) -> Problem:
         if hasattr(problem, key):
             setattr(problem, key, value)
 
-    session.commit()
+    session.flush()
     return problem
 
 
@@ -439,7 +439,7 @@ def create_provider_result(
         error_message=error_message,
     )
     session.add(result)
-    session.commit()
+    session.flush()
     logger.debug(f"Saved provider result: {provider_name} for problem {problem_id}")
     return result
 
@@ -462,7 +462,7 @@ def create_cards(
         cards.append(card)
         session.add(card)
 
-    session.commit()
+    session.flush()
     logger.debug(f"Saved {len(cards)} cards for problem {problem_id}")
     return cards
 

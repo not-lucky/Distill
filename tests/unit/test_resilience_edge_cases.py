@@ -853,7 +853,7 @@ class TestZeroQuestions:
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
             combine_prompt="Combine: {inputs}",
         )
         assert_that(generator.llm_providers).is_length(0)
@@ -892,7 +892,7 @@ class TestSingleQuestion:
             providers=[provider],
             combiner=provider,
             formatter=None,
-            repository=None,
+            run_id=None,
             combine_prompt="",
         )
 
@@ -973,7 +973,7 @@ class TestLargeScaleBoundary:
             providers=providers,
             combiner=providers[0],
             formatter=None,
-            repository=None,
+            run_id=None,
             combine_prompt="Combine",
         )
 
@@ -1009,7 +1009,7 @@ class TestEmptyProviders:
             providers=[],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
             combine_prompt="Combine",
         )
         assert_that(generator.llm_providers).is_length(0)
@@ -1020,21 +1020,21 @@ class TestEmptyProviders:
             providers=[MockLLMProvider()],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
             combine_prompt="Combine",
         )
         assert_that(generator.formatter).is_none()
 
     def test_generator_with_none_repository(self):
-        """Test CardGenerator accepts None repository."""
+        """Test CardGenerator accepts None run_id."""
         generator = CardGenerator(
             providers=[MockLLMProvider()],
             combiner=MockLLMProvider(),
             formatter=None,
-            repository=None,
+            run_id=None,
             combine_prompt="Combine",
         )
-        assert_that(generator.repository).is_none()
+        assert_that(generator.run_id).is_none()
 
 
 # =============================================================================

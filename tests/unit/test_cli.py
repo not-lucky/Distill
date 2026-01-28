@@ -1410,15 +1410,13 @@ class TestHandleCache:
             mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
             MockDbManager.get_default.return_value = mock_db
 
-            with patch("src.cache.CacheRepository") as MockRepo:
-                mock_repo = MagicMock()
-                mock_repo.clear.return_value = 5
-                MockRepo.return_value = mock_repo
+            with patch("src.cache.clear_cache") as mock_clear:
+                mock_clear.return_value = 5
 
                 result = handle_cache(args)
 
-                assert_that(result).is_equal_to(0)
-                mock_repo.clear.assert_called_once()
+                assert result == 0
+                mock_clear.assert_called_with(mock_session)
                 captured = capsys.readouterr()
                 assert_that(captured.out).contains("Cleared 5 cache entries")
 
@@ -1438,15 +1436,13 @@ class TestHandleCache:
             mock_db.session_scope.return_value.__exit__ = MagicMock(return_value=False)
             MockDbManager.get_default.return_value = mock_db
 
-            with patch("src.cache.CacheRepository") as MockRepo:
-                mock_repo = MagicMock()
-                mock_repo.stats.return_value = {"total_entries": 10, "total_hits": 25}
-                MockRepo.return_value = mock_repo
+            with patch("src.cache.get_cache_stats") as mock_stats:
+                mock_stats.return_value = {"total_entries": 10, "total_hits": 25}
 
                 result = handle_cache(args)
 
                 assert_that(result).is_equal_to(0)
-                mock_repo.stats.assert_called_once()
+                mock_stats.assert_called_with(mock_session)
                 captured = capsys.readouterr()
                 assert_that(captured.out).contains("Cache entries: 10")
                 assert_that(captured.out).contains("Total hits: 25")

@@ -4,177 +4,8 @@ import json
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 
-from src.repositories import RunRepository, RunStats
-from src.database import DatabaseManager, Run, Problem
-
-
-class TestRunRepositoryResume:
-    """Tests for RunRepository resume-related methods."""
-
-    def test_set_run_id_sets_internal_run_id(self, in_memory_db):
-        """Test that set_run_id correctly sets the internal run ID."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
-        repo.set_run_id("test-run-123")
-        
-        assert repo.run_id == "test-run-123"
-
-    def test_load_existing_run_returns_none_when_not_found(self, in_memory_db):
-        """Test that load_existing_run returns None for non-existent runs."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
-        result = repo.load_existing_run("nonexistent-run")
-        
-        assert result is None
-
-    def test_load_existing_run_returns_run_data(self, in_memory_db):
-        """Test that load_existing_run returns correct run data."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
-        # Create a run first
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-            user_label="test-label",
-        )
-        
-        # Load it back
-        result = repo.load_existing_run(run_id)
-        
-        assert result is not None
-        assert result["id"] == run_id
-        assert result["mode"] == "leetcode"
-        assert result["subject"] == "leetcode"
-        assert result["card_type"] == "standard"
-        assert result["status"] == "running"
-        assert result["user_label"] == "test-label"
-
-    def test_load_existing_run_with_partial_id(self, in_memory_db):
-        """Test that load_existing_run works with partial run IDs."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
-        # Create a run
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        
-        # Load with partial ID (first 8 chars)
-        partial_id = run_id[:8]
-        result = repo.load_existing_run(partial_id)
-        
-        assert result is not None
-        assert result["id"] == run_id
-
-    def test_get_processed_questions_returns_empty_set_for_new_run(self, in_memory_db):
-        """Test that get_processed_questions returns empty set for run with no problems."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode", 
-            card_type="standard",
-        )
-        
-        result = repo.get_processed_questions(run_id)
-        
-        assert result == set()
-
-    def test_get_processed_questions_returns_successful_questions(self, in_memory_db):
-        """Test that get_processed_questions returns only successful questions."""
-        from src.database import create_problem, update_problem
-        
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        
-        # Create problems with different statuses
-        with in_memory_db.session_scope() as session:
-            p1 = create_problem(session, run_id, "Two Sum", status="success")
-            p2 = create_problem(session, run_id, "Three Sum", status="failed")
-            p3 = create_problem(session, run_id, "Binary Search", status="success")
-        
-        result = repo.get_processed_questions(run_id)
-        
-        assert result == {"Two Sum", "Binary Search"}
-        assert "Three Sum" not in result
-
-    def test_get_existing_results_returns_card_data(self, in_memory_db):
-        """Test that get_existing_results returns card data from successful problems."""
-        from src.database import create_problem, update_problem
-        
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        
-        card_data = {
-            "title": "Two Sum",
-            "cards": [{"front": "Q", "back": "A"}]
-        }
-        
-        with in_memory_db.session_scope() as session:
-            p = create_problem(session, run_id, "Two Sum", status="success")
-            update_problem(session, p.id, final_result=json.dumps(card_data))
-        
-        result = repo.get_existing_results(run_id)
-        
-        assert len(result) == 1
-        assert result[0]["title"] == "Two Sum"
-        assert len(result[0]["cards"]) == 1
-
-    def test_get_existing_results_skips_failed_problems(self, in_memory_db):
-        """Test that get_existing_results skips failed problems."""
-        from src.database import create_problem, update_problem
-        
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        
-        with in_memory_db.session_scope() as session:
-            create_problem(session, run_id, "Failed Problem", status="failed")
-        
-        result = repo.get_existing_results(run_id)
-        
-        assert result == []
-
-    def test_update_run_status_changes_status(self, in_memory_db):
-        """Test that update_run_status correctly updates the run status."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        
-        # Verify initial status
-        run_data = repo.load_existing_run(run_id)
-        assert run_data["status"] == "running"
-        
-        # Mark as failed
-        repo.update_run_status("failed")
-        
-        # Verify updated status
-        run_data = repo.load_existing_run(run_id)
-        assert run_data["status"] == "failed"
-
-    def test_update_run_status_raises_without_active_run(self, in_memory_db):
-        """Test that update_run_status raises error without active run."""
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        
-        with pytest.raises(RuntimeError, match="No active run"):
-            repo.update_run_status("failed")
+from src.database import DatabaseManager, create_run, create_problem, update_problem, update_run
+from src.queries import get_run_by_id, get_successful_questions_for_run, get_successful_problems_with_results
 
 
 class TestOrchestratorResume:
@@ -229,28 +60,48 @@ class TestOrchestratorResume:
         from src.orchestrator import Orchestrator
         
         # Create and complete a run
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        repo.mark_run_completed(RunStats(total_problems=1, successful_problems=1, failed_problems=0))
+        run_id = "test-run-completed"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+                status="completed"
+            )
         
         with patch("src.orchestrator.load_config") as mock_config:
             mock_config.return_value.generation.concurrent_requests = 4
             mock_config.return_value.generation.request_delay = 0.1
             
             with patch("src.orchestrator.DATABASE_PATH", ":memory:"):
-                orch = Orchestrator(
-                    subject_config=mock_subject_config,
-                    resume_run_id=run_id,
-                )
-                orch.run_repo = repo
-                
-                result = orch._initialize_for_resume()
-                
-                assert result is False
+                # Mock DatabaseManager.get_default() to return our in_memory_db
+                with patch("src.database.DatabaseManager.get_default", return_value=in_memory_db):
+                    # Mock get_run_by_id to use our in_memory_db
+                    with patch("src.orchestrator.get_run_by_id") as mock_get_run:
+                        # Helper to get run from db
+                        def get_run_helper(rid):
+                            with in_memory_db.session_scope() as session:
+                                from src.database import Run
+                                run = session.query(Run).filter(Run.id == rid).first()
+                                if run:
+                                    session.refresh(run)
+                                    session.expunge(run)
+                                return run
+
+                        mock_get_run.side_effect = get_run_helper
+
+                        orch = Orchestrator(
+                            subject_config=mock_subject_config,
+                            resume_run_id=run_id,
+                        )
+                        # Inject db_manager
+                        orch.db_manager = in_memory_db
+
+                        result = orch._initialize_for_resume()
+
+                        assert result is False
 
     @pytest.mark.asyncio
     async def test_initialize_for_resume_fails_on_mode_mismatch(
@@ -260,28 +111,43 @@ class TestOrchestratorResume:
         from src.orchestrator import Orchestrator
         
         # Create a run with different mode
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="cs",  # Different mode
-            subject="cs",
-            card_type="standard",
-        )
-        repo.update_run_status("failed")
+        run_id = "test-run-mismatch"
+        with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="cs",  # Different mode
+                subject="cs",
+                card_type="standard",
+                status="failed"
+            )
         
         with patch("src.orchestrator.load_config") as mock_config:
             mock_config.return_value.generation.concurrent_requests = 4
             mock_config.return_value.generation.request_delay = 0.1
             
             with patch("src.orchestrator.DATABASE_PATH", ":memory:"):
-                orch = Orchestrator(
-                    subject_config=mock_subject_config,  # leetcode mode
-                    resume_run_id=run_id,
-                )
-                orch.run_repo = repo
-                
-                result = orch._initialize_for_resume()
-                
-                assert result is False
+                with patch("src.database.DatabaseManager.get_default", return_value=in_memory_db):
+                    with patch("src.orchestrator.get_run_by_id") as mock_get_run:
+                        def get_run_helper(rid):
+                            with in_memory_db.session_scope() as session:
+                                from src.database import Run
+                                run = session.query(Run).filter(Run.id == rid).first()
+                                if run:
+                                    session.refresh(run)
+                                    session.expunge(run)
+                                return run
+                        mock_get_run.side_effect = get_run_helper
+
+                        orch = Orchestrator(
+                            subject_config=mock_subject_config,  # leetcode mode
+                            resume_run_id=run_id,
+                        )
+                        orch.db_manager = in_memory_db
+
+                        result = orch._initialize_for_resume()
+
+                        assert result is False
 
     @pytest.mark.asyncio
     async def test_initialize_for_resume_succeeds_for_failed_run(
@@ -289,40 +155,59 @@ class TestOrchestratorResume:
     ):
         """Test that resume succeeds for failed runs."""
         from src.orchestrator import Orchestrator
-        from src.database import create_problem, update_problem
         
         # Create a failed run with some processed questions
-        repo = RunRepository(db_path=":memory:", db_manager=in_memory_db)
-        run_id = repo.create_new_run(
-            mode="leetcode",
-            subject="leetcode",
-            card_type="standard",
-        )
-        
-        # Add a successful problem
-        card_data = {"title": "Two Sum", "cards": []}
+        run_id = "test-run-failed"
         with in_memory_db.session_scope() as session:
+            create_run(
+                session=session,
+                id=run_id,
+                mode="leetcode",
+                subject="leetcode",
+                card_type="standard",
+                status="failed"
+            )
+
+            # Add a successful problem
+            card_data = {"title": "Two Sum", "cards": []}
             p = create_problem(session, run_id, "Two Sum", status="success")
             update_problem(session, p.id, final_result=json.dumps(card_data))
-        
-        repo.update_run_status("failed")
         
         with patch("src.orchestrator.load_config") as mock_config:
             mock_config.return_value.generation.concurrent_requests = 4
             mock_config.return_value.generation.request_delay = 0.1
             
             with patch("src.orchestrator.DATABASE_PATH", ":memory:"):
-                orch = Orchestrator(
-                    subject_config=mock_subject_config,
-                    resume_run_id=run_id,
-                )
-                orch.run_repo = repo
-                
-                result = orch._initialize_for_resume()
-                
-                assert result is True
-                assert "Two Sum" in orch._processed_questions
-                assert len(orch._existing_results) == 1
+                with patch("src.database.DatabaseManager.get_default", return_value=in_memory_db):
+                    # Mock query functions to use our DB
+                    with patch("src.orchestrator.get_run_by_id") as mock_get_run, \
+                         patch("src.orchestrator.get_successful_questions_for_run") as mock_get_questions, \
+                         patch("src.orchestrator.get_successful_problems_with_results") as mock_get_results:
+
+                        def get_run_helper(rid):
+                            with in_memory_db.session_scope() as session:
+                                from src.database import Run
+                                run = session.query(Run).filter(Run.id == rid).first()
+                                if run:
+                                    session.refresh(run)
+                                    session.expunge(run)
+                                return run
+                        mock_get_run.side_effect = get_run_helper
+
+                        mock_get_questions.return_value = ["Two Sum"]
+                        mock_get_results.return_value = [{"title": "Two Sum"}]
+
+                        orch = Orchestrator(
+                            subject_config=mock_subject_config,
+                            resume_run_id=run_id,
+                        )
+                        orch.db_manager = in_memory_db
+
+                        result = orch._initialize_for_resume()
+
+                        assert result is True
+                        assert "Two Sum" in orch._processed_questions
+                        assert len(orch._existing_results) == 1
 
 
 class TestQuestionFiltering:

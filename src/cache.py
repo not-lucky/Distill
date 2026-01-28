@@ -63,91 +63,91 @@ def generate_cache_key(
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
-class CacheRepository:
-    """Repository for LLM response cache operations."""
+def get_cached_response(session: Session, cache_key: str) -> Optional[str]:
+    """Get cached response by key.
 
-    def __init__(self, session: Session):
-        """Initialize with a database session.
+    Args:
+        session: SQLAlchemy session
+        cache_key: The cache key to look up
 
-        Args:
-            session: SQLAlchemy session for database operations
-        """
-        self.session = session
+    Returns:
+        Response string if found, None otherwise
+    """
+    entry = (
+        session.query(LLMCache)
+        .filter(LLMCache.cache_key == cache_key)
+        .first()
+    )
+    if entry:
+        # Increment hit count
+        entry.hit_count += 1
+        session.flush()
+        return entry.response
+    return None
 
-    def get(self, cache_key: str) -> Optional[str]:
-        """Get cached response by key.
 
-        Args:
-            cache_key: The cache key to look up
+def put_cached_response(
+    session: Session,
+    cache_key: str,
+    provider_name: str,
+    model: str,
+    prompt_preview: str,
+    response: str,
+) -> None:
+    """Store response in cache. Upserts if key exists.
 
-        Returns:
-            Response string if found, None otherwise
-        """
-        entry = (
-            self.session.query(LLMCache)
-            .filter(LLMCache.cache_key == cache_key)
-            .first()
-        )
-        if entry:
-            # Increment hit count
-            entry.hit_count += 1
-            self.session.commit()
-            return entry.response
-        return None
-
-    def put(
-        self,
-        cache_key: str,
-        provider_name: str,
-        model: str,
-        prompt_preview: str,
-        response: str,
-    ) -> None:
-        """Store response in cache. Upserts if key exists.
-
-        Args:
-            cache_key: The cache key
-            provider_name: Name of the LLM provider
-            model: Model identifier
-            prompt_preview: First 200 chars of prompt for debugging
-            response: The full response to cache
-        """
-        stmt = insert(LLMCache).values(
-            cache_key=cache_key,
-            provider_name=provider_name,
-            model=model,
-            prompt_preview=prompt_preview[:200],
-            response=response,
-            created_at=datetime.now(timezone.utc),
+    Args:
+        session: SQLAlchemy session
+        cache_key: The cache key
+        provider_name: Name of the LLM provider
+        model: Model identifier
+        prompt_preview: First 200 chars of prompt for debugging
+        response: The full response to cache
+    """
+    stmt = insert(LLMCache).values(
+        cache_key=cache_key,
+        provider_name=provider_name,
+        model=model,
+        prompt_preview=prompt_preview[:200],
+        response=response,
+        created_at=datetime.now(timezone.utc),
+        hit_count=0,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["cache_key"],
+        set_=dict(
+            response=stmt.excluded.response,
+            created_at=stmt.excluded.created_at,
             hit_count=0,
-        )
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["cache_key"],
-            set_=dict(
-                response=stmt.excluded.response,
-                created_at=stmt.excluded.created_at,
-                hit_count=0,
-            ),
-        )
-        self.session.execute(stmt)
-        self.session.commit()
+        ),
+    )
+    session.execute(stmt)
+    session.flush()
 
-    def clear(self) -> int:
-        """Clear all cache entries.
 
-        Returns:
-            Count of deleted entries
-        """
-        count = self.session.query(LLMCache).delete()
-        self.session.commit()
-        return count
+def clear_cache(session: Session) -> int:
+    """Clear all cache entries.
 
-    def stats(self) -> dict[str, int]:
-        """Get cache statistics.
+    Args:
+        session: SQLAlchemy session
 
-        Returns:
-            Dict with total_entries and total_hits
-        """
-        total = self.session.query(func.count(LLMCache.cache_key)).scalar() or 0
-        total_hits = self.session.query(func.sum(LLMCache.hit_count)).scalar() or 0
-        return {"total_entries": total, "total_hits": total_hits}
+    Returns:
+        Count of deleted entries
+    """
+    count = session.query(LLMCache).delete()
+    session.flush()
+    return count
+
+
+def get_cache_stats(session: Session) -> dict[str, int]:
+    """Get cache statistics.
+
+    Args:
+        session: SQLAlchemy session
+
+    Returns:
+        Dict with total_entries and total_hits
+    """
+    total = session.query(func.count(LLMCache.cache_key)).scalar() or 0
+    total_hits = session.query(func.sum(LLMCache.hit_count)).scalar() or 0
+    return {"total_entries": total, "total_hits": total_hits}
