@@ -277,6 +277,20 @@ class OpenAICompatibleProvider(LLMProvider):
         """Generate initial cards for a given question."""
         active_template = prompt_template or prompts.initial
 
+        # If it's a custom pre-formatted prompt (from ingest), it might already contain content
+        # We should only format if placeholders exist and we haven't already replaced them
+        content = active_template
+        if "{question}" in content or "{schema}" in content:
+            try:
+                content = content.format(
+                    question=question,
+                    schema=json.dumps(json_schema, indent=2, ensure_ascii=False),
+                )
+            except KeyError:
+                # Fallback to simple replace if format fails due to extra braces in content
+                content = content.replace("{question}", question)
+                content = content.replace("{schema}", json.dumps(json_schema, indent=2, ensure_ascii=False))
+
         chat_messages = [
             {
                 "role": "system",
@@ -284,10 +298,7 @@ class OpenAICompatibleProvider(LLMProvider):
             },
             {
                 "role": "user",
-                "content": active_template.format(
-                    question=question,
-                    schema=json.dumps(json_schema, indent=2, ensure_ascii=False),
-                ),
+                "content": content,
             },
         ]
 
@@ -307,6 +318,17 @@ class OpenAICompatibleProvider(LLMProvider):
         """
         active_template = combine_prompt_template or prompts.combine
 
+        content = active_template
+        if "{question}" in content or "{inputs}" in content:
+            try:
+                content = content.format(
+                    question=question,
+                    inputs=combined_inputs,
+                )
+            except KeyError:
+                content = content.replace("{question}", question)
+                content = content.replace("{inputs}", combined_inputs)
+
         chat_messages = [
             {
                 "role": "system",
@@ -314,10 +336,7 @@ class OpenAICompatibleProvider(LLMProvider):
             },
             {
                 "role": "user",
-                "content": active_template.format(
-                    question=question,
-                    inputs=combined_inputs,
-                ),
+                "content": content,
             },
         ]
 

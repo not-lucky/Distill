@@ -25,6 +25,7 @@ LLM2Deck is a powerful tool that generates comprehensive Anki flashcard decks by
 - **Real-Time Progress Visualization** — Rich progress bar with ETA, provider status indicators, and live token/cost tracking
 - **Cost Estimation & Budgeting** — Pre-run cost estimates, budget limits, and cumulative cost tracking across runs
 - **Built-in Subjects** — LeetCode algorithms, Computer Science fundamentals, and Physics concepts ready to go
+- **Document Ingestion** — Generate cards directly from your own documents (Markdown, PDF, Text, etc.) with automatic deck hierarchy mapping
 - **Custom Subjects** — Define your own subjects with custom prompts and question sets
 - **Multiple Card Formats** — Standard Q&A and Multiple Choice Question (MCQ) modes
 - **Beautiful Cards** — Catppuccin-themed styling with syntax highlighting for code
@@ -96,6 +97,7 @@ uv run main.py <command> [options]
 
 Commands:
   generate    Generate flashcards from LLM providers
+  ingest      Generate flashcards from documents in a directory
   convert     Convert JSON deck to Anki .apkg format
   merge       Merge archived JSON files for a subject
   export-md   Export JSON cards to Markdown format
@@ -160,6 +162,40 @@ uv run main.py generate physics --skip-until "Quantum Mechanics"
 # Combine filters: Trees category, first 5 questions
 uv run main.py generate leetcode --category "Trees" --limit 5
 ```
+
+### Ingest Documents
+
+Generate cards from your own study materials, tutorials, or notes. LLM2Deck maps your folder structure to Anki deck hierarchy.
+
+```bash
+uv run main.py ingest <source_dir> [options]
+
+# Basic usage
+uv run main.py ingest ./docs/react-tutorial
+
+# Options
+--deck-name TEXT    Override the main deck name (default: derived from folder name)
+--label TEXT        Optional label for this run
+--extensions TEXT   Comma-separated list of extensions (default: .md,.txt,.rst,.html)
+--dry-run           Preview deck structure and costs without making API calls
+--estimate-only     Show cost estimate only
+--budget AMOUNT     Maximum budget in USD
+--no-cache          Bypass cache lookup
+```
+
+**How Document Mapping Works:**
+
+Directory structure:
+```text
+react-tutorial/           → ReactTutorial (Main Deck)
+├── basics/               → ReactTutorial::Basics (Sub-deck)
+│   ├── jsx-intro.md      → ReactTutorial::Basics::JsxIntro (Cards for this file)
+│   └── components.md     → ReactTutorial::Basics::Components
+└── hooks/                → ReactTutorial::Hooks
+    └── useState.md       → ReactTutorial::Hooks::UseState
+```
+
+LLM2Deck reads each file, extracts the content, and asks LLMs to generate high-quality flashcards (concepts, definitions, code examples, pitfalls) specifically from that content.
 
 ### Resume Failed Runs
 
@@ -563,6 +599,8 @@ LLM2Deck/
 ├── src/
 │   ├── cli.py              # CLI interface (argparse)
 │   ├── orchestrator.py     # Generation workflow coordinator
+│   ├── document_orchestrator.py  # Document ingestion coordinator
+│   ├── document.py         # Document discovery and parsing
 │   ├── generator.py        # Parallel card generation
 │   ├── progress.py         # Real-time progress visualization
 │   ├── prompts.py          # PromptLoader - lazy prompt loading
@@ -597,6 +635,8 @@ LLM2Deck/
 │   │   └── export.py       # ExportService
 │   └── data/
 │       ├── prompts/        # Prompt templates
+│       │   ├── document/   # Document-based prompts
+│       │   └── ...
 │       └── questions.json  # Built-in questions
 ├── tests/                  # Test suite
 ├── anki_cards_archival/    # Archived JSON outputs

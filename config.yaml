@@ -66,9 +66,10 @@ providers:
     enabled: true
     models:
       - "gemini-3-flash-preview"
+      - "gemini-3-flash-preview"
       # - "gemini-claude-opus-4-5-thinking"
     timeout: 900
-    max_tokens: 16384
+    max_tokens: 64000
     base_url: "http://127.0.0.1:8317/v1"  # Optional, has default
 
 # Generation Settings

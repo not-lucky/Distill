@@ -35,7 +35,7 @@ def normalize_legacy_args(argv: list[str]) -> list[str]:
     Returns:
         Normalized argument list compatible with new subcommand syntax.
     """
-    SUBCOMMANDS = {"generate", "convert", "merge", "export-md", "cache", "query", "-h", "--help"}
+    SUBCOMMANDS = {"generate", "ingest", "convert", "merge", "export-md", "cache", "query", "-h", "--help"}
 
     if not argv or argv[0] in SUBCOMMANDS:
         return argv
@@ -178,6 +178,58 @@ def create_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Show what would be done without writing files",
+    )
+
+    # ====== ingest command ======
+    ingest_parser = subparsers.add_parser(
+        "ingest",
+        help="Generate flashcards from documents in a directory",
+        description="Process documents and generate Anki flashcards using LLMs.",
+    )
+    ingest_parser.add_argument(
+        "source_dir",
+        type=str,
+        help="Directory containing documents to process (structure becomes deck hierarchy)",
+    )
+    ingest_parser.add_argument(
+        "--deck-name",
+        type=str,
+        default=None,
+        help="Override the main deck name (default: derived from directory name)",
+    )
+    ingest_parser.add_argument(
+        "--label",
+        type=str,
+        default=None,
+        help="Optional label for this run",
+    )
+    ingest_parser.add_argument(
+        "--extensions",
+        type=str,
+        default=None,
+        help="Comma-separated list of file extensions to process (default: .md,.txt,.rst,.html)",
+    )
+    ingest_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without making API calls or writing files",
+    )
+    ingest_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass cache lookup (still stores new results)",
+    )
+    ingest_parser.add_argument(
+        "--budget",
+        type=float,
+        default=None,
+        metavar="AMOUNT",
+        help="Maximum budget in USD - stops generation when exceeded",
+    )
+    ingest_parser.add_argument(
+        "--estimate-only",
+        action="store_true",
+        help="Show cost estimate without generating cards",
     )
 
     # ====== merge command ======
@@ -540,6 +592,59 @@ def handle_convert(args: argparse.Namespace) -> int:
         return 1
 
 
+async def handle_ingest(args: argparse.Namespace) -> int:
+    """Handle the ingest subcommand."""
+    from src.document_orchestrator import DocumentOrchestrator
+    from src.document import SUPPORTED_EXTENSIONS
+
+    source_dir = Path(args.source_dir)
+    dry_run = getattr(args, "dry_run", False)
+    no_cache = getattr(args, "no_cache", False)
+    budget_limit = getattr(args, "budget", None)
+    estimate_only = getattr(args, "estimate_only", False)
+    deck_name = getattr(args, "deck_name", None)
+
+    # Parse extensions if provided
+    extensions = None
+    if args.extensions:
+        extensions = set(f".{ext.strip().lstrip('.')}" for ext in args.extensions.split(","))
+
+    if estimate_only:
+        logger.info(f"[ESTIMATE] Processing documents from: {source_dir}")
+    elif dry_run:
+        logger.info(f"[DRY RUN] Processing documents from: {source_dir}")
+    else:
+        logger.info(f"Processing documents from: {source_dir}")
+
+    if args.label:
+        logger.info(f"Run Label: {args.label}")
+    if no_cache:
+        logger.info("Cache lookup disabled (--no-cache)")
+    if budget_limit is not None:
+        logger.info(f"Budget limit: ${budget_limit:.2f}")
+    if extensions:
+        logger.info(f"File extensions: {', '.join(sorted(extensions))}")
+
+    orchestrator = DocumentOrchestrator(
+        source_dir=source_dir,
+        deck_name=deck_name,
+        run_label=args.label,
+        dry_run=dry_run,
+        bypass_cache_lookup=no_cache,
+        budget_limit_usd=budget_limit,
+        estimate_only=estimate_only,
+        extensions=extensions,
+    )
+
+    if not await orchestrator.initialize():
+        return 1
+
+    problems = await orchestrator.run()
+    orchestrator.save_results(problems)
+
+    return 0
+
+
 def handle_merge(args: argparse.Namespace) -> int:
     """Handle the merge subcommand."""
     from src.services.merge import MergeService
@@ -726,6 +831,8 @@ def main(argv: Optional[list] = None) -> int:
 
     if args.command == "generate":
         return asyncio.run(handle_generate(args))
+    elif args.command == "ingest":
+        return asyncio.run(handle_ingest(args))
     elif args.command == "convert":
         return handle_convert(args)
     elif args.command == "merge":
