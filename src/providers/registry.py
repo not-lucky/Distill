@@ -10,6 +10,7 @@ from src.config.loader import DefaultsConfig, ProviderConfig
 from src.providers.base import LLMProvider
 from src.providers.baseten import BasetenProvider
 from src.providers.canopywave import CanopywaveProvider
+from src.providers.cliproxy import CliProxyProvider
 from src.providers.cerebras import CerebrasProvider
 from src.providers.g4f_provider import G4FProvider
 from src.providers.gemini import GeminiProvider
@@ -28,7 +29,8 @@ ProviderFactory = Callable[[ProviderConfig, DefaultsConfig], Awaitable[List[LLMP
 # Default base URLs for OpenAI-compatible providers
 DEFAULT_BASE_URLS: Dict[str, str] = {
     "baseten": "https://inference.baseten.co/v1",
-    "canopywave": "https://api.xiaomimimo.com/v1",
+    "canopywave": "https://inference.canopywave.io/v1",
+    "cliproxy": "https://cliproxyapi.notlucky.dedyn.io/v1",
     "google_antigravity": "http://127.0.0.1:8317/v1",
     "nvidia": "https://integrate.api.nvidia.com/v1",
     "openrouter": "https://openrouter.ai/api/v1",
@@ -74,6 +76,13 @@ PROVIDER_REGISTRY: Dict[str, ProviderSpec] = {
     "canopywave": ProviderSpec(
         provider_class=CanopywaveProvider,
         key_name="canopywave",
+        multi_model=True,
+        uses_base_url=True,
+    ),
+    "cliproxy": ProviderSpec(
+        provider_class=CliProxyProvider,
+        key_name="cliproxy",
+        multi_model=True,
         uses_base_url=True,
     ),
     "baseten": ProviderSpec(
@@ -133,20 +142,34 @@ async def create_provider_instances(
     # Handle multi-model providers (e.g., google_antigravity)
     if spec.multi_model:
         base_url = cfg.base_url or DEFAULT_BASE_URLS.get(name, "")
+
+        # Load API keys if needed
+        api_keys_cycle = None
+        if not spec.no_keys and spec.key_name:
+            keys = await load_keys(spec.key_name)
+            if not keys:
+                logger.warning(f"No API keys found for {name}")
+                return []
+            api_keys_cycle = itertools.cycle(keys)
+
         # Cast provider_class to Any to allow dynamic kwargs
         provider_cls = cast(Any, spec.provider_class)
-        return [
-            provider_cls(
-                model=model,
-                base_url=base_url,
-                timeout=effective_timeout,
-                temperature=effective_temperature,
-                max_tokens=effective_max_tokens,
-                max_retries=max_retries,
-                json_parse_retries=json_parse_retries,
-            )
-            for model in cfg.models
-        ]
+
+        instances = []
+        for model in cfg.models:
+            kwargs: Dict[str, Any] = {
+                "model": model,
+                "base_url": base_url,
+                "timeout": effective_timeout,
+                "temperature": effective_temperature,
+                "max_tokens": effective_max_tokens,
+                "max_retries": max_retries,
+                "json_parse_retries": json_parse_retries,
+            }
+            if api_keys_cycle is not None:
+                kwargs["api_keys"] = api_keys_cycle
+            instances.append(provider_cls(**kwargs))
+        return instances
 
     # Build kwargs for provider instantiation
     kwargs: Dict[str, Any] = {}

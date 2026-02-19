@@ -99,9 +99,8 @@ class G4FProvider(LLMProvider):
             },
             {
                 "role": "user",
-                "content": active_template.format(
-                    question=question,
-                    schema=json.dumps(json_schema, indent=2, ensure_ascii=False),
+                "content": active_template.replace("{question}", question).replace(
+                    "{schema}", json.dumps(json_schema, indent=2, ensure_ascii=False)
                 ),
             },
         ]
@@ -129,8 +128,8 @@ class G4FProvider(LLMProvider):
             },
             {
                 "role": "user",
-                "content": active_template.format(
-                    question=question, inputs=combined_inputs
+                "content": active_template.replace("{question}", question).replace(
+                    "{inputs}", combined_inputs
                 ),
             },
         ]

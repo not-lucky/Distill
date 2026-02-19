@@ -194,8 +194,14 @@ class OpenAICompatibleProvider(LLMProvider):
                 request_params.update(self._get_extra_request_params())
 
                 completion = await client.chat.completions.create(**request_params)
-                response_content = completion.choices[0].message.content
                 
+                if not completion or not hasattr(completion, "choices") or not completion.choices:
+                    raise EmptyResponseError(
+                        f"[{self.model_name}] Received invalid or empty response: {completion}"
+                    )
+                    
+                response_content = completion.choices[0].message.content
+
                 # Extract token usage if available
                 usage = TokenUsage()
                 if completion.usage:
@@ -221,7 +227,7 @@ class OpenAICompatibleProvider(LLMProvider):
 
         try:
             response, token_usage = await _do_request()
-            
+
             # Report token usage via callback
             if self.on_token_usage:
                 self.on_token_usage(self.name, self.model_name, token_usage, True)
@@ -280,15 +286,8 @@ class OpenAICompatibleProvider(LLMProvider):
         # We should only format if placeholders exist and we haven't already replaced them
         content = active_template
         if "{question}" in content or "{schema}" in content:
-            try:
-                content = content.format(
-                    question=question,
-                    schema=json.dumps(json_schema, indent=2, ensure_ascii=False),
-                )
-            except KeyError:
-                # Fallback to simple replace if format fails due to extra braces in content
-                content = content.replace("{question}", question)
-                content = content.replace("{schema}", json.dumps(json_schema, indent=2, ensure_ascii=False))
+            content = content.replace("{question}", question)
+            content = content.replace("{schema}", json.dumps(json_schema, indent=2, ensure_ascii=False))
 
         chat_messages = [
             {
@@ -319,14 +318,8 @@ class OpenAICompatibleProvider(LLMProvider):
 
         content = active_template
         if "{question}" in content or "{inputs}" in content:
-            try:
-                content = content.format(
-                    question=question,
-                    inputs=combined_inputs,
-                )
-            except KeyError:
-                content = content.replace("{question}", question)
-                content = content.replace("{inputs}", combined_inputs)
+            content = content.replace("{question}", question)
+            content = content.replace("{inputs}", combined_inputs)
 
         chat_messages = [
             {

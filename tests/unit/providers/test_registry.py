@@ -68,7 +68,7 @@ class TestProviderRegistry:
         When counting entries
         Then it contains expected number of providers
         """
-        assert_that(PROVIDER_REGISTRY).is_length(9)
+        assert_that(PROVIDER_REGISTRY).is_length(10)
 
     def test_cerebras_spec(self):
         """
@@ -467,7 +467,7 @@ class TestDefaultBaseUrls:
         When counting entries
         Then it contains expected number of URLs
         """
-        assert_that(DEFAULT_BASE_URLS).is_length(5)
+        assert_that(DEFAULT_BASE_URLS).is_length(6)
 
 
 # =============================================================================

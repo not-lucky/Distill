@@ -126,9 +126,8 @@ class CerebrasProvider(LLMProvider):
             },
             {
                 "role": "user",
-                "content": template.format(
-                    question=question,
-                    schema=json.dumps(json_schema, indent=2, ensure_ascii=False),
+                "content": template.replace("{question}", question).replace(
+                    "{schema}", json.dumps(json_schema, indent=2, ensure_ascii=False)
                 ),
             },
         ]
@@ -156,9 +155,8 @@ class CerebrasProvider(LLMProvider):
             },
             {
                 "role": "user",
-                "content": template.format(
-                    question=question,
-                    inputs=combined_inputs,
+                "content": template.replace("{question}", question).replace(
+                    "{inputs}", combined_inputs
                 ),
             },
         ]

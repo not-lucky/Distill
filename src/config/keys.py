@@ -50,6 +50,7 @@ ENV_VAR_NAMES = {
     "gemini": "GEMINI_CREDENTIALS_FILE_PATH",
     "nvidia": "NVIDIA_KEYS_FILE_PATH",
     "canopywave": "CANOPYWAVE_KEYS_FILE_PATH",
+    "cliproxy": "CLIPROXY_KEYS_FILE_PATH",
     "baseten": "BASETEN_KEYS_FILE_PATH",
     "google_genai": "GOOGLE_GENAI_KEYS_FILE_PATH",
 }
@@ -92,6 +93,7 @@ def get_key_path(provider_name: str) -> Path:
         "gemini": "python3ds.json",
         "nvidia": "nvidia_keys.json",
         "canopywave": "canopywave_keys.json",
+        "cliproxy": "cliproxy_keys.json",
         "baseten": "baseten_keys.json",
         "google_genai": "google_genai_keys.json",
     }
@@ -130,6 +132,10 @@ KEY_CONFIGS: dict[str, KeyConfig] = {
     ),
     "canopywave": KeyConfig(
         path=get_key_path("canopywave"),
+        extractor=_extract_flexible,
+    ),
+    "cliproxy": KeyConfig(
+        path=get_key_path("cliproxy"),
         extractor=_extract_flexible,
     ),
     "baseten": KeyConfig(
