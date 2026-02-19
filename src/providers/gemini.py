@@ -32,9 +32,8 @@ class GeminiProvider(LLMProvider):
             active_template = (
                 prompt_template if prompt_template else prompts.initial
             )
-            formatted_prompt = active_template.format(
-                question=question,
-                schema=json.dumps(json_schema, indent=2, ensure_ascii=False),
+            formatted_prompt = active_template.replace("{question}", question).replace(
+                "{schema}", json.dumps(json_schema, indent=2, ensure_ascii=False)
             )
             api_response = await self.gemini_client.generate_content(
                 formatted_prompt, model=Model.G_3_0_PRO

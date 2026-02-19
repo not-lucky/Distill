@@ -1,122 +1,130 @@
 {
-    "leetcode": {
-        "Arrays and Hashing": [
-            "Contains Duplicate",
-            "Valid Anagram",
-            "Two Sum",
-            "Group Anagrams",
-            "Top K Frequent Elements",
-            "Encode and Decode Strings",
-            "Product of Array Except Self",
-            "Valid Sudoku",
-            "Longest Consecutive Sequence"
-        ],
-        "Two Pointers": [
-            "Valid Palindrome",
-            "Two Sum II Input Array Is Sorted",
-            "3Sum",
-            "Container With Most Water",
-            "Trapping Rain Water"
-        ],
-        "Sliding Window": [
-            "Best Time to Buy And Sell Stock",
-            "Longest Substring Without Repeating Characters",
-            "Longest Repeating Character Replacement",
-            "Permutation In String",
-            "Minimum Window Substring",
-            "Sliding Window Maximum"
-        ],
-        "Stacks": [
-            "Valid Parentheses",
-            "Min Stack",
-            "Evaluate Reverse Polish Notation",
-            "Daily Temperatures",
-            "Car Fleet",
-            "Largest Rectangle In Histogram"
-        ]
-    },
-    "cs": {
-        "Introduction": [
-            "String formatting in python",
-            "Object-Oriented Programming in Python",
-            "Python list operations and time complexity",
-            "Python dictionary operations and time complexity",
-            "Python string operations and time complexity",
-            "python collections module, deque, defaultdict, Counter and their time complexities",
-            "python bisect",
-            "python heapq",
-            "python itertools module",
-            "python functools"
-        ],
-        "Data Structures": [
-            "Stacks",
-            "implement stacks in python",
-            "convert decimal to n base",
-            "Infix, Prefix, and Postfix Expressions, convertors and evaluators",
-            "queues",
-            "queues implementation in python",
-            "deque implemention using common python data structures (dont use deque class directly)",
-            "Linked List, implementation of common operations (both iterative and recursive) and time complexity",
-            "Doubly Linked List, implementation of common operations (both iterative and recursive) and time complexity"
-        ],
-        "Recursion": [
-            "Tower of Hanoi",
-            "Dynamic programming"
-        ],
-        "Searching and Sorting": [
-            "Binary Search",
-            "Bubble sort",
-            "Selection sort",
-            "Insertion sort",
-            "Merge sort",
-            "quick sort",
-            "Counting sort",
-            "Heap sort",
-            "Bucket sort",
-            "Radix sort",
-            "Hashing",
-            "Map Abstract Data Structure implementation"
-        ],
-        "Trees and Tree Algorithms": [
-            "Tree Data Structures",
-            "Trees Representation",
-            "Tree Traversals",
-            "Priority Queues with Binary Heaps",
-            "Binary Search Trees and Operations",
-            "Balanced Binary Search Trees",
-            "AVL Tree and Performance",
-            "RedBlackTree"
-        ],
-        "Graphs and Graph Algorithms": [
-            "Graph Fundamentals",
-            "Graph Representation",
-            "Graph Traversals",
-            "Shortest Path Algorithms",
-            "Minimum Spanning Tree Algorithms",
-            "Word Ladder Problem",
-            "Knight's Tour Problem",
-            "Topological Sorting"
-        ]
-    },
-    "physics": {
-        "Classical Mechanics": [
-            "Kinematics",
-            "Newton's Laws of Motion",
-            "Work and Energy",
-            "Linear Momentum",
-            "Rotational Motion",
-            "Universal Gravitation"
-        ],
-        "Electromagnetism": [
-            "Electrostatics",
-            "Electric Circuits",
-            "Magnetic Fields",
-            "Electromagnetic Induction"
-        ],
-        "Thermodynamics": [
-            "Laws of Thermodynamics",
-            "Kinetic Theory of Gases",
-            "Heat Transfer"
-        ]
-    }
+  "leetcode": {
+    "Advanced Graphs": [
+      "Network Delay Time",
+      "Reconstruct Itinerary",
+      "Min Cost to Connect All Points",
+      "Swim In Rising Water",
+      "Alien Dictionary",
+      "Cheapest Flights Within K Stops"
+    ],
+    "1-D Dynamic Programming": [
+      "Climbing Stairs",
+      "Min Cost Climbing Stairs",
+      "House Robber",
+      "House Robber II",
+      "Longest Palindromic Substring",
+      "Palindromic Substrings",
+      "Decode Ways",
+      "Coin Change",
+      "Maximum Product Subarray",
+      "Word Break",
+      "Longest Increasing Subsequence",
+      "Partition Equal Subset Sum"
+    ],
+    "2-D Dynamic Programming": [
+      "Unique Paths",
+      "Longest Common Subsequence",
+      "Best Time to Buy And Sell Stock With Cooldown",
+      "Coin Change II",
+      "Target Sum",
+      "Interleaving String",
+      "Longest Increasing Path In a Matrix",
+      "Distinct Subsequences",
+      "Edit Distance",
+      "Burst Balloons",
+      "Regular Expression Matching"
+    ],
+    "Greedy": [
+      "Maximum Subarray",
+      "Jump Game",
+      "Jump Game II",
+      "Gas Station",
+      "Hand of Straights",
+      "Merge Triplets to Form Target Triplet",
+      "Partition Labels",
+      "Valid Parenthesis String"
+    ]
+  },
+  "cs": {
+    "Introduction": [
+      "String formatting in python",
+      "Object-Oriented Programming in Python",
+      "Python list operations and time complexity",
+      "Python dictionary operations and time complexity",
+      "Python string operations and time complexity",
+      "python collections module, deque, defaultdict, Counter and their time complexities",
+      "python bisect",
+      "python heapq",
+      "python itertools module",
+      "python functools"
+    ],
+    "Data Structures": [
+      "Stacks",
+      "implement stacks in python",
+      "convert decimal to n base",
+      "Infix, Prefix, and Postfix Expressions, convertors and evaluators",
+      "queues",
+      "queues implementation in python",
+      "deque implemention using common python data structures (dont use deque class directly)",
+      "Linked List, implementation of common operations (both iterative and recursive) and time complexity",
+      "Doubly Linked List, implementation of common operations (both iterative and recursive) and time complexity"
+    ],
+    "Recursion": ["Tower of Hanoi", "Dynamic programming"],
+    "Searching and Sorting": [
+      "Binary Search",
+      "Bubble sort",
+      "Selection sort",
+      "Insertion sort",
+      "Merge sort",
+      "quick sort",
+      "Counting sort",
+      "Heap sort",
+      "Bucket sort",
+      "Radix sort",
+      "Hashing",
+      "Map Abstract Data Structure implementation"
+    ],
+    "Trees and Tree Algorithms": [
+      "Tree Data Structures",
+      "Trees Representation",
+      "Tree Traversals",
+      "Priority Queues with Binary Heaps",
+      "Binary Search Trees and Operations",
+      "Balanced Binary Search Trees",
+      "AVL Tree and Performance",
+      "RedBlackTree"
+    ],
+    "Graphs and Graph Algorithms": [
+      "Graph Fundamentals",
+      "Graph Representation",
+      "Graph Traversals",
+      "Shortest Path Algorithms",
+      "Minimum Spanning Tree Algorithms",
+      "Word Ladder Problem",
+      "Knight's Tour Problem",
+      "Topological Sorting"
+    ]
+  },
+  "physics": {
+    "Classical Mechanics": [
+      "Kinematics",
+      "Newton's Laws of Motion",
+      "Work and Energy",
+      "Linear Momentum",
+      "Rotational Motion",
+      "Universal Gravitation"
+    ],
+    "Electromagnetism": [
+      "Electrostatics",
+      "Electric Circuits",
+      "Magnetic Fields",
+      "Electromagnetic Induction"
+    ],
+    "Thermodynamics": [
+      "Laws of Thermodynamics",
+      "Kinetic Theory of Gases",
+      "Heat Transfer"
+    ]
+  }
 }

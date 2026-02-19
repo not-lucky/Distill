@@ -1,21 +1,21 @@
-"""Canopywave LLM Provider using OpenAI-compatible API."""
+"""CliProxy LLM Provider using OpenAI-compatible API."""
 
 from typing import Iterator, Optional
 
 from src.providers.openai_compatible import OpenAICompatibleProvider
 
 
-class CanopywaveProvider(OpenAICompatibleProvider):
-    """LLM Provider for Canopywave's OpenAI-compatible API."""
+class CliProxyProvider(OpenAICompatibleProvider):
+    """LLM Provider for CliProxy's OpenAI-compatible API."""
 
     def __init__(
         self,
         api_keys: Iterator[str],
         model: str,
-        base_url: str = "https://inference.canopywave.io/v1",
+        base_url: str = "https://cliproxyapi.notlucky.dedyn.io/v1",
         timeout: float = 900.0,
         temperature: float = 0.4,
-        max_tokens: Optional[int] = 128000,
+        max_tokens: Optional[int] = 16384,
         max_retries: int = 5,
         json_parse_retries: int = 3,
     ):
@@ -32,4 +32,4 @@ class CanopywaveProvider(OpenAICompatibleProvider):
 
     @property
     def name(self) -> str:
-        return "llm2deck_canopywave"
+        return "llm2deck_cliproxy"

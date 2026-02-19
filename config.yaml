@@ -4,22 +4,22 @@
 # Global Defaults
 # These values apply to all providers unless overridden per-provider
 defaults:
-  timeout: 120.0              # Request timeout in seconds
-  temperature: 0.4            # Sampling temperature
-  max_tokens: null            # Max tokens (null = API default)
-  max_retries: 5              # Max retry attempts for API requests
-  json_parse_retries: 5       # Max retries for JSON parsing
-  retry_delay: 1.0            # Base delay between retries
-  retry_min_wait: 1.0         # Minimum wait for exponential backoff
-  retry_max_wait: 10.0        # Maximum wait for exponential backoff
+  timeout: 120.0 # Request timeout in seconds
+  temperature: 0.4 # Sampling temperature
+  max_tokens: null # Max tokens (null = API default)
+  max_retries: 5 # Max retry attempts for API requests
+  json_parse_retries: 8 # Max retries for JSON parsing
+  retry_delay: 1.0 # Base delay between retries
+  retry_min_wait: 1.0 # Minimum wait for exponential backoff
+  retry_max_wait: 10.0 # Maximum wait for exponential backoff
 
 # Provider Configuration
 # Each provider can override defaults with its own timeout, temperature, etc.
 providers:
   cerebras:
     enabled: true
-    model: "gpt-oss-120b"
-    reasoning_effort: "high"
+    model: "zai-glm-4.7"
+    # reasoning_effort: "high"
 
   openrouter:
     enabled: false
@@ -29,7 +29,7 @@ providers:
   nvidia:
     enabled: false
     model: "moonshotai/kimi-k2-thinking"
-    timeout: 900                                 # Override default timeout
+    timeout: 900 # Override default timeout
     max_tokens: 16384
     top_p: 0.95
     # base_url: "https://integrate.api.nvidia.com/v1"  # Optional, has default
@@ -40,10 +40,12 @@ providers:
     provider_name: "LMArena"
 
   canopywave:
-    enabled: false
-    model: "zai/glm-4.7"
+    enabled: true
+    models:
+      - "zai/glm-5.1"
+      - "moonshotai/kimi-k2.6"
     timeout: 900
-    max_tokens: 16384
+    max_tokens: 127000
     # base_url: "https://api.xiaomimimo.com/v1"  # Optional, has default
 
   baseten:
@@ -58,24 +60,37 @@ providers:
 
   google_genai:
     enabled: false
-    model: "gemini-3-flash-preview"
+    model: "gemini-3.1-flash-lite-preview"
     thinking_level: "high"
-    temperature: 1.0                             # Gemini 3 recommends 1.0
+    temperature: 0.3 # Gemini 3 recommends 1.0
 
   google_antigravity:
-    enabled: true
+    enabled: false
     models:
-      - "gemini-3-flash-preview"
-      - "gemini-3-flash-preview"
-      # - "gemini-claude-opus-4-5-thinking"
+      - "glm-5"
+      - "coder-model"
+      - "claude-opus-4-6-thinking"
+      - "gemini-3.1-pro-high"
+      # - "claude-opus-4-6-thinking"
     timeout: 900
     max_tokens: 64000
-    base_url: "http://127.0.0.1:8317/v1"  # Optional, has default
+    base_url: "http://127.0.0.1:8317/v1" # Optional, has default
+
+  cliproxy:
+    enabled: true
+    models:
+      # - "aihubmix/coding-glm-5-free"
+      # - "aihubmix/coding-minimax-m2.7-free"
+      - "gemini-3.1-pro-preview"
+      # - "aistudio/Gemini Flash Latest"
+    timeout: 900
+    # max_tokens: 64000
+    # base_url: "https://cliproxyapi.notlucky.dedyn.io/v1"  # Optional, has default
 
 # Generation Settings
 generation:
-  concurrent_requests: 7
-  request_delay: 1  # Delay in seconds between starting each request (prevents rate limiting)
+  concurrent_requests: 10
+  request_delay: 1 # Delay in seconds between starting each request (prevents rate limiting)
   max_retries: 10
   json_parse_retries: 10
 
@@ -83,20 +98,22 @@ generation:
   # Specify which provider/model combines cards from all generators.
   # If not set, the first enabled provider is used as combiner.
   combiner:
-    provider: google_antigravity   # Provider name from providers section
-    model: gemini-3-flash-preview  # Model to use for combining
-    also_generate: true            # If true, combiner also does initial generation
-                                   # If false, combiner only combines (not used for generation)
+    provider: cliproxy # Provider name from providers section
+    model: "gemini-3.1-pro-preview" # Model to use for combining
+    also_generate:
+      true # If true, combiner also does initial generation
+      # If false, combiner only combines (not used for generation)
 
   # Formatter Configuration
   # Specify which provider/model formats the combiner output into valid JSON.
   # Use this when your combiner model is intelligent but unreliable at JSON output.
   # If not set, combiner must output valid JSON directly (legacy behavior).
   formatter:
-    provider: cerebras             # Provider name from providers section
-    model: gpt-oss-120b            # Model to use for formatting
-    also_generate: false           # If true, formatter also does initial generation
-                                   # If false, formatter only formats (not used for generation)
+    provider: cerebras # Provider name from providers section
+    model: zai-glm-4.7 # Model to use for formatting
+    also_generate:
+      false # If true, formatter also does initial generation
+      # If false, formatter only formats (not used for generation)
 
 # Database Settings
 database:
@@ -104,9 +121,9 @@ database:
 
 # Paths Configuration
 paths:
-  archival_dir: "anki_cards_archival"   # Directory for archived JSON files
-  markdown_dir: "anki_cards_markdown"   # Directory for exported Markdown files
-  timestamp_format: "%Y%m%dT%H%M%S"     # Timestamp format for output files
+  archival_dir: "anki_cards_archival" # Directory for archived JSON files
+  markdown_dir: "anki_cards_markdown" # Directory for exported Markdown files
+  timestamp_format: "%Y%m%dT%H%M%S" # Timestamp format for output files
 
   # API Key File Paths (optional)
   # These can be overridden by environment variables (higher priority)
@@ -117,6 +134,7 @@ paths:
   #   gemini: "python3ds.json"
   #   nvidia: "nvidia_keys.json"
   #   canopywave: "canopywave_keys.json"
+  #   cliproxy: "cliproxy_keys.json"
   #   baseten: "baseten_keys.json"
   #   google_genai: "google_genai_keys.json"
 

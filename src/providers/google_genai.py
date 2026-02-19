@@ -141,9 +141,8 @@ class GoogleGenAIProvider(LLMProvider):
             prompt_template if prompt_template else prompts.initial
         )
 
-        formatted_prompt = active_template.format(
-            question=question,
-            schema=json.dumps(json_schema, indent=2, ensure_ascii=False),
+        formatted_prompt = active_template.replace("{question}", question).replace(
+            "{schema}", json.dumps(json_schema, indent=2, ensure_ascii=False)
         )
 
         response_content = await self._make_request(formatted_prompt, json_schema)
@@ -174,8 +173,8 @@ class GoogleGenAIProvider(LLMProvider):
             else prompts.combine
         )
 
-        formatted_prompt = active_template.format(
-            question=question, inputs=combined_inputs
+        formatted_prompt = active_template.replace("{question}", question).replace(
+            "{inputs}", combined_inputs
         )
 
         return await self._make_request(formatted_prompt, json_schema)
