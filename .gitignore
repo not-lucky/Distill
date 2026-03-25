@@ -6,3 +6,16 @@ dist/
 wheels/
 *.egg-info
 
+
+# Node-generated files
+node_modules/
+npm-debug.log*
+
+# Application DB & Keys
+keys.yaml
+llm2deck.db
+.env
+.env.local
+
+# Python venv
+.venv/

@@ -1,0 +1,27 @@
+{
+  "name": "llm2deck",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/not-lucky/LLM2Deck.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/not-lucky/LLM2Deck/issues"
+  },
+  "homepage": "https://github.com/not-lucky/LLM2Deck#readme",
+  "dependencies": {
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.7"
+  }
+}
