@@ -6,32 +6,3 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
-.venv
-idk
-screenshots
-output
-final_output
-final_final_output
-final_final_final_output
-*json
-.env
-anki_cards_archival
-anki_cards_markdown
-*apkg
-app.log
-!src/data/questions.json
-!tests/fixtures/*.json
-
-# Database
-llm2deck.db
-
-.flow
-.claude
-AGENTS.md
-CLAUDE.md
-
-# Hypothesis test cache
-.hypothesis/
-.coverage
-htmlcov/
