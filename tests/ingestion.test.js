@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { 
@@ -473,5 +473,216 @@ categories:
     expect(doc.version).toBe('1.0.0');
     expect(doc.description).toBe('Practice questions for MERN stack');
     expect(doc.categories[0].topics[0]).toBe('Two Sum');
+  });
+
+  it('should throw for preset content that parses to a non-object (plain string)', () => {
+    expect(() => parsePreset('just a plain string')).toThrow(/Preset content is empty or invalid/);
+  });
+
+  it('should throw for preset content that parses to null', () => {
+    // YAML null literal
+    expect(() => parsePreset('null')).toThrow(/Preset content is empty or invalid/);
+    expect(() => parsePreset('~')).toThrow(/Preset content is empty or invalid/);
+  });
+
+  it('should throw for preset content that parses to a number', () => {
+    expect(() => parsePreset('42')).toThrow(/Preset content is empty or invalid/);
+  });
+
+  it('should throw when a category entry is null', () => {
+    const yamlContent = `
+name: "Test"
+categories:
+  - null
+`;
+    expect(() => parsePreset(yamlContent)).toThrow(/Category entry must be an object/);
+  });
+
+  it('should throw when a category entry is a string instead of an object', () => {
+    const yamlContent = `
+name: "Test"
+categories:
+  - "just a string"
+`;
+    expect(() => parsePreset(yamlContent)).toThrow(/Category entry must be an object/);
+  });
+
+  it('should throw when a category is missing the topics array', () => {
+    const yamlContent = `
+name: "Test"
+categories:
+  - name: "ValidCategory"
+`;
+    expect(() => parsePreset(yamlContent)).toThrow(/Category entry must have a "topics" array/);
+  });
+
+  it('should throw when a category has topics as a string instead of an array', () => {
+    const yamlContent = `
+name: "Test"
+categories:
+  - name: "ValidCategory"
+    topics: "not an array"
+`;
+    expect(() => parsePreset(yamlContent)).toThrow(/Category entry must have a "topics" array/);
+  });
+
+  it('should throw when a topic is a whitespace-only string', () => {
+    const yamlContent = `
+name: "Test"
+categories:
+  - name: "ValidCategory"
+    topics:
+      - "   "
+`;
+    expect(() => parsePreset(yamlContent)).toThrow(/Topic must be a non-empty string/);
+  });
+
+  it('should throw when loading a preset from a nonexistent file', async () => {
+    await expect(loadPreset('/nonexistent/path/preset.yaml')).rejects.toThrow();
+  });
+});
+
+describe('Ingestion - Uncovered Branch Coverage', () => {
+  const FIXTURES_DIR = path.resolve('./tests/fixtures_ingestion');
+
+  beforeAll(() => {
+    if (!fs.existsSync(FIXTURES_DIR)) {
+      fs.mkdirSync(FIXTURES_DIR, { recursive: true });
+    }
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(FIXTURES_DIR)) {
+      fs.rmSync(FIXTURES_DIR, { recursive: true, force: true });
+    }
+  });
+
+  it('should handle unreadable subdirectory gracefully (walkDirectory catch block)', async () => {
+    const rootScanDir = path.join(FIXTURES_DIR, 'unreadable-dir-root');
+    const unreadableDir = path.join(rootScanDir, 'no-access');
+    const readableDir = path.join(rootScanDir, 'readable');
+
+    fs.mkdirSync(unreadableDir, { recursive: true });
+    fs.mkdirSync(readableDir, { recursive: true });
+
+    // Add a readable file for contrast
+    fs.writeFileSync(path.join(readableDir, 'good.md'), 'readable content', 'utf8');
+
+    // Remove read permission from subdirectory
+    fs.chmodSync(unreadableDir, 0o000);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const results = await ingestDirectory(rootScanDir);
+      // Should still process the readable directory
+      expect(results.length).toBe(1);
+      expect(results[0].content).toBe('readable content');
+    } finally {
+      // Restore permission before cleanup
+      fs.chmodSync(unreadableDir, 0o755);
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should throw when ingestDirectory is called with a nonexistent path', async () => {
+    await expect(ingestDirectory('/nonexistent/path/to/dir')).rejects.toThrow();
+  });
+
+  it('should handle files in root directory (no subdirectory nesting)', async () => {
+    const rootScanDir = path.join(FIXTURES_DIR, 'flat-root');
+    fs.mkdirSync(rootScanDir, { recursive: true });
+
+    fs.writeFileSync(path.join(rootScanDir, 'intro.md'), 'flat content', 'utf8');
+
+    const results = await ingestDirectory(rootScanDir);
+    expect(results.length).toBe(1);
+    expect(results[0].deckPath).toBe('Flat_Root::Intro');
+    expect(results[0].content).toBe('flat content');
+  });
+
+  it('should handle readFileWithFallback when both UTF-8 and Latin-1 fail', async () => {
+    // Mock TextDecoder to force both decoders to fail
+    const originalTextDecoder = globalThis.TextDecoder;
+    let callCount = 0;
+
+    globalThis.TextDecoder = class MockTextDecoder {
+      constructor(encoding, options) {
+        this.encoding = encoding;
+        this.options = options;
+      }
+      decode(buffer) {
+        callCount++;
+        throw new Error(`Mocked ${this.encoding} decode failure`);
+      }
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const filePath = path.join(FIXTURES_DIR, 'mock_decode_file.txt');
+      fs.writeFileSync(filePath, 'some content', 'utf8');
+
+      const result = await readFileWithFallback(filePath);
+      expect(result).toBeNull();
+      expect(callCount).toBe(2); // Both UTF-8 and Latin-1 attempted
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to decode file')
+      );
+    } finally {
+      globalThis.TextDecoder = originalTextDecoder;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should handle file that contains only null bytes', async () => {
+    const filePath = path.join(FIXTURES_DIR, 'null_bytes.txt');
+    // Write a file with only null bytes — valid UTF-8 but content is non-printable
+    fs.writeFileSync(filePath, Buffer.from([0x00, 0x00, 0x00]));
+
+    const result = await readFileWithFallback(filePath);
+    // Should successfully decode (null bytes are valid UTF-8)
+    expect(result).not.toBeNull();
+    expect(result.length).toBe(3);
+  });
+
+  it('should handle .htm and .markdown extensions correctly', async () => {
+    const rootScanDir = path.join(FIXTURES_DIR, 'multi-ext-root');
+    fs.mkdirSync(rootScanDir, { recursive: true });
+
+    fs.writeFileSync(path.join(rootScanDir, 'page.htm'), 'htm content', 'utf8');
+    fs.writeFileSync(path.join(rootScanDir, 'doc.markdown'), 'markdown content', 'utf8');
+
+    const results = await ingestDirectory(rootScanDir);
+    expect(results.length).toBe(2);
+
+    const htmResult = results.find(r => r.filePath.endsWith('.htm'));
+    expect(htmResult).toBeDefined();
+    expect(htmResult.content).toBe('htm content');
+
+    const markdownResult = results.find(r => r.filePath.endsWith('.markdown'));
+    expect(markdownResult).toBeDefined();
+    expect(markdownResult.content).toBe('markdown content');
+  });
+
+  it('should skip files where readFileWithFallback returns null', async () => {
+    const rootScanDir = path.join(FIXTURES_DIR, 'null-read-root');
+    fs.mkdirSync(rootScanDir, { recursive: true });
+
+    const filePath = path.join(rootScanDir, 'unreadable.md');
+    fs.writeFileSync(filePath, 'content', 'utf8');
+    // Remove read permission from the file itself
+    fs.chmodSync(filePath, 0o000);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const results = await ingestDirectory(rootScanDir);
+      // The file should be skipped because readFileWithFallback returns null
+      expect(results.length).toBe(0);
+    } finally {
+      fs.chmodSync(filePath, 0o644);
+      warnSpy.mockRestore();
+    }
   });
 });
