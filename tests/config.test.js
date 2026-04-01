@@ -471,4 +471,270 @@ describe('deepMerge utility', () => {
     expect(merged.polluted).toBeUndefined();
     expect({}.polluted).toBeUndefined();
   });
+
+  it('should return source when target is null, undefined, or a non-object', () => {
+    const source = { a: 1 };
+    expect(deepMerge(null, source)).toEqual(source);
+    expect(deepMerge(undefined, source)).toEqual(source);
+    expect(deepMerge('string', source)).toEqual(source);
+    expect(deepMerge(42, source)).toEqual(source);
+    expect(deepMerge(false, source)).toEqual(source);
+  });
+
+  it('should return target when source is null, undefined, or a non-object', () => {
+    const target = { a: 1 };
+    expect(deepMerge(target, null)).toEqual(target);
+    expect(deepMerge(target, undefined)).toEqual(target);
+    expect(deepMerge(target, 'string')).toEqual(target);
+    expect(deepMerge(target, 42)).toEqual(target);
+    expect(deepMerge(target, false)).toEqual(target);
+  });
+
+  it('should handle source overriding a primitive target value with an object', () => {
+    const target = { a: 1, b: 'text' };
+    const source = { b: { nested: true } };
+    const merged = deepMerge(target, source);
+    expect(merged.b).toEqual({ nested: true });
+  });
+});
+
+describe('Configuration Loader - Uncovered Branch Coverage', () => {
+  const FIXTURES_DIR = path.resolve('./tests/fixtures');
+
+  beforeAll(() => {
+    if (!fs.existsSync(FIXTURES_DIR)) {
+      fs.mkdirSync(FIXTURES_DIR, { recursive: true });
+    }
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(FIXTURES_DIR)) {
+      fs.rmSync(FIXTURES_DIR, { recursive: true, force: true });
+    }
+  });
+
+  it('should handle pipeline with null/undefined/empty object gracefully (extractActiveProviders early return)', () => {
+    const configPath = path.join(FIXTURES_DIR, 'null_pipeline_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'null_pipeline_keys.yaml');
+
+    // Config with no pipeline section at all — pipeline defaults to {}
+    const configContent = `
+global:
+  concurrency_limit: 2
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, '', 'utf8');
+
+    const { config, warnings } = loadConfig(configPath, keysPath);
+    expect(config.global.concurrency_limit).toBe(2);
+    // Should not throw and should have no provider-related warnings
+    const providerWarnings = warnings.filter(w => w.includes('Missing API key'));
+    expect(providerWarnings.length).toBe(0);
+  });
+
+  it('should traverse pipeline values that are numbers, booleans, or null without error', () => {
+    const configPath = path.join(FIXTURES_DIR, 'mixed_pipeline_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'mixed_pipeline_keys.yaml');
+
+    // Pipeline contains non-string, non-array, non-object values (numbers, booleans)
+    // These should be silently skipped by the traverse function
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  generation:
+    temperature: 0.7
+    enabled: true
+    max_tokens: 2048
+    model: "openai/gpt-4"
+`;
+    const keysContent = `
+openai:
+  - "sk-key"
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, keysContent, 'utf8');
+
+    const { warnings } = loadConfig(configPath, keysPath);
+    // Only the model field is parsed as a provider; numbers and booleans are skipped
+    expect(warnings.length).toBe(0);
+  });
+
+  it('should log warnings via console.warn when NODE_ENV is not test', () => {
+    const configPath = path.join(FIXTURES_DIR, 'warn_env_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'warn_env_keys.yaml');
+
+    // Missing config and keys files will generate warnings
+    const originalNodeEnv = process.env.NODE_ENV;
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      process.env.NODE_ENV = 'development';
+      const { warnings } = loadConfig(
+        path.join(FIXTURES_DIR, 'nonexistent_config.yaml'),
+        path.join(FIXTURES_DIR, 'nonexistent_keys.yaml')
+      );
+
+      expect(warnings.length).toBeGreaterThan(0);
+      // console.warn should have been called for each warning
+      expect(warnSpy).toHaveBeenCalled();
+      expect(warnSpy.mock.calls.some(call => call[0].includes('[Config Warning]'))).toBe(true);
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should warn for a single whitespace-only string key', () => {
+    const configPath = path.join(FIXTURES_DIR, 'ws_key_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'ws_key_keys.yaml');
+
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  synthesis:
+    model: "openai/gpt-4o"
+`;
+    // Key is a single whitespace string (not an array)
+    const keysContent = `
+openai: "   "
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, keysContent, 'utf8');
+
+    const { warnings } = loadConfig(configPath, keysPath);
+    expect(warnings.some(w => w.includes('Missing API key for active provider: openai'))).toBe(true);
+  });
+
+  it('should handle config that parses to a non-object value (e.g. bare string)', () => {
+    const configPath = path.join(FIXTURES_DIR, 'string_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'string_config_keys.yaml');
+
+    // A YAML file that parses to a plain string, not an object
+    fs.writeFileSync(configPath, 'just a plain string', 'utf8');
+    fs.writeFileSync(keysPath, '', 'utf8');
+
+    const { config, warnings } = loadConfig(configPath, keysPath);
+    expect(config.global.concurrency_limit).toBe(8); // defaults
+    expect(warnings.some(w => w.includes('empty or invalid'))).toBe(true);
+  });
+
+  it('should handle config that parses to a number', () => {
+    const configPath = path.join(FIXTURES_DIR, 'number_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'number_config_keys.yaml');
+
+    fs.writeFileSync(configPath, '42', 'utf8');
+    fs.writeFileSync(keysPath, '', 'utf8');
+
+    const { config, warnings } = loadConfig(configPath, keysPath);
+    expect(config.global.concurrency_limit).toBe(8);
+    expect(warnings.some(w => w.includes('empty or invalid'))).toBe(true);
+  });
+
+  it('should handle keys file that parses to a non-object value (e.g. a string)', () => {
+    const configPath = path.join(FIXTURES_DIR, 'keys_nonobj_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'keys_nonobj_keys.yaml');
+
+    const configContent = `
+global:
+  concurrency_limit: 4
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, 'just a string not an object', 'utf8');
+
+    const { keys, warnings } = loadConfig(configPath, keysPath);
+    expect(keys).toEqual({});
+    expect(warnings.some(w => w.includes('empty or invalid'))).toBe(true);
+  });
+
+  it('should throw for model ending with slash (e.g. "openai/")', () => {
+    const configPath = path.join(FIXTURES_DIR, 'trailing_slash_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'trailing_slash_keys.yaml');
+
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  generation:
+    model: "openai/"
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, '', 'utf8');
+
+    expect(() => loadConfig(configPath, keysPath)).toThrow(/Invalid model format/);
+  });
+
+  it('should throw for model starting with slash (e.g. "/gpt-4")', () => {
+    const configPath = path.join(FIXTURES_DIR, 'leading_slash_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'leading_slash_keys.yaml');
+
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  generation:
+    model: "/gpt-4"
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, '', 'utf8');
+
+    expect(() => loadConfig(configPath, keysPath)).toThrow(/Invalid model format/);
+  });
+
+  it('should not warn for provider keys that are neither string nor array (e.g. number, object)', () => {
+    const configPath = path.join(FIXTURES_DIR, 'nonstandard_keys_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'nonstandard_keys_keys.yaml');
+
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  generation:
+    model: "openai/gpt-4"
+`;
+    // Key value is a number — not a string or array, so hasKey stays false
+    const keysContent = `
+openai: 12345
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, keysContent, 'utf8');
+
+    const { warnings } = loadConfig(configPath, keysPath);
+    expect(warnings.some(w => w.includes('Missing API key for active provider: openai'))).toBe(true);
+  });
+
+  it('should handle duplicate providers in pipeline without duplication in validation', () => {
+    const configPath = path.join(FIXTURES_DIR, 'dup_provider_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'dup_provider_keys.yaml');
+
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  stage1:
+    model: "openai/gpt-4"
+  stage2:
+    model: "openai/gpt-3.5-turbo"
+  stage3:
+    models:
+      - "openai/gpt-4o"
+`;
+    const keysContent = `
+openai:
+  - "sk-key"
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, keysContent, 'utf8');
+
+    const { warnings } = loadConfig(configPath, keysPath);
+    // Only one provider "openai", deduplicated by Set
+    expect(warnings.length).toBe(0);
+  });
 });
