@@ -27,7 +27,7 @@ export function getDb() {
  * - Opens the connection.
  * - Sets pragmas for foreign keys and WAL mode.
  * - Creates tables and indices if they do not exist.
- * 
+ *
  * @param {string} dbPath Path to the SQLite database file.
  * @returns {Database.Database} The initialized database connection.
  */
@@ -50,10 +50,11 @@ export function initDatabase(dbPath) {
 
   dbConn = new Database(dbPath);
 
-  // WAL (Write-Ahead Logging) mode allows concurrent reads and writes by writing changes to a separate log.
-  // This prevents SQLite database locking or busy issues when parallel async operations perform database writes.
-  // Foreign keys are enabled explicitly on every connection because SQLite disables them by default.
-  // This ensures cascade deletions ON DELETE CASCADE are correctly propagated.
+  // WAL (Write-Ahead Logging) mode allows concurrent reads and writes by writing changes to
+  // a separate log. This prevents SQLite database locking or busy issues when parallel
+  // async operations perform database writes.
+  // Foreign keys are enabled explicitly on every connection because SQLite disables
+  // them by default. This ensures cascade deletions ON DELETE CASCADE are correctly propagated.
   dbConn.pragma('foreign_keys = ON');
   dbConn.pragma('journal_mode = WAL');
 
@@ -112,7 +113,7 @@ export function closeDatabase() {
 
 /**
  * Creates a new execution run record in the database.
- * 
+ *
  * @param {Object} params
  * @param {string} params.runId Unique identifier for the run.
  * @param {string} params.subject Name of the subject or directory path.
@@ -121,7 +122,9 @@ export function closeDatabase() {
  * @param {string} params.configHash Hash representing current system configuration.
  * @returns {Database.RunResult} Result of the insertion operation.
  */
-export function createRun({ runId, subject, cardType, status, configHash }) {
+export function createRun({
+  runId, subject, cardType, status, configHash,
+}) {
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO runs (run_id, subject, card_type, status, config_hash)
@@ -132,7 +135,7 @@ export function createRun({ runId, subject, cardType, status, configHash }) {
 
 /**
  * Updates the execution status of a run.
- * 
+ *
  * @param {string} runId
  * @param {string} status ('running', 'completed', 'failed')
  * @returns {Database.RunResult}
@@ -152,7 +155,7 @@ export function updateRunStatus(runId, status) {
 
 /**
  * Retrieves a run record by ID.
- * 
+ *
  * @param {string} runId
  * @returns {Object|undefined} The run record or undefined if not found.
  */
@@ -166,7 +169,7 @@ export function getRun(runId) {
 
 /**
  * Deletes a run record and cascades deletions to all associated pipeline steps.
- * 
+ *
  * @param {string} runId
  * @returns {Database.RunResult}
  */
@@ -180,7 +183,7 @@ export function deleteRun(runId) {
 
 /**
  * Logs a pipeline execution step for auditing.
- * 
+ *
  * @param {Object} params
  * @param {string} params.runId
  * @param {string} params.questionId
@@ -191,7 +194,9 @@ export function deleteRun(runId) {
  * @param {string} params.outputData
  * @returns {Database.RunResult}
  */
-export function addPipelineStep({ runId, questionId, stage, provider, model, inputData, outputData }) {
+export function addPipelineStep({
+  runId, questionId, stage, provider, model, inputData, outputData,
+}) {
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO pipeline_steps (run_id, question_id, stage, provider, model, input_data, output_data)
@@ -202,7 +207,7 @@ export function addPipelineStep({ runId, questionId, stage, provider, model, inp
 
 /**
  * Retrieves all step audits for a specific question within a run.
- * 
+ *
  * @param {string} runId
  * @param {string} questionId
  * @returns {Array<Object>} List of pipeline step audit records.
@@ -220,7 +225,7 @@ export function getPipelineSteps(runId, questionId) {
 
 /**
  * Retrieves all step audits associated with a run.
- * 
+ *
  * @param {string} runId
  * @returns {Array<Object>} List of pipeline step audit records.
  */
@@ -237,7 +242,7 @@ export function getPipelineStepsForRun(runId) {
 
 /**
  * Retrieves a cached response by key.
- * 
+ *
  * @param {string} cacheKey SHA256 request parameter hash.
  * @returns {Object|undefined} Cached record or undefined if cache miss.
  */
@@ -253,7 +258,7 @@ export function getCache(cacheKey) {
  * Inserts or updates a cached response.
  * Implements an upsert policy: if the cache key already exists, updates the fields
  * with the new LLM output and resets the created_at timestamp.
- * 
+ *
  * @param {Object} params
  * @param {string} params.cacheKey
  * @param {string} params.provider
@@ -262,7 +267,9 @@ export function getCache(cacheKey) {
  * @param {string} params.response
  * @returns {Database.RunResult}
  */
-export function setCache({ cacheKey, provider, model, promptHash, response }) {
+export function setCache({
+  cacheKey, provider, model, promptHash, response,
+}) {
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO llm_cache (cache_key, provider, model, prompt_hash, response)
@@ -279,7 +286,7 @@ export function setCache({ cacheKey, provider, model, promptHash, response }) {
 
 /**
  * Clears all cached LLM response entries.
- * 
+ *
  * @returns {Database.RunResult}
  */
 export function clearCache() {
@@ -292,7 +299,7 @@ export function clearCache() {
 
 /**
  * Retrieves cache utilization metrics.
- * 
+ *
  * @returns {{ count: number }} Cache metrics.
  */
 export function getCacheStats() {
@@ -308,7 +315,7 @@ export function getCacheStats() {
  * - If the callback throws an error, the transaction is automatically rolled back.
  * - If the callback completes successfully, the transaction is committed.
  * - better-sqlite3 automatically handles nested transactions using SAVEPOINTs.
- * 
+ *
  * @param {Function} callback Callback containing DB queries to execute.
  * @returns {*} Result of the callback execution.
  */

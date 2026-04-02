@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import {
+  describe, it, expect, beforeAll, afterAll, beforeEach, afterEach,
+} from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -16,7 +18,7 @@ import {
   setCache,
   clearCache,
   getCacheStats,
-  transaction
+  transaction,
 } from '../src/database.js';
 
 const FIXTURES_DIR = path.resolve('./tests/fixtures_database');
@@ -63,31 +65,31 @@ describe('Database Module & SQLite Operations', () => {
 
   it('should correctly initialize tables and indices', () => {
     const db = getDb();
-    
+
     // Check if runs, pipeline_steps, and llm_cache tables exist
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name);
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);
     expect(tables).toContain('runs');
     expect(tables).toContain('pipeline_steps');
     expect(tables).toContain('llm_cache');
 
     // Check if indices exist
-    const indices = db.prepare("SELECT name FROM sqlite_master WHERE type='index'").all().map(r => r.name);
+    const indices = db.prepare("SELECT name FROM sqlite_master WHERE type='index'").all().map((r) => r.name);
     expect(indices).toContain('idx_pipeline_steps_lookup');
     expect(indices).toContain('idx_runs_status');
   });
 
   it('should support run creation, retrieval, and status updates', () => {
     const runId = 'test-run-123';
-    
+
     // Create a run
     const res = createRun({
       runId,
       subject: 'LeetCode',
       cardType: 'standard',
       status: 'running',
-      configHash: 'hash123'
+      configHash: 'hash123',
     });
-    
+
     expect(res.changes).toBe(1);
 
     // Retrieve and verify details
@@ -118,7 +120,7 @@ describe('Database Module & SQLite Operations', () => {
       subject: 'JavaScript',
       cardType: 'standard',
       status: 'running',
-      configHash: 'config456'
+      configHash: 'config456',
     });
 
     const step1 = {
@@ -128,7 +130,7 @@ describe('Database Module & SQLite Operations', () => {
       provider: 'openai',
       model: 'gpt-3.5-turbo',
       inputData: 'Explain closures',
-      outputData: 'A closure is...'
+      outputData: 'A closure is...',
     };
 
     const step2 = {
@@ -138,7 +140,7 @@ describe('Database Module & SQLite Operations', () => {
       provider: 'openai',
       model: 'gpt-4o',
       inputData: 'Combine results',
-      outputData: 'Synthesized closure card...'
+      outputData: 'Synthesized closure card...',
     };
 
     addPipelineStep(step1);
@@ -162,7 +164,7 @@ describe('Database Module & SQLite Operations', () => {
       subject: 'MERN',
       cardType: 'standard',
       status: 'running',
-      configHash: 'config789'
+      configHash: 'config789',
     });
 
     addPipelineStep({
@@ -172,7 +174,7 @@ describe('Database Module & SQLite Operations', () => {
       provider: 'openai',
       model: 'gpt-3.5-turbo',
       inputData: 'Express route',
-      outputData: 'app.get(...)'
+      outputData: 'app.get(...)',
     });
 
     // Verify step exists
@@ -193,7 +195,7 @@ describe('Database Module & SQLite Operations', () => {
 
   it('should manage LLM cache keys, overrides, stats, and clearing', () => {
     const cacheKey = 'sha256-hash-key';
-    
+
     // Check initial cache stats
     expect(getCacheStats().count).toBe(0);
 
@@ -203,7 +205,7 @@ describe('Database Module & SQLite Operations', () => {
       provider: 'openai',
       model: 'gpt-4o',
       promptHash: 'prompt-hash-1',
-      response: 'Initial cached response'
+      response: 'Initial cached response',
     });
 
     expect(getCacheStats().count).toBe(1);
@@ -220,7 +222,7 @@ describe('Database Module & SQLite Operations', () => {
       provider: 'openai',
       model: 'gpt-4o',
       promptHash: 'prompt-hash-2',
-      response: 'Overwritten cached response'
+      response: 'Overwritten cached response',
     });
 
     // Check count is still 1
@@ -243,7 +245,7 @@ describe('Database Module & SQLite Operations', () => {
       subject: 'Concurrency',
       cardType: 'standard',
       status: 'running',
-      configHash: 'hash-parallel'
+      configHash: 'hash-parallel',
     });
 
     // Perform many insertions in parallel simulating high-frequency writes
@@ -259,7 +261,7 @@ describe('Database Module & SQLite Operations', () => {
           provider: 'cerebras',
           model: 'llama3',
           inputData: `input-${i}`,
-          outputData: `output-${i}`
+          outputData: `output-${i}`,
         });
       })());
     }
@@ -279,7 +281,7 @@ describe('Database Module & SQLite Operations', () => {
       subject: 'Transactions',
       cardType: 'standard',
       status: 'running',
-      configHash: 'tx-hash'
+      configHash: 'tx-hash',
     });
 
     // Successful transaction
@@ -291,7 +293,7 @@ describe('Database Module & SQLite Operations', () => {
         provider: 'openai',
         model: 'gpt-3.5',
         inputData: 'data1',
-        outputData: 'out1'
+        outputData: 'out1',
       });
       addPipelineStep({
         runId,
@@ -300,7 +302,7 @@ describe('Database Module & SQLite Operations', () => {
         provider: 'openai',
         model: 'gpt-3.5',
         inputData: 'data2',
-        outputData: 'out2'
+        outputData: 'out2',
       });
     });
 
@@ -317,7 +319,7 @@ describe('Database Module & SQLite Operations', () => {
           provider: 'openai',
           model: 'gpt-3.5',
           inputData: 'data3',
-          outputData: 'out3'
+          outputData: 'out3',
         });
 
         // Intentional error to trigger rollback
@@ -333,7 +335,7 @@ describe('Database Module & SQLite Operations', () => {
   it('should handle nested directory database path creation', () => {
     // Close the standard test DB
     closeDatabase();
-    
+
     const nestedDbPath = path.join(FIXTURES_DIR, 'nested1/nested2/test_nested.db');
     // Ensure clean state: delete nested database file if present
     if (fs.existsSync(nestedDbPath)) {
@@ -356,15 +358,15 @@ describe('Database Module & SQLite Operations', () => {
   it('should safely close stale connections when initDatabase is called multiple times', () => {
     // Call initDatabase to open first connection
     const db1 = getDb();
-    
+
     // Call initDatabase again on standard path to re-initialize
     const db2 = initDatabase(TEST_DB_PATH);
-    
+
     // db1 should now be closed. Calling prepare on db1 should throw because it is closed.
     expect(() => db1.prepare('SELECT 1')).toThrow(/database connection is not open/);
-    
+
     // db2 should be open and operational
-    expect(db2.prepare('SELECT 1').get()).toEqual({ '1': 1 });
+    expect(db2.prepare('SELECT 1').get()).toEqual({ 1: 1 });
   });
 
   it('should enforce NOT NULL constraints on runs table', () => {
@@ -374,7 +376,7 @@ describe('Database Module & SQLite Operations', () => {
         runId: 'invalid-run-1',
         cardType: 'standard',
         status: 'running',
-        configHash: 'hash'
+        configHash: 'hash',
       });
     }).toThrow(/NOT NULL constraint failed/);
   });
@@ -387,7 +389,7 @@ describe('Database Module & SQLite Operations', () => {
         subject: 'LeetCode',
         cardType: 'standard',
         status: 'invalid_status_value',
-        configHash: 'hash'
+        configHash: 'hash',
       });
     }).toThrow(/CHECK constraint failed/);
 
@@ -398,7 +400,7 @@ describe('Database Module & SQLite Operations', () => {
         subject: 'LeetCode',
         cardType: 'invalid_card_type',
         status: 'running',
-        configHash: 'hash'
+        configHash: 'hash',
       });
     }).toThrow(/CHECK constraint failed/);
 
@@ -409,7 +411,7 @@ describe('Database Module & SQLite Operations', () => {
       subject: 'LeetCode',
       cardType: 'standard',
       status: 'running',
-      configHash: 'hash'
+      configHash: 'hash',
     });
 
     // Stage CHECK constraint: must be ('generation', 'synthesis', 'translation', 'enforcement')
@@ -421,7 +423,7 @@ describe('Database Module & SQLite Operations', () => {
         provider: 'openai',
         model: 'gpt-3.5',
         inputData: 'in',
-        outputData: 'out'
+        outputData: 'out',
       });
     }).toThrow(/CHECK constraint failed/);
   });
@@ -433,17 +435,18 @@ describe('Database Module & SQLite Operations', () => {
       subject: 'LeetCode',
       cardType: 'standard',
       status: 'running',
-      configHash: 'hash'
+      configHash: 'hash',
     });
 
-    // Inserting another run with the same primary key run_id should throw UNIQUE/PRIMARY KEY failure
+    // Inserting another run with the same primary key run_id should throw
+    // UNIQUE/PRIMARY KEY failure
     expect(() => {
       createRun({
         runId,
         subject: 'Other',
         cardType: 'standard',
         status: 'running',
-        configHash: 'hash'
+        configHash: 'hash',
       });
     }).toThrow(/UNIQUE constraint failed: runs.run_id/);
   });
@@ -467,7 +470,7 @@ describe('Database Module & SQLite Operations', () => {
       subject: 'Transactions',
       cardType: 'standard',
       status: 'running',
-      configHash: 'hash'
+      configHash: 'hash',
     });
 
     // Outer transaction succeeds, inner transaction fails and rolls back only the inner part
@@ -479,7 +482,7 @@ describe('Database Module & SQLite Operations', () => {
         provider: 'openai',
         model: 'gpt-3.5',
         inputData: 'outer-in',
-        outputData: 'outer-out'
+        outputData: 'outer-out',
       });
 
       // Nested transaction
@@ -492,7 +495,7 @@ describe('Database Module & SQLite Operations', () => {
             provider: 'openai',
             model: 'gpt-3.5',
             inputData: 'inner-in',
-            outputData: 'inner-out'
+            outputData: 'inner-out',
           });
           throw new Error('Rollback nested');
         });
@@ -503,7 +506,7 @@ describe('Database Module & SQLite Operations', () => {
 
     const steps = getPipelineStepsForRun(runId);
     // Outer question was saved, but inner question was rolled back
-    const questionIds = steps.map(s => s.question_id);
+    const questionIds = steps.map((s) => s.question_id);
     expect(questionIds).toContain('outer-q');
     expect(questionIds).not.toContain('inner-q');
   });
@@ -515,11 +518,11 @@ describe('Database Module & SQLite Operations', () => {
       subject: 'Unicode Study 🚀',
       cardType: 'standard',
       status: 'running',
-      configHash: 'hash'
+      configHash: 'hash',
     });
 
     // Large code block and complex unicode text
-    const largeUnicodeInput = 'const x = "你好, 世界!";\n' + '🚀'.repeat(10000);
+    const largeUnicodeInput = `const x = "你好, 世界!";\n${'🚀'.repeat(10000)}`;
     const unicodeOutput = 'Output: 🌟 🎏 💖';
 
     addPipelineStep({
@@ -529,7 +532,7 @@ describe('Database Module & SQLite Operations', () => {
       provider: 'openai compatible client',
       model: 'gpt-4o-unicode-🚀',
       inputData: largeUnicodeInput,
-      outputData: unicodeOutput
+      outputData: unicodeOutput,
     });
 
     const steps = getPipelineSteps(runId, 'unicode-q');

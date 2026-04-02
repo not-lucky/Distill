@@ -1,12 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import {
+  describe, it, expect, beforeAll, afterAll, vi,
+} from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { 
-  formatNamespaceComponent, 
-  readFileWithFallback, 
-  ingestDirectory, 
-  parsePreset, 
-  loadPreset 
+import {
+  formatNamespaceComponent,
+  readFileWithFallback,
+  ingestDirectory,
+  parsePreset,
+  loadPreset,
 } from '../src/ingestion.js';
 
 const FIXTURES_DIR = path.resolve('./tests/fixtures_ingestion');
@@ -106,8 +108,8 @@ describe('Ingestion - File Reading Encodings', () => {
   it('should fall back to Latin-1 for non-UTF-8 files', async () => {
     const filePath = path.join(FIXTURES_DIR, 'latin1_file.txt');
     // Write high-ASCII Latin-1 bytes that are invalid in UTF-8
-    // e.g. 0xE9 (é) and 0xF1 (ñ)
-    const buffer = Buffer.from([0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0xE9, 0xF1]); // "Hello éñ" in Latin-1
+    // "Hello éñ" in Latin-1
+    const buffer = Buffer.from([0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0xE9, 0xF1]);
     fs.writeFileSync(filePath, buffer);
 
     const result = await readFileWithFallback(filePath);
@@ -192,12 +194,12 @@ describe('Ingestion - Directory Ingestion', () => {
     // Expect 2 valid ingested files
     expect(results.length).toBe(2);
 
-    const match1 = results.find(r => r.filePath === file1);
+    const match1 = results.find((r) => r.filePath === file1);
     expect(match1).toBeDefined();
     expect(match1.deckPath).toBe('My_Study_Root::01_React_Basics::01_Jsx_Intro');
     expect(match1.content).toBe('# Jsx Intro\nSome react content.');
 
-    const match2 = results.find(r => r.filePath === file2);
+    const match2 = results.find((r) => r.filePath === file2);
     expect(match2).toBeDefined();
     expect(match2.deckPath).toBe('My_Study_Root::02_Advanced_Topics::State_Management');
     expect(match2.content).toBe('Redux vs Context API');
@@ -265,8 +267,8 @@ describe('Ingestion - Directory Ingestion', () => {
 
     const results = await ingestDirectory(rootScanDir);
     expect(results.length).toBe(4);
-    
-    const deckPaths = results.map(r => r.deckPath);
+
+    const deckPaths = results.map((r) => r.deckPath);
     expect(deckPaths).toContain('Case_Ext_Root::File');
   });
 
@@ -300,7 +302,7 @@ describe('Ingestion - Directory Ingestion', () => {
 
     // Create a symlink to the target file inside our scan folder
     const symlinkPath = path.join(rootScanDir, 'linked_file.txt');
-    
+
     // In Windows this might require admin rights or fail, but in Linux it is fully supported.
     // Since the USER runs Linux, we can write a clean, native test.
     let symlinkCreated = false;
@@ -314,7 +316,8 @@ describe('Ingestion - Directory Ingestion', () => {
 
     if (symlinkCreated) {
       const results = await ingestDirectory(rootScanDir);
-      // Since walkDirectory skips non-regular files (only allows entry.isFile() or entry.isDirectory()),
+      // Since walkDirectory skips non-regular files (only allows
+      // entry.isFile() or entry.isDirectory()),
       // and entry.isFile() is false for symbolic links, it should skip it.
       expect(results.length).toBe(0);
     }
@@ -325,7 +328,7 @@ describe('Ingestion - Directory Ingestion', () => {
     const rootScanDir = path.join(FIXTURES_DIR, 'duplicate-folder-scan');
     const folderLevel1 = path.join(rootScanDir, 'basics');
     const folderLevel2 = path.join(rootScanDir, 'advanced/basics');
-    
+
     fs.mkdirSync(folderLevel1, { recursive: true });
     fs.mkdirSync(folderLevel2, { recursive: true });
 
@@ -338,10 +341,10 @@ describe('Ingestion - Directory Ingestion', () => {
     const results = await ingestDirectory(rootScanDir);
     expect(results.length).toBe(2);
 
-    const match1 = results.find(r => r.filePath === file1);
+    const match1 = results.find((r) => r.filePath === file1);
     expect(match1.deckPath).toBe('Duplicate_Folder_Scan::Basics::Concept');
 
-    const match2 = results.find(r => r.filePath === file2);
+    const match2 = results.find((r) => r.filePath === file2);
     expect(match2.deckPath).toBe('Duplicate_Folder_Scan::Advanced::Basics::Concept');
   });
 });
@@ -543,8 +546,6 @@ categories:
 });
 
 describe('Ingestion - Uncovered Branch Coverage', () => {
-  const FIXTURES_DIR = path.resolve('./tests/fixtures_ingestion');
-
   beforeAll(() => {
     if (!fs.existsSync(FIXTURES_DIR)) {
       fs.mkdirSync(FIXTURES_DIR, { recursive: true });
@@ -611,7 +612,8 @@ describe('Ingestion - Uncovered Branch Coverage', () => {
         this.encoding = encoding;
         this.options = options;
       }
-      decode(buffer) {
+
+      decode() {
         callCount++;
         throw new Error(`Mocked ${this.encoding} decode failure`);
       }
@@ -627,7 +629,7 @@ describe('Ingestion - Uncovered Branch Coverage', () => {
       expect(result).toBeNull();
       expect(callCount).toBe(2); // Both UTF-8 and Latin-1 attempted
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to decode file')
+        expect.stringContaining('Failed to decode file'),
       );
     } finally {
       globalThis.TextDecoder = originalTextDecoder;
@@ -656,11 +658,11 @@ describe('Ingestion - Uncovered Branch Coverage', () => {
     const results = await ingestDirectory(rootScanDir);
     expect(results.length).toBe(2);
 
-    const htmResult = results.find(r => r.filePath.endsWith('.htm'));
+    const htmResult = results.find((r) => r.filePath.endsWith('.htm'));
     expect(htmResult).toBeDefined();
     expect(htmResult.content).toBe('htm content');
 
-    const markdownResult = results.find(r => r.filePath.endsWith('.markdown'));
+    const markdownResult = results.find((r) => r.filePath.endsWith('.markdown'));
     expect(markdownResult).toBeDefined();
     expect(markdownResult.content).toBe('markdown content');
   });

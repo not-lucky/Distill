@@ -8,7 +8,7 @@ import yaml from 'js-yaml';
  * - Splits by separators (hyphens, underscores, spaces)
  * - Converts each word to Title Case (first letter uppercase, rest lowercase)
  * - Joins them with underscores
- * 
+ *
  * @param {string} name The component name to format.
  * @returns {string} The formatted component.
  */
@@ -24,15 +24,15 @@ export function formatNamespaceComponent(name) {
   // 3. Filter out empty tokens, convert to Title Case (capital first letter, lowercase rest),
   // and join them with underscores (e.g., "react-tutorial" becomes "React_Tutorial").
   return words
-    .filter(w => w.length > 0)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .filter((w) => w.length > 0)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join('_');
 }
 
 /**
  * Reads a file trying UTF-8 first with fatal decode error checking,
  * falling back to Latin-1 if UTF-8 decoding fails.
- * 
+ *
  * @param {string} filePath Absolute path to the file.
  * @returns {Promise<string|null>} The parsed content or null if reading/decoding fails.
  */
@@ -69,7 +69,7 @@ export async function readFileWithFallback(filePath) {
 /**
  * Recursively walks a directory, returning a flat list of matching absolute file paths.
  * Hidden files and directories (names starting with '.') are skipped.
- * 
+ *
  * @param {string} dirPath The absolute directory path.
  * @param {string[]} allowedExtensions Suffix matches (case-insensitive, e.g. ['.txt', '.md'])
  * @returns {Promise<string[]>}
@@ -78,8 +78,9 @@ async function walkDirectory(dirPath, allowedExtensions) {
   let files = [];
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    
-    // Map entries to parallel scanning promises to optimize scanning performance on massive directory trees.
+
+    // Map entries to parallel scanning promises to optimize scanning performance
+    // on massive directory trees.
     const scanPromises = entries.map(async (entry) => {
       // Skip hidden files and directories (VCS, build, or configuration assets)
       if (entry.name.startsWith('.')) {
@@ -88,8 +89,8 @@ async function walkDirectory(dirPath, allowedExtensions) {
 
       const fullPath = path.join(dirPath, entry.name);
       if (entry.isDirectory()) {
-        return await walkDirectory(fullPath, allowedExtensions);
-      } else if (entry.isFile()) {
+        return walkDirectory(fullPath, allowedExtensions);
+      } if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
         if (allowedExtensions.includes(ext)) {
           return [fullPath];
@@ -109,13 +110,13 @@ async function walkDirectory(dirPath, allowedExtensions) {
 /**
  * Scans a local directory, parses document contents, and maps folder structures
  * to Title Case double colon path namespaces (e.g. ReactTutorial::Basics::JsxIntro).
- * 
+ *
  * @param {string} rootPath Path to the root directory to scan.
  * @returns {Promise<Array<{ filePath: string, deckPath: string, content: string }>>}
  */
 export async function ingestDirectory(rootPath) {
   const resolvedRoot = path.resolve(rootPath);
-  
+
   // Verify directory existence/status before walking
   const stats = await fs.stat(resolvedRoot);
   if (!stats.isDirectory()) {
@@ -130,7 +131,7 @@ export async function ingestDirectory(rootPath) {
 
   for (const filePath of filePaths) {
     const content = await readFileWithFallback(filePath);
-    
+
     // Skip if reading failed or if file contains only whitespace to avoid token waste
     if (content === null || content.trim().length === 0) {
       continue;
@@ -141,7 +142,8 @@ export async function ingestDirectory(rootPath) {
     const parts = relativePath.split(path.sep);
 
     // Grab file component and strip extension case-insensitively.
-    // We only strip extensions for the final file name, preserving any dots in intermediate directory names.
+    // We only strip extensions for the final file name, preserving any dots
+    // in intermediate directory names.
     const fileComponent = parts[parts.length - 1];
     const ext = path.extname(fileComponent);
     const filenameWithoutExt = fileComponent.slice(0, fileComponent.length - ext.length);
@@ -161,7 +163,7 @@ export async function ingestDirectory(rootPath) {
     results.push({
       filePath,
       deckPath,
-      content
+      content,
     });
   }
 
@@ -170,7 +172,7 @@ export async function ingestDirectory(rootPath) {
 
 /**
  * Validates and parses topic presets in YAML format.
- * 
+ *
  * @param {string} fileContent String content of YAML file.
  * @returns {Object} Parsed preset object.
  */
@@ -212,7 +214,7 @@ export function parsePreset(fileContent) {
 
 /**
  * Asynchronously loads and parses a YAML preset from file path.
- * 
+ *
  * @param {string} filePath Path to preset file.
  * @returns {Promise<Object>}
  */

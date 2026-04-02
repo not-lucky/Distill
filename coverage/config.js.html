@@ -247,7 +247,10 @@
 <a name='L182'></a><a href='#L182'>182</a>
 <a name='L183'></a><a href='#L183'>183</a>
 <a name='L184'></a><a href='#L184'>184</a>
-<a name='L185'></a><a href='#L185'>185</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
@@ -324,6 +327,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -371,6 +377,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -430,7 +437,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">68x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import fs from 'fs';
 import yaml from 'js-yaml';
 &nbsp;
@@ -439,18 +445,18 @@ const DEFAULTS = {
     concurrency_limit: 8,
     request_delay: 1.0,
     default_timeout: 500.0,
-    output_dir: "./output",
-    cache_db_path: "./llm2deck.db",
-    keys_file_path: "./keys.yaml"
+    output_dir: './output',
+    cache_db_path: './llm2deck.db',
+    keys_file_path: './keys.yaml',
   },
   providers: {},
-  pipeline: {}
+  pipeline: {},
 };
 &nbsp;
 /**
  * Loads config.yaml and keys.yaml, merges with default values,
  * and validates that active pipeline providers have configured API keys.
- * 
+ *
  * @param {string} configPath Path to the configuration YAML file.
  * @param {string|null} keysPath Path to the keys YAML file (overrides config global setting).
  * @returns {{ config: Object, keys: Object, warnings: string[] }}
@@ -505,7 +511,10 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
 &nbsp;
   // 5. Dynamically extract all active providers referenced in the pipeline and validate them
   /* v8 ignore next */
-  const activeProviders = extractActiveProviders(config.pipeline, Object.keys(config.providers || {}));
+  const activeProviders = extractActiveProviders(
+    config.pipeline,
+    Object.keys(config.providers || {}),
+  );
 &nbsp;
   // 6. Validate that active providers have at least one non-empty API key
   for (const provider of activeProviders) {
@@ -515,7 +524,7 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
     const providerKeys = keys[provider];
     let hasKey = false;
     if (Array.isArray(providerKeys)) {
-      hasKey = providerKeys.some(k =&gt; typeof k === 'string' &amp;&amp; k.trim().length &gt; 0);
+      hasKey = providerKeys.some((k) =&gt; typeof k === 'string' &amp;&amp; k.trim().length &gt; 0);
     } else if (typeof providerKeys === 'string') {
       hasKey = providerKeys.trim().length &gt; 0;
     }
@@ -527,7 +536,7 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
 &nbsp;
   // Log warnings if not running inside a test environment
   if (warnings.length &gt; 0 &amp;&amp; process.env.NODE_ENV !== 'test') {
-    warnings.forEach(w =&gt; console.warn(`[Config Warning] ${w}`));
+    warnings.forEach((w) =&gt; console.warn(`[Config Warning] ${w}`));
   }
 &nbsp;
   return { config, keys, warnings };
@@ -536,7 +545,7 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
 /**
  * Recursively traverses pipeline stages to find any provider prefixes in "provider/model" format.
  * Throws an error if any model is specified in an invalid format or uses an undeclared provider.
- * 
+ *
  * @param {Object} pipeline The pipeline configuration object.
  * @param {string[]} declaredProviders List of declared provider names from configuration.
  * @returns {Set&lt;string&gt;} Set of active provider names.
@@ -555,7 +564,8 @@ function extractActiveProviders(pipeline, declaredProviders = []) {
         }
         const provider = value.substring(0, firstSlashIdx);
         const model = value.substring(firstSlashIdx + 1);
-        /* v8 ignore next 3 -- Defensive guard: logically unreachable after the slash-index bounds check above */
+        /* v8 ignore next 3 -- Defensive guard: logically unreachable
+           after the slash-index bounds check above */
         if (!provider || !model) {
           throw new Error(`Invalid model format: "${value}". Must be in "provider/model" format.`);
         }
@@ -582,9 +592,9 @@ function extractActiveProviders(pipeline, declaredProviders = []) {
 /**
  * Recursively merges source object into target object.
  * Returns a new merged object without mutating target or source.
- * 
- * @param {Object} target 
- * @param {Object} source 
+ *
+ * @param {Object} target
+ * @param {Object} source
  * @returns {Object}
  */
 export function deepMerge(target, source) {
@@ -614,7 +624,6 @@ export function deepMerge(target, source) {
   }
   return result;
 }
-&nbsp;
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -622,7 +631,7 @@ export function deepMerge(target, source) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-29T04:48:48.244Z
+                at 2026-05-29T05:27:36.280Z
             </div>
         <script src="prettify.js"></script>
         <script>
