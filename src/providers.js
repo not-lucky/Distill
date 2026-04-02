@@ -136,7 +136,9 @@ export function createProviderClients(config, keys) {
  */
 export function createThrottledFetcher(config) {
   const concurrencyLimit = config.global.concurrency_limit || 8;
-  const requestDelay = config.global.request_delay || 1.0;
+  const requestDelay = config.global.request_delay !== undefined
+    ? config.global.request_delay
+    : 1.0;
 
   const limit = pLimit(concurrencyLimit);
   let lastStartTime = 0;
