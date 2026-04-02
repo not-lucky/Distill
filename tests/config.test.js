@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import {
+  describe, it, expect, beforeAll, afterAll, vi,
+} from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { loadConfig, deepMerge } from '../src/config.js';
@@ -38,8 +40,8 @@ describe('Configuration Loader - Edge Cases & Robustness', () => {
     expect(keys).toEqual({});
 
     // Warnings should contain file missing messages
-    expect(warnings.some(w => w.includes('Config file not found'))).toBe(true);
-    expect(warnings.some(w => w.includes('Keys file not found'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Config file not found'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Keys file not found'))).toBe(true);
   });
 
   it('should successfully parse valid config and keys yaml files', () => {
@@ -118,9 +120,10 @@ openai:
       expect(config.global.keys_file_path).toBe('./keys.yaml');
       expect(config.pipeline.generation.models).toContain('openai/gpt-3.5-turbo');
 
-      // Since we initialized keys.yaml with template placeholder keys, active providers should have keys
+      // Since we initialized keys.yaml with template placeholder keys,
+      // active providers should have keys
       expect(keys.openai).toBeDefined();
-      
+
       // There should be no warnings in a clean base environment setup
       expect(warnings.length).toBe(0);
     } finally {
@@ -142,9 +145,9 @@ openai:
     // Should fall back to standard defaults for global config
     expect(config.global.concurrency_limit).toBe(8);
     expect(keys).toEqual({});
-    
+
     // Warn about empty/invalid structures
-    expect(warnings.some(w => w.includes('empty or invalid'))).toBe(true);
+    expect(warnings.some((w) => w.includes('empty or invalid'))).toBe(true);
   });
 
   it('should issue warning if active provider has missing keys', () => {
@@ -175,8 +178,8 @@ openai:
     const { keys, warnings } = loadConfig(configPath, keysPath);
 
     expect(keys.openai).toEqual(['sk-some-key']);
-    expect(warnings.some(w => w.includes('Missing API key for active provider: cerebras'))).toBe(true);
-    expect(warnings.some(w => w.includes('Missing API key for active provider: openai'))).toBe(false);
+    expect(warnings.some((w) => w.includes('Missing API key for active provider: cerebras'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Missing API key for active provider: openai'))).toBe(false);
   });
 
   it('should issue warning if keys array is empty or contains only empty strings', () => {
@@ -203,7 +206,7 @@ openai:
     const { warnings } = loadConfig(configPath, keysPath);
 
     // Warn because all keys in the list are whitespace/empty
-    expect(warnings.some(w => w.includes('Missing API key for active provider: openai'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Missing API key for active provider: openai'))).toBe(true);
   });
 
   it('should not warn if at least one key in the array is valid', () => {
@@ -361,7 +364,7 @@ openai:
     const { warnings } = loadConfig(configPath, keysPath);
 
     // Should not output any warnings about missing keys for "." or "templates" or "var"
-    const bogusWarnings = warnings.filter(w => w.includes('Missing API key for active provider'));
+    const bogusWarnings = warnings.filter((w) => w.includes('Missing API key for active provider'));
     expect(bogusWarnings.length).toBe(0);
   });
 
@@ -375,8 +378,8 @@ openai:
     const { config, warnings } = loadConfig(configPath, keysPath);
 
     expect(config.global.concurrency_limit).toBe(8); // fell back to default
-    expect(warnings.some(w => w.includes('Error reading config file') || w.includes('invalid'))).toBe(true);
-    expect(warnings.some(w => w.includes('Error reading keys file') || w.includes('invalid'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Error reading config file') || w.includes('invalid'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Error reading keys file') || w.includes('invalid'))).toBe(true);
   });
 
   it('should correctly merge custom global and provider structures', () => {
@@ -412,16 +415,16 @@ describe('deepMerge utility', () => {
       a: 1,
       b: {
         c: 2,
-        d: 3
+        d: 3,
       },
-      arr: [1, 2]
+      arr: [1, 2],
     };
     const source = {
       b: {
         d: 4,
-        e: 5
+        e: 5,
       },
-      arr: [3, 4]
+      arr: [3, 4],
     };
 
     const merged = deepMerge(target, source);
@@ -431,9 +434,9 @@ describe('deepMerge utility', () => {
       b: {
         c: 2,
         d: 4,
-        e: 5
+        e: 5,
       },
-      arr: [3, 4]
+      arr: [3, 4],
     });
 
     // Verify non-mutation
@@ -444,24 +447,24 @@ describe('deepMerge utility', () => {
   it('should ignore null and undefined values from source', () => {
     const target = {
       a: 1,
-      b: { c: 2 }
+      b: { c: 2 },
     };
     const source = {
       a: undefined,
-      b: null
+      b: null,
     };
 
     const merged = deepMerge(target, source);
 
     expect(merged).toEqual({
       a: 1,
-      b: { c: 2 }
+      b: { c: 2 },
     });
   });
 
   it('should prevent prototype pollution by ignoring keys like __proto__', () => {
     const target = {
-      a: 1
+      a: 1,
     };
     const source = JSON.parse('{"__proto__": {"polluted": true}, "constructor": {"prototype": {"polluted": true}}, "prototype": {"polluted": true}, "b": 2}');
 
@@ -499,8 +502,6 @@ describe('deepMerge utility', () => {
 });
 
 describe('Configuration Loader - Uncovered Branch Coverage', () => {
-  const FIXTURES_DIR = path.resolve('./tests/fixtures');
-
   beforeAll(() => {
     if (!fs.existsSync(FIXTURES_DIR)) {
       fs.mkdirSync(FIXTURES_DIR, { recursive: true });
@@ -528,7 +529,7 @@ global:
     const { config, warnings } = loadConfig(configPath, keysPath);
     expect(config.global.concurrency_limit).toBe(2);
     // Should not throw and should have no provider-related warnings
-    const providerWarnings = warnings.filter(w => w.includes('Missing API key'));
+    const providerWarnings = warnings.filter((w) => w.includes('Missing API key'));
     expect(providerWarnings.length).toBe(0);
   });
 
@@ -562,9 +563,6 @@ openai:
   });
 
   it('should log warnings via console.warn when NODE_ENV is not test', () => {
-    const configPath = path.join(FIXTURES_DIR, 'warn_env_config.yaml');
-    const keysPath = path.join(FIXTURES_DIR, 'warn_env_keys.yaml');
-
     // Missing config and keys files will generate warnings
     const originalNodeEnv = process.env.NODE_ENV;
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -573,13 +571,13 @@ openai:
       process.env.NODE_ENV = 'development';
       const { warnings } = loadConfig(
         path.join(FIXTURES_DIR, 'nonexistent_config.yaml'),
-        path.join(FIXTURES_DIR, 'nonexistent_keys.yaml')
+        path.join(FIXTURES_DIR, 'nonexistent_keys.yaml'),
       );
 
       expect(warnings.length).toBeGreaterThan(0);
       // console.warn should have been called for each warning
       expect(warnSpy).toHaveBeenCalled();
-      expect(warnSpy.mock.calls.some(call => call[0].includes('[Config Warning]'))).toBe(true);
+      expect(warnSpy.mock.calls.some((call) => call[0].includes('[Config Warning]'))).toBe(true);
     } finally {
       process.env.NODE_ENV = originalNodeEnv;
       warnSpy.mockRestore();
@@ -606,7 +604,7 @@ openai: "   "
     fs.writeFileSync(keysPath, keysContent, 'utf8');
 
     const { warnings } = loadConfig(configPath, keysPath);
-    expect(warnings.some(w => w.includes('Missing API key for active provider: openai'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Missing API key for active provider: openai'))).toBe(true);
   });
 
   it('should handle config that parses to a non-object value (e.g. bare string)', () => {
@@ -619,7 +617,7 @@ openai: "   "
 
     const { config, warnings } = loadConfig(configPath, keysPath);
     expect(config.global.concurrency_limit).toBe(8); // defaults
-    expect(warnings.some(w => w.includes('empty or invalid'))).toBe(true);
+    expect(warnings.some((w) => w.includes('empty or invalid'))).toBe(true);
   });
 
   it('should handle config that parses to a number', () => {
@@ -631,7 +629,7 @@ openai: "   "
 
     const { config, warnings } = loadConfig(configPath, keysPath);
     expect(config.global.concurrency_limit).toBe(8);
-    expect(warnings.some(w => w.includes('empty or invalid'))).toBe(true);
+    expect(warnings.some((w) => w.includes('empty or invalid'))).toBe(true);
   });
 
   it('should handle keys file that parses to a non-object value (e.g. a string)', () => {
@@ -647,7 +645,7 @@ global:
 
     const { keys, warnings } = loadConfig(configPath, keysPath);
     expect(keys).toEqual({});
-    expect(warnings.some(w => w.includes('empty or invalid'))).toBe(true);
+    expect(warnings.some((w) => w.includes('empty or invalid'))).toBe(true);
   });
 
   it('should throw for model ending with slash (e.g. "openai/")', () => {
@@ -706,7 +704,7 @@ openai: 12345
     fs.writeFileSync(keysPath, keysContent, 'utf8');
 
     const { warnings } = loadConfig(configPath, keysPath);
-    expect(warnings.some(w => w.includes('Missing API key for active provider: openai'))).toBe(true);
+    expect(warnings.some((w) => w.includes('Missing API key for active provider: openai'))).toBe(true);
   });
 
   it('should handle duplicate providers in pipeline without duplication in validation', () => {

@@ -6,18 +6,18 @@ const DEFAULTS = {
     concurrency_limit: 8,
     request_delay: 1.0,
     default_timeout: 500.0,
-    output_dir: "./output",
-    cache_db_path: "./llm2deck.db",
-    keys_file_path: "./keys.yaml"
+    output_dir: './output',
+    cache_db_path: './llm2deck.db',
+    keys_file_path: './keys.yaml',
   },
   providers: {},
-  pipeline: {}
+  pipeline: {},
 };
 
 /**
  * Loads config.yaml and keys.yaml, merges with default values,
  * and validates that active pipeline providers have configured API keys.
- * 
+ *
  * @param {string} configPath Path to the configuration YAML file.
  * @param {string|null} keysPath Path to the keys YAML file (overrides config global setting).
  * @returns {{ config: Object, keys: Object, warnings: string[] }}
@@ -72,7 +72,10 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
 
   // 5. Dynamically extract all active providers referenced in the pipeline and validate them
   /* v8 ignore next */
-  const activeProviders = extractActiveProviders(config.pipeline, Object.keys(config.providers || {}));
+  const activeProviders = extractActiveProviders(
+    config.pipeline,
+    Object.keys(config.providers || {}),
+  );
 
   // 6. Validate that active providers have at least one non-empty API key
   for (const provider of activeProviders) {
@@ -82,7 +85,7 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
     const providerKeys = keys[provider];
     let hasKey = false;
     if (Array.isArray(providerKeys)) {
-      hasKey = providerKeys.some(k => typeof k === 'string' && k.trim().length > 0);
+      hasKey = providerKeys.some((k) => typeof k === 'string' && k.trim().length > 0);
     } else if (typeof providerKeys === 'string') {
       hasKey = providerKeys.trim().length > 0;
     }
@@ -94,7 +97,7 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
 
   // Log warnings if not running inside a test environment
   if (warnings.length > 0 && process.env.NODE_ENV !== 'test') {
-    warnings.forEach(w => console.warn(`[Config Warning] ${w}`));
+    warnings.forEach((w) => console.warn(`[Config Warning] ${w}`));
   }
 
   return { config, keys, warnings };
@@ -103,7 +106,7 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
 /**
  * Recursively traverses pipeline stages to find any provider prefixes in "provider/model" format.
  * Throws an error if any model is specified in an invalid format or uses an undeclared provider.
- * 
+ *
  * @param {Object} pipeline The pipeline configuration object.
  * @param {string[]} declaredProviders List of declared provider names from configuration.
  * @returns {Set<string>} Set of active provider names.
@@ -122,7 +125,8 @@ function extractActiveProviders(pipeline, declaredProviders = []) {
         }
         const provider = value.substring(0, firstSlashIdx);
         const model = value.substring(firstSlashIdx + 1);
-        /* v8 ignore next 3 -- Defensive guard: logically unreachable after the slash-index bounds check above */
+        /* v8 ignore next 3 -- Defensive guard: logically unreachable
+           after the slash-index bounds check above */
         if (!provider || !model) {
           throw new Error(`Invalid model format: "${value}". Must be in "provider/model" format.`);
         }
@@ -149,9 +153,9 @@ function extractActiveProviders(pipeline, declaredProviders = []) {
 /**
  * Recursively merges source object into target object.
  * Returns a new merged object without mutating target or source.
- * 
- * @param {Object} target 
- * @param {Object} source 
+ *
+ * @param {Object} target
+ * @param {Object} source
  * @returns {Object}
  */
 export function deepMerge(target, source) {
@@ -181,4 +185,3 @@ export function deepMerge(target, source) {
   }
   return result;
 }
-
