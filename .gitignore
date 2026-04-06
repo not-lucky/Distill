@@ -19,3 +19,5 @@ llm2deck.db
 
 # Python venv
 .venv/
+
+ coverage/
