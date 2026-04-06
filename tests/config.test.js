@@ -86,7 +86,7 @@ openai:
       if (filePath === './config.yaml' || filePath === './keys.yaml') {
         return true;
       }
-      return fs.existsSync(filePath);
+      return false;
     });
 
     const readSpy = vi.spyOn(fs, 'readFileSync').mockImplementation((filePath, encoding) => {

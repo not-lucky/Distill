@@ -211,7 +211,7 @@ describe('Providers Module', () => {
         openai: 'key-single-openai',
         cerebras: ['key-cer-1'],
       };
-      const clients = createProviderClients(config, stringKeys);
+      createProviderClients(config, stringKeys);
       expect(OpenAI).toHaveBeenCalledWith(
         expect.objectContaining({
           baseURL: 'https://api.openai.com/v1',
@@ -259,10 +259,10 @@ describe('Providers Module', () => {
         providers: {
           openai: {
             base_url: 'https://api.openai.com/v1',
-          }
-        }
+          },
+        },
       };
-      const clients = createProviderClients(configNoTimeout, keys);
+      createProviderClients(configNoTimeout, keys);
       expect(OpenAI).toHaveBeenCalledWith(
         expect.objectContaining({
           timeout: undefined,
@@ -601,7 +601,7 @@ describe('Providers Module', () => {
           keys,
           clients,
           throttledFetch,
-        })
+        }),
       ).rejects.toThrow(/No initialized client found for provider/);
     });
 
@@ -630,7 +630,7 @@ describe('Providers Module', () => {
       expect(result).toBe('Done');
       expect(createSpy).toHaveBeenCalledWith(
         expect.any(Object),
-        expect.objectContaining({ apiKey: 'key-single-op' })
+        expect.objectContaining({ apiKey: 'key-single-op' }),
       );
     });
 
@@ -656,7 +656,7 @@ describe('Providers Module', () => {
         expect.objectContaining({
           temperature: 0.8,
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -667,8 +667,8 @@ describe('Providers Module', () => {
         providers: {
           openai: {
             base_url: 'https://api.openai.com/v1',
-          }
-        }
+          },
+        },
       };
       const openaiClient = clients.get('openai');
       const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
@@ -689,7 +689,7 @@ describe('Providers Module', () => {
         expect.objectContaining({
           temperature: 0.3,
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -697,7 +697,7 @@ describe('Providers Module', () => {
       const messages = [{ role: 'user', content: 'No provider config check' }];
       const configNoProvider = {
         global: { default_timeout: 10 },
-        providers: {}
+        providers: {},
       };
       const openaiClient = clients.get('openai');
       const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
@@ -718,7 +718,7 @@ describe('Providers Module', () => {
         expect.objectContaining({
           temperature: 0.3,
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -746,7 +746,7 @@ describe('Providers Module', () => {
         }),
         expect.not.objectContaining({
           apiKey: expect.any(String),
-        })
+        }),
       );
     });
 
@@ -773,7 +773,7 @@ describe('Providers Module', () => {
 
       expect(createSpy).toHaveBeenCalledWith(
         expect.any(Object),
-        expect.not.objectContaining({ apiKey: expect.any(String) })
+        expect.not.objectContaining({ apiKey: expect.any(String) }),
       );
     });
   });

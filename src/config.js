@@ -9,6 +9,7 @@ const DEFAULTS = {
     output_dir: './output',
     cache_db_path: './llm2deck.db',
     keys_file_path: './keys.yaml',
+    prompts_file_path: './prompts.yaml',
   },
   providers: {},
   pipeline: {},
@@ -20,7 +21,7 @@ const DEFAULTS = {
  *
  * @param {string} configPath Path to the configuration YAML file.
  * @param {string|null} keysPath Path to the keys YAML file (overrides config global setting).
- * @returns {{ config: Object, keys: Object, warnings: string[] }}
+ * @returns {{ config: Object, keys: Object, prompts: Object, warnings: string[] }}
  */
 export function loadConfig(configPath = './config.yaml', keysPath = null) {
   const warnings = [];
@@ -95,12 +96,34 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
     }
   }
 
+  // 7. Load and parse the prompts YAML file
+  let prompts = {};
+  const resolvedPromptsPath = config.global.prompts_file_path;
+  try {
+    if (fs.existsSync(resolvedPromptsPath)) {
+      const fileContent = fs.readFileSync(resolvedPromptsPath, 'utf8');
+      const parsedPrompts = yaml.load(fileContent);
+      if (parsedPrompts && typeof parsedPrompts === 'object') {
+        prompts = parsedPrompts;
+      } else {
+        warnings.push(`Prompts file at ${resolvedPromptsPath} is empty or invalid.`);
+      }
+    }
+  } catch (error) {
+    warnings.push(`Error reading prompts file at ${resolvedPromptsPath}: ${error.message}.`);
+  }
+
   // Log warnings if not running inside a test environment
   if (warnings.length > 0 && process.env.NODE_ENV !== 'test') {
     warnings.forEach((w) => console.warn(`[Config Warning] ${w}`));
   }
 
-  return { config, keys, warnings };
+  return {
+    config,
+    keys,
+    prompts,
+    warnings,
+  };
 }
 
 /**
