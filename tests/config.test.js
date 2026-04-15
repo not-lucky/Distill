@@ -60,6 +60,12 @@ pipeline:
   generation:
     models:
       - "openai/gpt-3.5-turbo"
+  synthesis:
+    model: "openai/gpt-4o"
+  translation:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
 `;
     const keysContent = `
 openai:
@@ -101,6 +107,12 @@ pipeline:
   generation:
     models:
       - "openai/gpt-3.5-turbo"
+  synthesis:
+    model: "openai/gpt-4o"
+  translation:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
 `;
       }
       if (filePath === './keys.yaml') {
@@ -218,8 +230,15 @@ providers:
   openai:
     base_url: "https://api.openai.com/v1"
 pipeline:
+  generation:
+    models:
+      - "openai/gpt-3.5-turbo"
   synthesis:
     model: "openai/gpt-4o"
+  translation:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
 `;
     const keysContent = `
 openai:
@@ -245,8 +264,15 @@ providers:
   openai:
     base_url: "https://api.openai.com/v1"
 pipeline:
+  generation:
+    models:
+      - "openai/gpt-3.5-turbo"
   synthesis:
     model: "openai/gpt-4o"
+  translation:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
 `;
     // Key specified as a single string instead of a list
     const keysContent = `
@@ -274,6 +300,12 @@ pipeline:
   generation:
     models:
       - "ollama_local/llama3"
+  synthesis:
+    model: "ollama_local/llama3"
+  translation:
+    model: "ollama_local/llama3"
+  schema_enforcement:
+    model: "ollama_local/llama3"
 `;
     const keysContent = `
 openai:
@@ -548,6 +580,13 @@ pipeline:
     temperature: 0.7
     enabled: true
     max_tokens: 2048
+    models:
+      - "openai/gpt-4"
+  synthesis:
+    model: "openai/gpt-4"
+  translation:
+    model: "openai/gpt-4"
+  schema_enforcement:
     model: "openai/gpt-4"
 `;
     const keysContent = `
@@ -723,6 +762,15 @@ pipeline:
   stage3:
     models:
       - "openai/gpt-4o"
+  generation:
+    models:
+      - "openai/gpt-3.5-turbo"
+  synthesis:
+    model: "openai/gpt-4o"
+  translation:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
 `;
     const keysContent = `
 openai:
@@ -734,5 +782,96 @@ openai:
     const { warnings } = loadConfig(configPath, keysPath);
     // Only one provider "openai", deduplicated by Set
     expect(warnings.length).toBe(0);
+  });
+
+  it('should issue warning if pipeline stage has missing models or empty array', () => {
+    const configPath = path.join(FIXTURES_DIR, 'missing_stage_models_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'missing_stage_models_keys.yaml');
+
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  generation:
+    models:
+      - "openai/gpt-3.5-turbo"
+  translation:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, '', 'utf8');
+
+    const { warnings } = loadConfig(configPath, keysPath);
+    expect(warnings.some((w) => w.includes('Pipeline stage "synthesis" has no model configured.'))).toBe(true);
+  });
+
+  it('should issue warning if pipeline stage generation has empty/invalid model strings', () => {
+    const configPath = path.join(FIXTURES_DIR, 'empty_gen_models_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'empty_gen_models_keys.yaml');
+
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  generation:
+    models:
+      - ""
+  synthesis:
+    model: "openai/gpt-4o"
+  translation:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, '', 'utf8');
+
+    const { warnings } = loadConfig(configPath, keysPath);
+    expect(warnings.some((w) => w.includes('Pipeline stage "generation" contains empty or invalid model strings.'))).toBe(true);
+  });
+
+  it('should handle filesystem errors when checking or reading prompts file', () => {
+    const configPath = path.join(FIXTURES_DIR, 'fs_error_config.yaml');
+    const keysPath = path.join(FIXTURES_DIR, 'fs_error_keys.yaml');
+
+    const configContent = `
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+global:
+  prompts_file_path: "./tests/fixtures/fs_error_prompts.yaml"
+pipeline:
+  generation:
+    models:
+      - "openai/gpt-3.5-turbo"
+  synthesis:
+    model: "openai/gpt-4o"
+  translation:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
+`;
+    fs.writeFileSync(configPath, configContent, 'utf8');
+    fs.writeFileSync(keysPath, '', 'utf8');
+
+    const existsSpy = vi.spyOn(fs, 'existsSync').mockImplementation((filePath) => {
+      if (filePath.includes('fs_error_prompts.yaml')) {
+        throw new Error('Simulated File System Read Error');
+      }
+      // Use original function logic for others
+      const { existsSync } = vi.importActual('fs');
+      return existsSync ? existsSync(filePath) : true;
+    });
+
+    try {
+      const { warnings } = loadConfig(configPath, keysPath);
+      expect(warnings.some((w) => w.includes('Error reading prompts file') && w.includes('Simulated File System Read Error'))).toBe(true);
+    } finally {
+      existsSpy.mockRestore();
+    }
   });
 });
