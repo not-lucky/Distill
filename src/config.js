@@ -96,6 +96,31 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
     }
   }
 
+  // Validate that all required pipeline stages have configured models.
+  // This notifies the user beforehand if any models are missing.
+  const { pipeline } = config;
+  const genModels = pipeline.generation?.models;
+  if (!pipeline.generation || !Array.isArray(genModels) || genModels.length === 0) {
+    warnings.push('Missing configuration: Pipeline stage "generation" has no models configured.');
+  } else {
+    const hasEmptyGenModel = pipeline.generation.models.some((m) => typeof m !== 'string' || !m.trim());
+    if (hasEmptyGenModel) {
+      warnings.push('Missing configuration: Pipeline stage "generation" contains empty or invalid model strings.');
+    }
+  }
+
+  if (!pipeline.synthesis || typeof pipeline.synthesis.model !== 'string' || !pipeline.synthesis.model.trim()) {
+    warnings.push('Missing configuration: Pipeline stage "synthesis" has no model configured.');
+  }
+
+  if (!pipeline.translation || typeof pipeline.translation.model !== 'string' || !pipeline.translation.model.trim()) {
+    warnings.push('Missing configuration: Pipeline stage "translation" has no model configured.');
+  }
+
+  if (!pipeline.schema_enforcement || typeof pipeline.schema_enforcement.model !== 'string' || !pipeline.schema_enforcement.model.trim()) {
+    warnings.push('Missing configuration: Pipeline stage "schema_enforcement" has no model configured.');
+  }
+
   // 7. Load and parse the prompts YAML file
   let prompts = {};
   const resolvedPromptsPath = config.global.prompts_file_path;
@@ -142,6 +167,9 @@ function extractActiveProviders(pipeline, declaredProviders = []) {
   function traverse(value, parentKey) {
     if (typeof value === 'string') {
       if (parentKey === 'model' || parentKey === 'models' || !parentKey) {
+        if (!value.trim()) {
+          return;
+        }
         const firstSlashIdx = value.indexOf('/');
         if (firstSlashIdx <= 0 || firstSlashIdx === value.length - 1) {
           throw new Error(`Invalid model format: "${value}". Must be in "provider/model" format.`);

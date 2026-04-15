@@ -1,3 +1,4 @@
+import Ajv from 'ajv';
 import { resolveProviderModel, callLLM } from './providers.js';
 import { addPipelineStep } from './database.js';
 import { resolvePrompts } from './prompts.js';
@@ -180,4 +181,344 @@ export async function runStage2({
   });
 
   return output;
+}
+
+export const CARD_JSON_SCHEMA = {
+  $schema: 'http://json-schema.org/draft-07/schema#',
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'Title of the concept, problem, or document section.' },
+    topic: { type: 'string', description: 'Main category hierarchy or path.' },
+    difficulty: {
+      type: 'string',
+      enum: ['Basic', 'Intermediate', 'Advanced'],
+      description: 'Standardized difficulty level for database sorting.',
+    },
+    cards: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          card_format: {
+            type: 'string',
+            enum: ['Basic', 'Cloze', 'MCQ'],
+            description: 'The structural layout of the card in Anki.',
+          },
+          card_type: {
+            type: 'string',
+            enum: ['Concept', 'Code', 'Procedure', 'Syntax', 'Behavior', 'Constraint', 'ErrorHandling', 'TradeOff'],
+            description: 'Pedagogical tag for sorting and styled headers.',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string', pattern: '^[A-Za-z0-9-_/]+$' },
+            description: 'Alphanumeric, hyphen, underscore, and slash tags (no spaces allowed).',
+          },
+          front: { type: 'string', description: 'Front/question side of the card, or statement with {{c1::hidden text}} syntax for Cloze.' },
+          back: { type: 'string', description: 'Short, punchy answer. Required for Basic card format; prohibited in MCQ or Cloze.' },
+          options: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 2,
+            maxItems: 4,
+            description: '2 to 4 choices. Required only for MCQ.',
+          },
+          correct_answer: {
+            type: 'string',
+            enum: ['A', 'B', 'C', 'D'],
+            description: 'Correct choice letter index. Required only for MCQ.',
+          },
+          explanation: {
+            type: 'string',
+            description: 'Detailed background explanation, code examples, or trade-offs shown on the back side of all card formats.',
+          },
+        },
+        required: ['card_format', 'card_type', 'tags', 'explanation'],
+        additionalProperties: false,
+        oneOf: [
+          {
+            properties: {
+              card_format: { const: 'Basic' },
+              options: { not: {} },
+              correct_answer: { not: {} },
+            },
+            required: ['front', 'back'],
+          },
+          {
+            properties: {
+              card_format: { const: 'Cloze' },
+              front: { pattern: '\\{\\{c[0-9]+::' },
+              back: { not: {} },
+              options: { not: {} },
+              correct_answer: { not: {} },
+            },
+            required: ['front'],
+            description: 'front must contain at least one cloze deletion using {{c1::word}} syntax.',
+          },
+          {
+            properties: {
+              card_format: { const: 'MCQ' },
+              back: { not: {} },
+            },
+            required: ['front', 'options', 'correct_answer'],
+          },
+        ],
+        allOf: [
+          {
+            if: {
+              properties: {
+                card_format: { const: 'MCQ' },
+                correct_answer: { const: 'C' },
+              },
+              required: ['card_format', 'correct_answer'],
+            },
+            then: {
+              properties: {
+                options: { minItems: 3 },
+              },
+            },
+          },
+          {
+            if: {
+              properties: {
+                card_format: { const: 'MCQ' },
+                correct_answer: { const: 'D' },
+              },
+              required: ['card_format', 'correct_answer'],
+            },
+            then: {
+              properties: {
+                options: { minItems: 4 },
+              },
+            },
+          },
+        ],
+      },
+    },
+  },
+  required: ['title', 'topic', 'difficulty', 'cards'],
+  additionalProperties: false,
+};
+
+/**
+ * Cleans markdown code block wraps from raw text returned by the LLM.
+ *
+ * @param {string} text Raw response.
+ * @returns {string} Cleaned text.
+ */
+export function cleanJsonOutput(text) {
+  if (typeof text !== 'string') return '';
+  let cleaned = text.trim();
+
+  // Try to match the content inside markdown code fence (```json ... ``` or ``` ... ```)
+  const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (codeBlockMatch) {
+    cleaned = codeBlockMatch[1].trim();
+  }
+
+  return cleaned;
+}
+
+/**
+ * Extracts question/front strings from Stage 2 raw text consolidated lists.
+ *
+ * @param {string} text Raw consolidated list.
+ * @returns {string[]} List of question texts.
+ */
+export function parseStage2Questions(text) {
+  if (typeof text !== 'string') return [];
+  const lines = text.split('\n');
+  const questions = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match lines starting with "Front:", "Q:", or "Question:"
+    // with optional bold markers or "Card X" prefix
+    const regexPattern = '^(?:\\*\\*|)?(?:Card\\s*\\d+\\s*:?\\s*)?'
+      + '(?:Front|Q(?:uestion)?)\\s*:\\s*(?:\\*\\*|)?(.*)';
+    const questionRegex = new RegExp(regexPattern, 'i');
+    const match = trimmed.match(questionRegex);
+    if (match) {
+      let qText = match[1].trim();
+      qText = qText.replace(/\*\*$/, '').trim();
+      if (qText) {
+        questions.push(qText);
+      }
+    }
+  }
+  return questions;
+}
+
+/**
+ * Audit checks that every Stage 2 question has a corresponding representation
+ * in the Stage 3 card objects.
+ *
+ * @param {string[]} stage2Questions List of questions parsed from Stage 2.
+ * @param {Array<Object>} stage3Cards List of cards from Stage 3 JSON.
+ * @returns {string[]} Missing questions.
+ */
+export function verifyContentLoss(stage2Questions, stage3Cards) {
+  const missingQuestions = [];
+  if (!Array.isArray(stage3Cards)) {
+    return [...stage2Questions];
+  }
+
+  for (const s2Q of stage2Questions) {
+    const normalizedS2 = s2Q.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!normalizedS2) continue;
+
+    let found = false;
+    for (const card of stage3Cards) {
+      if (card && typeof card.front === 'string') {
+        const normalizedS3 = card.front.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (normalizedS3.includes(normalizedS2) || normalizedS2.includes(normalizedS3)) {
+          found = true;
+          break;
+        }
+      }
+    }
+    if (!found) {
+      missingQuestions.push(s2Q);
+    }
+  }
+  return missingQuestions;
+}
+
+/**
+ * Executes Stage 3 of the pipeline: JSON Translation & Schema Enforcement.
+ * Translates consolidated text from Stage 2 into valid polymorphic JSON cards.
+ * Uses an AJV compiler for validation and run a recovery re-prompt loop on failures.
+ *
+ * @param {Object} params
+ * @param {string} params.runId Active execution run ID.
+ * @param {string} params.questionId Unique identifier for this chunk/topic.
+ * @param {string} params.synthesisResult Stage 2 consolidated text output.
+ * @param {string} [params.cardType='standard'] Layout format ('standard' or 'mcq').
+ * @param {string} [params.subject=''] Explicit subject name passed to the pipeline.
+ * @param {Object} [params.prompts={}] Loaded prompts configuration from yaml file.
+ * @param {Object} params.config The merged system configuration.
+ * @param {Object} params.keys Loaded API keys.
+ * @param {Map<string, OpenAI>} params.clients Initialized provider clients.
+ * @param {Function} params.throttledFetch Concurrency-throttled fetch wrapper.
+ * @param {number} [params.maxEnforcementRetries=5] Maximum recovery re-prompts on failures.
+ * @returns {Promise<Object>} The conforming parsed JSON cards object.
+ */
+export async function runStage3({
+  runId,
+  questionId,
+  synthesisResult,
+  cardType = 'standard',
+  subject = '',
+  prompts = {},
+  config,
+  keys,
+  clients,
+  throttledFetch,
+  maxEnforcementRetries = 5,
+}) {
+  if (typeof synthesisResult !== 'string' || !synthesisResult.trim()) {
+    throw new Error('Stage 2 synthesis result is missing or empty');
+  }
+
+  // Retrieve schema enforcement model config, fallback to translation model
+  const modelString = config?.pipeline?.schema_enforcement?.model
+    || config?.pipeline?.translation?.model;
+  if (!modelString) {
+    throw new Error('No schema enforcement model configured in config.pipeline.schema_enforcement.model');
+  }
+
+  const { provider, model } = resolveProviderModel(modelString);
+
+  // Resolve Stage 3 prompts
+  const resolvedPrompts = resolvePrompts(prompts, subject, cardType);
+  const enforcementBase = resolvedPrompts.enforcement;
+
+  // Inject target JSON Schema to guide enforcement
+  const systemPrompt = `${enforcementBase}\n\nYou must output a JSON object conforming strictly to this JSON Schema:\n${JSON.stringify(CARD_JSON_SCHEMA, null, 2)}`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Consolidated Text Flashcard List:\n\n${synthesisResult}` },
+  ];
+
+  const ajv = new Ajv({ allErrors: true, strict: false });
+  const validate = ajv.compile(CARD_JSON_SCHEMA);
+
+  const stage2Questions = parseStage2Questions(synthesisResult);
+
+  let attempt = 0;
+  let lastErrorMsg = '';
+
+  while (attempt < maxEnforcementRetries) {
+    attempt++;
+    const rawOutput = await callLLM({
+      provider,
+      model,
+      messages,
+      config,
+      keys,
+      clients,
+      throttledFetch,
+    });
+
+    const cleanedOutput = cleanJsonOutput(rawOutput);
+    let jsonObj;
+    const errorsList = [];
+
+    // 1. JSON Parsing Check
+    try {
+      jsonObj = JSON.parse(cleanedOutput);
+    } catch (parseError) {
+      errorsList.push(`JSON Parsing Error: ${parseError.message}`);
+    }
+
+    // 2. AJV Validation Check
+    if (jsonObj) {
+      const valid = validate(jsonObj);
+      if (!valid) {
+        const schemaErrors = validate.errors.map(
+          (err) => `${err.instancePath || '/'}: ${err.message} (${JSON.stringify(err.params)})`,
+        );
+        errorsList.push(...schemaErrors);
+      }
+    }
+
+    // 3. Content Loss Audit Check
+    if (jsonObj) {
+      const cards = jsonObj.cards || [];
+      const missing = verifyContentLoss(stage2Questions, cards);
+      if (missing.length > 0) {
+        errorsList.push(
+          `Content Loss Audit Error: The following questions from Stage 2 are missing in the Stage 3 JSON cards array:\n${
+            missing.map((q) => `- ${q}`).join('\n')}`,
+        );
+      }
+    }
+
+    if (errorsList.length === 0) {
+      // Success! Log the trace to pipeline_steps and return the conforming object
+      addPipelineStep({
+        runId,
+        questionId,
+        stage: 'enforcement',
+        provider,
+        model,
+        inputData: JSON.stringify(messages),
+        outputData: rawOutput,
+      });
+
+      return jsonObj;
+    }
+
+    // Failed validation/audit: prepare feedback and append history for retry
+    lastErrorMsg = errorsList.join('\n');
+    messages.push({ role: 'assistant', content: rawOutput });
+    messages.push({
+      role: 'user',
+      content: `Your previous output did not conform to the schema or failed the Content Loss Audit. Please fix the following errors and output the entire, corrected JSON matching the schema:\n\n${lastErrorMsg}`,
+    });
+  }
+
+  throw new Error(
+    `Stage 3 Schema Enforcement failed after ${maxEnforcementRetries} attempts.\nLast Errors:\n${lastErrorMsg}`,
+  );
 }
