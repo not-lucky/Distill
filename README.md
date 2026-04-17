@@ -58,10 +58,9 @@ npm install
 ```
 
 ### 2. Set Up Python Virtual Environment
-Use `uv` to create a virtual environment and sync python dependencies:
+Use `uv` to sync python dependencies:
 ```bash
-uv venv
-uv pip install -r requirements.txt
+uv sync
 ```
 
 ---
@@ -201,11 +200,27 @@ node src/cli.js cache clear
 ```
 
 ### Running Tests
-Execute unit tests or test coverage using Vitest:
+Execute unit tests for JavaScript (Vitest) and Python (Pytest):
 ```bash
-# Run tests
-npm run test
+# Run all tests (JavaScript + Python)
+npm test
 
-# Check code coverage
+# Run JavaScript unit tests only
+npm run test:js
+
+# Run Python compilation unit tests only
+npm run test:py (or: uv run pytest)
+
+# Check JavaScript test coverage
 npm run coverage
+```
+
+### Linting & Formatting
+Verify code health and styling consistency across JavaScript and Python files:
+```bash
+# Run all linters (ESLint + Ruff check & format validation)
+npm run lint
+
+# Auto-fix and format all files in place
+npm run lint:fix
 ```

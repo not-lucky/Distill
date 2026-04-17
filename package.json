@@ -4,10 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && uv run pytest",
+    "test:js": "vitest run",
+    "test:py": "uv run pytest",
     "coverage": "vitest run --coverage",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint": "eslint . && uv run ruff check src tests && uv run ruff format --check src tests",
+    "lint:fix": "eslint . --fix && uv run ruff check --fix src tests && uv run ruff format src tests"
   },
   "repository": {
     "type": "git",
