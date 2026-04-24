@@ -125,6 +125,7 @@ program
       const result = await runPipeline({
         config,
         keys,
+        prompts,
         questions,
         subject: subjectParam,
         cardType,

@@ -21,3 +21,4 @@ llm2deck.db
 .venv/
 
 coverage/
+output/

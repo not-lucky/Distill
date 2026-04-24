@@ -83,6 +83,19 @@ export function initDatabase(dbPath) {
         FOREIGN KEY(run_id) REFERENCES runs(run_id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS run_questions (
+        question_id TEXT NOT NULL,
+        run_id TEXT NOT NULL,
+        current_stage TEXT NOT NULL,
+        input_content TEXT,
+        latest_prompt TEXT,
+        latest_response TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (run_id, question_id),
+        FOREIGN KEY(run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS llm_cache (
         cache_key TEXT PRIMARY KEY,
         provider TEXT NOT NULL,
@@ -203,6 +216,35 @@ export function addPipelineStep({
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   return stmt.run(runId, questionId, stage, provider, model, inputData, outputData);
+}
+
+/**
+ * Upserts a question entry to maintain a single record per question.
+ *
+ * @param {Object} params
+ * @param {string} params.runId
+ * @param {string} params.questionId
+ * @param {string} params.currentStage
+ * @param {string} [params.inputContent]
+ * @param {string} [params.latestPrompt]
+ * @param {string} [params.latestResponse]
+ * @returns {Database.RunResult}
+ */
+export function upsertQuestionEntry({
+  runId, questionId, currentStage, inputContent = null, latestPrompt = null, latestResponse = null,
+}) {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT INTO run_questions (run_id, question_id, current_stage, input_content, latest_prompt, latest_response)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(run_id, question_id) DO UPDATE SET
+      current_stage = excluded.current_stage,
+      input_content = COALESCE(excluded.input_content, input_content),
+      latest_prompt = COALESCE(excluded.latest_prompt, latest_prompt),
+      latest_response = COALESCE(excluded.latest_response, latest_response),
+      updated_at = CURRENT_TIMESTAMP
+  `);
+  return stmt.run(runId, questionId, currentStage, inputContent, latestPrompt, latestResponse);
 }
 
 /**

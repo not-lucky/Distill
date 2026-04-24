@@ -118,8 +118,8 @@ export function spawnCompiler(jsonPath, outputPath, options = {}) {
 export function getCompletedQuestions(runId) {
   const db = getDb();
   const stmt = db.prepare(`
-    SELECT DISTINCT question_id FROM pipeline_steps
-    WHERE run_id = ? AND stage = 'enforcement'
+    SELECT question_id FROM run_questions
+    WHERE run_id = ? AND current_stage = 'enforcement'
   `);
   const rows = stmt.all(runId);
   return new Set(rows.map((row) => row.question_id));
@@ -146,6 +146,7 @@ export function getCompletedQuestions(runId) {
 export async function runPipeline({
   config,
   keys,
+  prompts,
   questions,
   subject,
   cardType = 'standard',
@@ -211,7 +212,7 @@ export async function runPipeline({
 
     const clients = createProviderClients(config, keys);
     const throttledFetch = createThrottledFetcher(config);
-    const resolvedPrompts = config.prompts || {};
+    const resolvedPrompts = prompts || {};
 
     const results = [];
     let hasFailures = false;
@@ -244,6 +245,7 @@ export async function runPipeline({
         const stage1Results = await runStage1({
           runId,
           questionId: qId,
+          topicName: question.topic,
           content: qContent,
           cardType,
           subject,

@@ -1,6 +1,6 @@
 import Ajv from 'ajv';
 import { resolveProviderModel, callLLM } from './providers.js';
-import { addPipelineStep } from './database.js';
+import { addPipelineStep, upsertQuestionEntry } from './database.js';
 import { resolvePrompts } from './prompts.js';
 
 /**
@@ -10,6 +10,7 @@ import { resolvePrompts } from './prompts.js';
  * @param {Object} params
  * @param {string} params.runId Active execution run ID.
  * @param {string} params.questionId Unique identifier for this chunk/topic (e.g. topic name).
+ * @param {string} [params.topicName] Optional original topic name.
  * @param {string} params.content Source text content or topic description.
  * @param {string} params.deckPath The parsed double-colon deck path.
  * @param {string} params.cardType Layout format ('standard' or 'mcq').
@@ -24,6 +25,7 @@ import { resolvePrompts } from './prompts.js';
 export async function runStage1({
   runId,
   questionId,
+  topicName,
   content,
   cardType = 'standard',
   subject = '',
@@ -40,7 +42,14 @@ export async function runStage1({
 
   const resolvedPrompts = resolvePrompts(prompts, subject, cardType);
   const systemPrompt = resolvedPrompts.generation;
-  const userPrompt = `Source Content:\n${content}`;
+  
+  let userPrompt;
+  if (content && content.trim().length > 0) {
+    userPrompt = `Source Content:\n${content}`;
+  } else {
+    const target = topicName || questionId.replace(/_/g, ' ');
+    userPrompt = `Please generate comprehensive flashcards for the following topic: ${target}`;
+  }
 
   // Construct user messages for LLM processing
   const messages = [
@@ -76,6 +85,15 @@ export async function runStage1({
       model,
       inputData: JSON.stringify(messages),
       outputData: output,
+    });
+
+    upsertQuestionEntry({
+      runId,
+      questionId,
+      currentStage: 'generation',
+      inputContent: content,
+      latestPrompt: JSON.stringify(messages),
+      latestResponse: output,
     });
 
     return { provider, model, output };
@@ -178,6 +196,14 @@ export async function runStage2({
     model,
     inputData: JSON.stringify(messages),
     outputData: output,
+  });
+
+  upsertQuestionEntry({
+    runId,
+    questionId,
+    currentStage: 'synthesis',
+    latestPrompt: JSON.stringify(messages),
+    latestResponse: output,
   });
 
   return output;
@@ -504,6 +530,14 @@ export async function runStage3({
         model,
         inputData: JSON.stringify(messages),
         outputData: rawOutput,
+      });
+
+      upsertQuestionEntry({
+        runId,
+        questionId,
+        currentStage: 'enforcement',
+        latestPrompt: JSON.stringify(messages),
+        latestResponse: rawOutput,
       });
 
       return jsonObj;

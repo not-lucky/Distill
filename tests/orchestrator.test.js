@@ -12,6 +12,7 @@ import {
   getRun,
   getPipelineStepsForRun,
   addPipelineStep,
+  upsertQuestionEntry,
   getDb,
 } from '../src/database.js';
 import {
@@ -286,25 +287,17 @@ describe('Orchestrator Module', () => {
       });
 
       // q1 is completed
-      addPipelineStep({
+      upsertQuestionEntry({
         runId,
         questionId: 'q1',
-        stage: 'enforcement',
-        provider: 'openai',
-        model: 'gpt-4',
-        inputData: '',
-        outputData: '',
+        currentStage: 'enforcement',
       });
 
       // q2 is partially completed (no enforcement step)
-      addPipelineStep({
+      upsertQuestionEntry({
         runId,
         questionId: 'q2',
-        stage: 'generation',
-        provider: 'openai',
-        model: 'gpt-4',
-        inputData: '',
-        outputData: '',
+        currentStage: 'generation',
       });
 
       const completed = getCompletedQuestions(runId);
@@ -418,14 +411,10 @@ describe('Orchestrator Module', () => {
       });
 
       // Mark q1 as completed
-      addPipelineStep({
+      upsertQuestionEntry({
         runId: resumeRunId,
         questionId: 'q-resume-1',
-        stage: 'enforcement',
-        provider: 'openai',
-        model: 'gpt-4',
-        inputData: '',
-        outputData: '',
+        currentStage: 'enforcement',
       });
 
       const questions = [

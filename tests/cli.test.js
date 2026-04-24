@@ -100,6 +100,7 @@ describe('CLI Commands Integration', () => {
       expect(runPipeline).toHaveBeenCalledWith({
         config: expect.any(Object),
         keys: { openai: 'key' },
+        prompts: mockPrompts,
         questions: [
           {
             questionId: 'leetcode::Two_Pointers::Valid_Palindrome',
@@ -144,6 +145,7 @@ describe('CLI Commands Integration', () => {
       expect(runPipeline).toHaveBeenCalledWith({
         config: expect.any(Object),
         keys: { openai: 'key' },
+        prompts: {},
         questions: mockQuestions,
         subject: 'cs',
         cardType: 'standard',
@@ -195,6 +197,7 @@ describe('CLI Commands Integration', () => {
       expect(runPipeline).toHaveBeenCalledWith({
         config: expect.any(Object),
         keys: expect.any(Object),
+        prompts: {},
         questions: [
           {
             questionId: 'Physics::Mechanics::Gravity',
