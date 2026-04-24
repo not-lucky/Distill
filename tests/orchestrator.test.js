@@ -22,6 +22,17 @@ import {
   runPipeline,
 } from '../src/orchestrator.js';
 
+vi.mock('../src/database.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    initDatabase: vi.fn().mockImplementation((dbPath) => {
+      const targetPath = dbPath === './llm2deck.db' ? './llm2deck_test_fallback.db' : dbPath;
+      return actual.initDatabase(targetPath);
+    }),
+  };
+});
+
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
 }));
@@ -88,6 +99,10 @@ describe('Orchestrator Module', () => {
 
   afterAll(() => {
     closeDatabase();
+    const fallbackDb = './llm2deck_test_fallback.db';
+    if (fs.existsSync(fallbackDb)) fs.unlinkSync(fallbackDb);
+    if (fs.existsSync(`${fallbackDb}-wal`)) fs.unlinkSync(`${fallbackDb}-wal`);
+    if (fs.existsSync(`${fallbackDb}-shm`)) fs.unlinkSync(`${fallbackDb}-shm`);
   });
 
   beforeEach(() => {
@@ -791,10 +806,13 @@ describe('Orchestrator Module', () => {
       // The database should have been closed at the end because dbInitialized was true
       expect(() => getDb()).toThrow();
 
-      // Clean up the default database file created
-      if (fs.existsSync('./llm2deck.db')) {
-        fs.unlinkSync('./llm2deck.db');
+      // Clean up the default test database file created
+      const fallbackDb = './llm2deck_test_fallback.db';
+      if (fs.existsSync(fallbackDb)) {
+        fs.unlinkSync(fallbackDb);
       }
+      if (fs.existsSync(`${fallbackDb}-wal`)) fs.unlinkSync(`${fallbackDb}-wal`);
+      if (fs.existsSync(`${fallbackDb}-shm`)) fs.unlinkSync(`${fallbackDb}-shm`);
 
       // Re-initialize for subsequent tests
       initDatabase(':memory:');

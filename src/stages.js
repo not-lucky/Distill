@@ -42,7 +42,7 @@ export async function runStage1({
 
   const resolvedPrompts = resolvePrompts(prompts, subject, cardType);
   const systemPrompt = resolvedPrompts.generation;
-  
+
   let userPrompt;
   if (content && content.trim().length > 0) {
     userPrompt = `Source Content:\n${content}`;
@@ -336,8 +336,8 @@ export function cleanJsonOutput(text) {
   if (typeof text !== 'string') return '';
   let cleaned = text.trim();
 
-  // Try to match the content inside markdown code fence (```json ... ``` or ``` ... ```)
-  const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  // Try to match the content inside markdown code fence (with any word-based language identifier like json, javascript, etc.)
+  const codeBlockMatch = cleaned.match(/```[a-z]*\s*([\s\S]*?)\s*```/i);
   if (codeBlockMatch) {
     cleaned = codeBlockMatch[1].trim();
   }
