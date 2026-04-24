@@ -113,6 +113,24 @@ describe('Database Module & SQLite Operations', () => {
     expect(() => updateRunStatus('non-existent', 'completed')).toThrow(/not found/);
   });
 
+  it('should support run creation with a custom createdAt timestamp', () => {
+    const runId = 'test-run-custom-created-at';
+    const customTime = '2026-05-31T10:00:00.000Z';
+
+    createRun({
+      runId,
+      subject: 'LeetCode',
+      cardType: 'standard',
+      status: 'running',
+      configHash: 'hash123',
+      createdAt: customTime,
+    });
+
+    const run = getRun(runId);
+    expect(run).toBeDefined();
+    expect(run.created_at).toBe(customTime);
+  });
+
   it('should support pipeline steps insertion and retrieval', () => {
     const runId = 'test-run-456';
     createRun({

@@ -76,6 +76,7 @@ vi.mock('../src/stages.js', () => ({
       ],
     };
   }),
+  cleanJsonOutput: vi.fn().mockImplementation((text) => text),
 }));
 
 describe('Orchestrator Module', () => {
@@ -410,15 +411,55 @@ describe('Orchestrator Module', () => {
         configHash: 'hash-resume',
       });
 
+      // Manually set created_at to NULL to cover line 214 fallback
+      getDb().prepare('UPDATE runs SET created_at = NULL WHERE run_id = ?').run(resumeRunId);
+
       // Mark q1 as completed
       upsertQuestionEntry({
         runId: resumeRunId,
         questionId: 'q-resume-1',
         currentStage: 'enforcement',
+        latestResponse: JSON.stringify({
+          title: 'Mock Title 1',
+          topic: 'Mock Topic 1',
+          difficulty: 'Basic',
+          cards: [],
+        }),
+      });
+
+      // Mark q1b as completed
+      upsertQuestionEntry({
+        runId: resumeRunId,
+        questionId: 'q-resume-1b',
+        currentStage: 'enforcement',
+        latestResponse: JSON.stringify({
+          title: 'Mock Title 1b',
+          topic: 'Mock Topic 1b',
+          difficulty: 'Basic',
+          cards: [],
+        }),
+      });
+
+      // Mark q1c with null latestResponse to cover line 31
+      upsertQuestionEntry({
+        runId: resumeRunId,
+        questionId: 'q-resume-1c',
+        currentStage: 'enforcement',
+        latestResponse: null,
       });
 
       const questions = [
         { questionId: 'q-resume-1', content: 'content 1' },
+        {
+          questionId: 'q-resume-1b',
+          content: 'content 1b',
+          metadata: {
+            categoryName: 'ResumeCat',
+            categoryIndex: 5,
+            problemIndex: 6,
+          },
+        },
+        { questionId: 'q-resume-1c', content: 'content 1c' },
         { questionId: 'q-resume-2', content: 'content 2' },
       ];
 
@@ -434,9 +475,11 @@ describe('Orchestrator Module', () => {
 
       expect(res.runId).toBe(resumeRunId);
       expect(res.hasFailures).toBe(false);
-      expect(res.results).toHaveLength(2);
+      expect(res.results).toHaveLength(4);
       expect(res.results[0].skipped).toBe(true);
-      expect(res.results[1].jsonPath).toBeDefined();
+      expect(res.results[1].skipped).toBe(true);
+      expect(res.results[2].skipped).toBeUndefined();
+      expect(res.results[3].jsonPath).toBeDefined();
 
       const runRecord = getRun(resumeRunId);
       expect(runRecord.status).toBe('completed');
@@ -533,7 +576,9 @@ describe('Orchestrator Module', () => {
       });
 
       expect(res.hasFailures).toBe(false);
-      expect(res.results[0].apkgPath).toBe(path.join(customDir, 'q-dir-test.apkg'));
+      const expectedFilename = `${res.results[0].apkgPath.split('/').pop()}`;
+      expect(expectedFilename).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_[0-9a-fA-F-]+\.apkg$/);
+      expect(res.results[0].apkgPath).toBe(path.join(customDir, expectedFilename));
       expect(fs.existsSync(customDir)).toBe(true);
     });
 
@@ -566,8 +611,8 @@ describe('Orchestrator Module', () => {
       expect(res.hasFailures).toBe(false);
       const res1 = res.results.find((r) => r.questionId === 'q-multi-1');
       const res2 = res.results.find((r) => r.questionId === 'q-multi-2');
-      expect(res1.apkgPath).toBe(path.join(tempOutputDir, 'output_q-multi-1.apkg'));
-      expect(res2.apkgPath).toBe(path.join(tempOutputDir, 'output_q-multi-2.apkg'));
+      expect(res1.apkgPath).toBe(customFile);
+      expect(res2.apkgPath).toBe(customFile);
     });
 
     it('should initialize and close the database if it is not already initialized', async () => {
@@ -662,7 +707,9 @@ describe('Orchestrator Module', () => {
       });
 
       expect(res.hasFailures).toBe(false);
-      expect(res.results[0].apkgPath).toBe(path.join(existingDir, 'q-existing-dir-test.apkg'));
+      const expectedFilename = `${res.results[0].apkgPath.split('/').pop()}`;
+      expect(expectedFilename).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_[0-9a-fA-F-]+\.apkg$/);
+      expect(res.results[0].apkgPath).toBe(path.join(existingDir, expectedFilename));
     });
 
     it('should compile to custom single file path when there is only one compiled question', async () => {
@@ -804,9 +851,10 @@ describe('Orchestrator Module', () => {
 
       expect(res.hasFailures).toBe(false);
 
-      // Read written JSONs to verify postProcess injected correct index values
-      const file1 = JSON.parse(fs.readFileSync(res.results[0].jsonPath, 'utf8'));
-      const file2 = JSON.parse(fs.readFileSync(res.results[1].jsonPath, 'utf8'));
+      // Read written JSON array to verify postProcess injected correct index values
+      const mergedArray = JSON.parse(fs.readFileSync(res.results[0].jsonPath, 'utf8'));
+      const file1 = mergedArray[0];
+      const file2 = mergedArray[1];
 
       // For q-idx-1: Category/problem index from root question structure
       expect(file1.category_index).toBe(10);
@@ -934,6 +982,79 @@ describe('Orchestrator Module', () => {
       // Run status in DB should still be 'failed' (not updated to running)
       const run = getRun(resumeRunId);
       expect(run.status).toBe('failed');
+    });
+
+    it('should skip completed questions in dry-run resumption mode', async () => {
+      const resumeRunId = 'run-resume-dry-completed-test';
+      createRun({
+        runId: resumeRunId,
+        subject: 'Algorithms',
+        cardType: 'standard',
+        status: 'failed',
+        configHash: 'hash-resume-dry-comp',
+      });
+
+      upsertQuestionEntry({
+        runId: resumeRunId,
+        questionId: 'q-resume-dry-comp-1',
+        currentStage: 'enforcement',
+      });
+
+      const questions = [
+        { questionId: 'q-resume-dry-comp-1', content: 'content' },
+      ];
+
+      const res = await runPipeline({
+        config: mockConfig,
+        keys: mockKeys,
+        questions,
+        subject: 'Algorithms',
+        cardType: 'standard',
+        resumeRunId,
+        dryRun: true,
+      });
+
+      expect(res.hasFailures).toBe(false);
+      expect(res.results).toHaveLength(1);
+      expect(res.results[0].dryRun).toBe(true);
+    });
+
+    it('should handle database parse errors gracefully when retrieving completed questions', async () => {
+      const resumeRunId = 'run-db-parse-err-test';
+      createRun({
+        runId: resumeRunId,
+        subject: 'Algorithms',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash-db-parse',
+      });
+
+      // Insert invalid JSON string in latestResponse to trigger JSON parse failure
+      upsertQuestionEntry({
+        runId: resumeRunId,
+        questionId: 'q-parse-err-1',
+        currentStage: 'enforcement',
+        latestResponse: '{invalid_json',
+      });
+
+      const questions = [
+        { questionId: 'q-parse-err-1', content: 'content' },
+      ];
+
+      const res = await runPipeline({
+        config: mockConfig,
+        keys: mockKeys,
+        questions,
+        subject: 'Algorithms',
+        cardType: 'standard',
+        outputDir: tempOutputDir,
+        resumeRunId,
+      });
+
+      expect(res.hasFailures).toBe(false);
+      // Since it couldn't retrieve from DB, it should have re-processed the question and succeeded
+      expect(res.results).toHaveLength(1);
+      expect(res.results[0].skipped).toBeUndefined();
     });
   });
 });
