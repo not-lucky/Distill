@@ -649,6 +649,71 @@ Card 2 Front: What is JSX?
       expect(result).toEqual(mockResultObj);
       expect(mockCompletions.mock.calls[0][0].model).toBe('gpt-3.5-turbo-fallback');
     });
+
+    it('should save failed recovery attempts to the database pipeline steps and run questions tables', async () => {
+      const openaiClient = clients.get('openai');
+      const mockCompletions = vi.spyOn(openaiClient.chat.completions, 'create');
+
+      const mockResultObj = {
+        title: 'React Recovery',
+        topic: 'React',
+        difficulty: 'Basic',
+        cards: [
+          {
+            card_format: 'Basic',
+            card_type: 'Concept',
+            tags: ['react'],
+            front: 'What is React?',
+            back: 'A library',
+            explanation: 'Details',
+          },
+        ],
+      };
+
+      // Mock first response as malformed JSON, second response as valid
+      mockCompletions
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: 'This is invalid JSON output {{{\n' } }],
+        })
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: JSON.stringify(mockResultObj) } }],
+        });
+
+      const runId = 'run-failed-save-test';
+      createRun({
+        runId,
+        subject: 'ReactPreset',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash-failed-save',
+      });
+
+      const result = await runStage3({
+        runId,
+        questionId: 'q-failed-save',
+        synthesisResult: 'Front: What is React?',
+        config,
+        keys,
+        clients,
+        throttledFetch,
+        maxEnforcementRetries: 3,
+      });
+
+      expect(result).toEqual(mockResultObj);
+      expect(mockCompletions).toHaveBeenCalledTimes(2);
+
+      // Verify that 2 pipeline steps were logged (1 for failed attempt, 1 for successful attempt)
+      const steps = getPipelineStepsForRun(runId);
+      expect(steps).toHaveLength(2);
+      expect(steps[0].stage).toBe('enforcement');
+      expect(steps[0].output_data).toBe('This is invalid JSON output {{{\n');
+      expect(steps[0].status).toBe('failed');
+      expect(steps[0].errors).toContain('JSON Parsing Error');
+      expect(steps[1].stage).toBe('enforcement');
+      expect(steps[1].output_data).toBe(JSON.stringify(mockResultObj));
+      expect(steps[1].status).toBe('success');
+      expect(steps[1].errors).toBeNull();
+    });
   });
 
   describe('Additional Edge Cases', () => {

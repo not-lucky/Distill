@@ -79,6 +79,8 @@ export function initDatabase(dbPath) {
         model TEXT NOT NULL,
         input_data TEXT NOT NULL,
         output_data TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'success' CHECK(status IN ('success', 'failed')),
+        errors TEXT,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(run_id) REFERENCES runs(run_id) ON DELETE CASCADE
     );
@@ -90,6 +92,7 @@ export function initDatabase(dbPath) {
         input_content TEXT,
         latest_prompt TEXT,
         latest_response TEXT,
+        errors TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (run_id, question_id),
@@ -209,14 +212,14 @@ export function deleteRun(runId) {
  * @returns {Database.RunResult}
  */
 export function addPipelineStep({
-  runId, questionId, stage, provider, model, inputData, outputData,
+  runId, questionId, stage, provider, model, inputData, outputData, status = 'success', errors = null,
 }) {
   const db = getDb();
   const stmt = db.prepare(`
-    INSERT INTO pipeline_steps (run_id, question_id, stage, provider, model, input_data, output_data)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO pipeline_steps (run_id, question_id, stage, provider, model, input_data, output_data, status, errors)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  return stmt.run(runId, questionId, stage, provider, model, inputData, outputData);
+  return stmt.run(runId, questionId, stage, provider, model, inputData, outputData, status, errors);
 }
 
 /**
@@ -232,20 +235,35 @@ export function addPipelineStep({
  * @returns {Database.RunResult}
  */
 export function upsertQuestionEntry({
-  runId, questionId, currentStage, inputContent = null, latestPrompt = null, latestResponse = null,
+  runId,
+  questionId,
+  currentStage,
+  inputContent = null,
+  latestPrompt = null,
+  latestResponse = null,
+  errors = null,
 }) {
   const db = getDb();
   const stmt = db.prepare(`
-    INSERT INTO run_questions (run_id, question_id, current_stage, input_content, latest_prompt, latest_response)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO run_questions (run_id, question_id, current_stage, input_content, latest_prompt, latest_response, errors)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(run_id, question_id) DO UPDATE SET
       current_stage = excluded.current_stage,
       input_content = COALESCE(excluded.input_content, input_content),
       latest_prompt = COALESCE(excluded.latest_prompt, latest_prompt),
       latest_response = COALESCE(excluded.latest_response, latest_response),
+      errors = excluded.errors,
       updated_at = CURRENT_TIMESTAMP
   `);
-  return stmt.run(runId, questionId, currentStage, inputContent, latestPrompt, latestResponse);
+  return stmt.run(
+    runId,
+    questionId,
+    currentStage,
+    inputContent,
+    latestPrompt,
+    latestResponse,
+    errors,
+  );
 }
 
 /**
@@ -258,7 +276,7 @@ export function upsertQuestionEntry({
 export function getPipelineSteps(runId, questionId) {
   const db = getDb();
   const stmt = db.prepare(`
-    SELECT step_id, run_id, question_id, stage, provider, model, input_data, output_data, timestamp
+    SELECT step_id, run_id, question_id, stage, provider, model, input_data, output_data, status, errors, timestamp
     FROM pipeline_steps
     WHERE run_id = ? AND question_id = ?
     ORDER BY timestamp ASC, step_id ASC
@@ -275,7 +293,7 @@ export function getPipelineSteps(runId, questionId) {
 export function getPipelineStepsForRun(runId) {
   const db = getDb();
   const stmt = db.prepare(`
-    SELECT step_id, run_id, question_id, stage, provider, model, input_data, output_data, timestamp
+    SELECT step_id, run_id, question_id, stage, provider, model, input_data, output_data, status, errors, timestamp
     FROM pipeline_steps
     WHERE run_id = ?
     ORDER BY timestamp ASC, step_id ASC
