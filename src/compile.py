@@ -518,9 +518,17 @@ def compile_deck(
     else:
         data = json_data
 
-    # Retrieve deck name
+    # Wrap in a list if it is a single dictionary (object) to normalize processing
+    # of both single-topic and multi-topic merged JSON data structures.
+    topics = data if isinstance(data, list) else [data]
+
+    # Determine the deck name. If not explicitly specified by CLI arguments,
+    # default to the topic name for single-topic runs, or a generic name for multi-topic runs.
     if not deck_name:
-        deck_name = data.get("topic", "LLM2Deck Compiled")
+        if len(topics) == 1 and isinstance(topics[0], dict):
+            deck_name = topics[0].get("topic", "LLM2Deck Compiled")
+        else:
+            deck_name = "LLM2Deck Compiled"
 
     # Generate deterministic models
     # Set model IDs deterministically
@@ -684,114 +692,118 @@ def compile_deck(
     deck_id = generate_id(deck_name)
     deck = genanki.Deck(deck_id, deck_name)
 
-    # Extract metadata properties for hierarchical taxonomy tags
-    topic = data.get("topic", "Default Topic")
-    title = data.get("title", "Default Title")
-    difficulty = data.get("difficulty", "Unknown")
-
-    # Gracefully handle missing or null cards array in JSON structure
-    cards = data.get("cards")
-    if not isinstance(cards, list):
-        cards = []
-
-    for card in cards:
-        if not isinstance(card, dict):
+    for topic_data in topics:
+        if not isinstance(topic_data, dict):
             continue
 
-        card_format = card.get("card_format", "Basic")
-        card_type = card.get("card_type", "Concept")
+        # Extract metadata properties for hierarchical taxonomy tags
+        topic = topic_data.get("topic", "Default Topic")
+        title = topic_data.get("title", "Default Title")
+        difficulty = topic_data.get("difficulty", "Unknown")
 
-        # Build card and taxonomy tags
-        unique_tags = build_tags(card, data, source=source, subject=subject)
-        tags_str = " ".join(unique_tags)
+        # Gracefully handle missing or null cards array in JSON structure
+        cards = topic_data.get("cards")
+        if not isinstance(cards, list):
+            cards = []
 
-        # Generate deterministic GUID based on card front and deck name to allow native update-in-place updates in Anki
-        guid = genanki.guid_for(card.get("front", ""), deck_name)
+        for card in cards:
+            if not isinstance(card, dict):
+                continue
 
-        if card_format == "Basic":
-            front_html = render_markdown(card.get("front", ""))
-            back_html = render_markdown(card.get("back", ""))
-            explanation_html = render_markdown(card.get("explanation", ""))
+            card_format = card.get("card_format", "Basic")
+            card_type = card.get("card_type", "Concept")
 
-            note = genanki.Note(
-                model=basic_model,
-                fields=[
-                    front_html,
-                    back_html,
-                    explanation_html,
-                    card_type,
-                    topic,
-                    title,
-                    difficulty,
-                    tags_str,
-                ],
-                tags=unique_tags,
-                guid=guid,
-            )
-            deck.add_note(note)
+            # Build card and taxonomy tags
+            unique_tags = build_tags(card, topic_data, source=source, subject=subject)
+            tags_str = " ".join(unique_tags)
 
-        elif card_format == "Cloze":
-            front_html = render_markdown(card.get("front", ""))
-            explanation_html = render_markdown(card.get("explanation", ""))
+            # Generate deterministic GUID based on card front and deck name to allow native update-in-place updates in Anki
+            guid = genanki.guid_for(card.get("front", ""), deck_name)
 
-            note = genanki.Note(
-                model=cloze_model,
-                fields=[
-                    front_html,
-                    explanation_html,
-                    card_type,
-                    topic,
-                    title,
-                    difficulty,
-                    tags_str,
-                ],
-                tags=unique_tags,
-                guid=guid,
-            )
-            deck.add_note(note)
+            if card_format == "Basic":
+                front_html = render_markdown(card.get("front", ""))
+                back_html = render_markdown(card.get("back", ""))
+                explanation_html = render_markdown(card.get("explanation", ""))
 
-        elif card_format == "MCQ":
-            front_html = render_markdown(card.get("front", ""))
-            options = card.get("options", [])
-            correct_ans = card.get("correct_answer", "A")
+                note = genanki.Note(
+                    model=basic_model,
+                    fields=[
+                        front_html,
+                        back_html,
+                        explanation_html,
+                        card_type,
+                        topic,
+                        title,
+                        difficulty,
+                        tags_str,
+                    ],
+                    tags=unique_tags,
+                    guid=guid,
+                )
+                deck.add_note(note)
 
-            shuffled_options, new_correct_letter = shuffle_mcq_options(
-                options, correct_ans
-            )
+            elif card_format == "Cloze":
+                front_html = render_markdown(card.get("front", ""))
+                explanation_html = render_markdown(card.get("explanation", ""))
 
-            # Render options with inline styling
-            opt_a = render_markdown(shuffled_options[0], inline=True)
-            opt_b = render_markdown(shuffled_options[1], inline=True)
-            opt_c = render_markdown(shuffled_options[2], inline=True)
-            opt_d = render_markdown(shuffled_options[3], inline=True)
+                note = genanki.Note(
+                    model=cloze_model,
+                    fields=[
+                        front_html,
+                        explanation_html,
+                        card_type,
+                        topic,
+                        title,
+                        difficulty,
+                        tags_str,
+                    ],
+                    tags=unique_tags,
+                    guid=guid,
+                )
+                deck.add_note(note)
 
-            explanation_html = render_markdown(card.get("explanation", ""))
+            elif card_format == "MCQ":
+                front_html = render_markdown(card.get("front", ""))
+                options = card.get("options", [])
+                correct_ans = card.get("correct_answer", "A")
 
-            note = genanki.Note(
-                model=mcq_model,
-                fields=[
-                    front_html,
-                    opt_a,
-                    opt_b,
-                    opt_c,
-                    opt_d,
-                    new_correct_letter,
-                    explanation_html,
-                    card_type,
-                    topic,
-                    title,
-                    difficulty,
-                    tags_str,
-                ],
-                tags=unique_tags,
-                guid=guid,
-            )
-            deck.add_note(note)
-        else:
-            print(
-                f"Warning: Skipped card with unsupported format '{card_format}' (front snippet: '{card.get('front', '')[:30]}...').",
-                file=sys.stderr,
-            )
+                shuffled_options, new_correct_letter = shuffle_mcq_options(
+                    options, correct_ans
+                )
+
+                # Render options with inline styling
+                opt_a = render_markdown(shuffled_options[0], inline=True)
+                opt_b = render_markdown(shuffled_options[1], inline=True)
+                opt_c = render_markdown(shuffled_options[2], inline=True)
+                opt_d = render_markdown(shuffled_options[3], inline=True)
+
+                explanation_html = render_markdown(card.get("explanation", ""))
+
+                note = genanki.Note(
+                    model=mcq_model,
+                    fields=[
+                        front_html,
+                        opt_a,
+                        opt_b,
+                        opt_c,
+                        opt_d,
+                        new_correct_letter,
+                        explanation_html,
+                        card_type,
+                        topic,
+                        title,
+                        difficulty,
+                        tags_str,
+                    ],
+                    tags=unique_tags,
+                    guid=guid,
+                )
+                deck.add_note(note)
+            else:
+                print(
+                    f"Warning: Skipped card with unsupported format '{card_format}' (front snippet: '{card.get('front', '')[:30]}...').",
+                    file=sys.stderr,
+                )
 
     # Save to file
     pkg = genanki.Package(deck)

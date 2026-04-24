@@ -136,14 +136,15 @@ export function closeDatabase() {
  * @returns {Database.RunResult} Result of the insertion operation.
  */
 export function createRun({
-  runId, subject, cardType, status, configHash,
+  runId, subject, cardType, status, configHash, createdAt,
 }) {
   const db = getDb();
+  const dateVal = createdAt || new Date().toISOString();
   const stmt = db.prepare(`
-    INSERT INTO runs (run_id, subject, card_type, status, config_hash)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO runs (run_id, created_at, subject, card_type, status, config_hash)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
-  return stmt.run(runId, subject, cardType, status, configHash);
+  return stmt.run(runId, dateVal, subject, cardType, status, configHash);
 }
 
 /**

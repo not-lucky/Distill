@@ -487,3 +487,169 @@ def test_compile_deck_unsupported_card_format(capsys):
             in captured.err
         )
         assert os.path.exists(apkg_path)
+
+
+def test_compile_multiple_topics_in_list():
+    """28. Verify that compiling a list of multiple topic JSON objects runs successfully."""
+    reset_id_registry()
+    data = [
+        {
+            "title": "Topic One Title",
+            "topic": "Topic One",
+            "difficulty": "Easy",
+            "cards": [
+                {
+                    "card_format": "Basic",
+                    "card_type": "Concept",
+                    "tags": ["tag1"],
+                    "front": "Topic 1 Front",
+                    "back": "Topic 1 Back",
+                    "explanation": "Topic 1 Explanation",
+                }
+            ],
+        },
+        {
+            "title": "Topic Two Title",
+            "topic": "Topic Two",
+            "difficulty": "Medium",
+            "cards": [
+                {
+                    "card_format": "Basic",
+                    "card_type": "Concept",
+                    "tags": ["tag2"],
+                    "front": "Topic 2 Front",
+                    "back": "Topic 2 Back",
+                    "explanation": "Topic 2 Explanation",
+                }
+            ],
+        }
+    ]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        json_path = os.path.join(tmpdir, "multi.json")
+        apkg_path = os.path.join(tmpdir, "multi.apkg")
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        compile_deck(json_path, apkg_path)
+
+        assert os.path.exists(apkg_path)
+        assert os.path.getsize(apkg_path) > 0
+
+        with zipfile.ZipFile(apkg_path, "r") as zf:
+            namelist = zf.namelist()
+            assert "collection.anki2" in namelist
+
+
+def test_compile_empty_topic_list():
+    """29. Verify that compiling an empty list runs successfully and writes an empty package."""
+    reset_id_registry()
+    data = []
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        json_path = os.path.join(tmpdir, "empty_list.json")
+        apkg_path = os.path.join(tmpdir, "empty_list.apkg")
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        compile_deck(json_path, apkg_path)
+
+        assert os.path.exists(apkg_path)
+        assert os.path.getsize(apkg_path) > 0
+
+
+def test_compile_topic_list_with_invalid_items():
+    """30. Verify that list elements that are not dicts are skipped gracefully."""
+    reset_id_registry()
+    data = [
+        None,
+        12345,
+        "not a dict",
+        {
+            "title": "Valid Topic Title",
+            "topic": "Valid Topic",
+            "difficulty": "Easy",
+            "cards": [
+                {
+                    "card_format": "Basic",
+                    "card_type": "Concept",
+                    "tags": ["tag"],
+                    "front": "Q",
+                    "back": "A",
+                    "explanation": "Exp",
+                }
+            ],
+        }
+    ]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        json_path = os.path.join(tmpdir, "invalid_items.json")
+        apkg_path = os.path.join(tmpdir, "invalid_items.apkg")
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        compile_deck(json_path, apkg_path)
+
+        assert os.path.exists(apkg_path)
+        assert os.path.getsize(apkg_path) > 0
+
+
+def test_compile_topic_list_missing_cards_field():
+    """31. Verify that topic objects with missing or null cards array are tolerated."""
+    reset_id_registry()
+    data = [
+        {
+            "title": "No Cards Topic",
+            "topic": "No Cards",
+            "difficulty": "Easy",
+            # cards field is completely missing
+        },
+        {
+            "title": "Null Cards Topic",
+            "topic": "Null Cards",
+            "difficulty": "Easy",
+            "cards": None,
+        }
+    ]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        json_path = os.path.join(tmpdir, "missing_cards.json")
+        apkg_path = os.path.join(tmpdir, "missing_cards.apkg")
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        compile_deck(json_path, apkg_path)
+
+        assert os.path.exists(apkg_path)
+        assert os.path.getsize(apkg_path) > 0
+
+
+def test_compile_topic_list_custom_deck_name():
+    """32. Verify that custom deck name overrides the default deck name for list compilation."""
+    reset_id_registry()
+    data = [
+        {
+            "title": "Title",
+            "topic": "Topic A",
+            "difficulty": "Easy",
+            "cards": [],
+        }
+    ]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        json_path = os.path.join(tmpdir, "custom_name.json")
+        apkg_path = os.path.join(tmpdir, "custom_name.apkg")
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        compile_deck(json_path, apkg_path, deck_name="Overridden Deck Name")
+
+        assert os.path.exists(apkg_path)
+        assert os.path.getsize(apkg_path) > 0
+
+

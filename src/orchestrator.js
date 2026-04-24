@@ -11,8 +11,36 @@ import {
   closeDatabase,
 } from './database.js';
 import { createProviderClients, createThrottledFetcher } from './providers.js';
-import { runStage1, runStage2, runStage3 } from './stages.js';
+import {
+  runStage1, runStage2, runStage3, cleanJsonOutput,
+} from './stages.js';
 import { postProcess } from './postProcess.js';
+
+/**
+ * Retrieves the enforcement step output from the database, parses it, and returns the JSON.
+ * This is crucial during resumption to pull previously generated card data out of the DB,
+ * ensuring all completed topics of the run are merged into the final consolidated output files.
+ *
+ * @param {string} runId
+ * @param {string} questionId
+ * @returns {Object|null} Conforming JSON object or null.
+ */
+function getCompletedStage3Result(runId, questionId) {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT latest_response FROM run_questions
+    WHERE run_id = ? AND question_id = ? AND current_stage = 'enforcement'
+  `);
+  const row = stmt.get(runId, questionId);
+  if (!row || !row.latest_response) return null;
+  try {
+    const cleaned = cleanJsonOutput(row.latest_response);
+    return JSON.parse(cleaned);
+  } catch (err) {
+    console.error(`Failed to parse completed question ${questionId} response from DB:`, err);
+    return null;
+  }
+}
 
 /**
  * Sanitizes a string to make it safe for use as a filename.
@@ -179,6 +207,7 @@ export async function runPipeline({
   try {
     let runId;
     let completedQuestions = new Set();
+    let createdAtIso;
 
     if (resumeRunId) {
       const existingRun = getRun(resumeRunId);
@@ -186,6 +215,7 @@ export async function runPipeline({
         throw new Error(`Run with ID "${resumeRunId}" not found in database.`);
       }
       runId = resumeRunId;
+      createdAtIso = existingRun.created_at || new Date().toISOString();
       if (!dryRun) {
         // Update database run status back to 'running' during resumption
         updateRunStatus(runId, 'running');
@@ -193,6 +223,7 @@ export async function runPipeline({
       completedQuestions = getCompletedQuestions(runId);
     } else {
       runId = crypto.randomUUID();
+      createdAtIso = new Date().toISOString();
       if (!dryRun) {
         const pipelineConfig = config.pipeline || {};
         const providersConfig = config.providers || {};
@@ -206,6 +237,7 @@ export async function runPipeline({
           cardType,
           status: 'running',
           configHash,
+          createdAt: createdAtIso,
         });
       }
     }
@@ -215,6 +247,7 @@ export async function runPipeline({
     const resolvedPrompts = prompts || {};
 
     const results = [];
+    const mergedTopics = [];
     let hasFailures = false;
 
     for (const question of questions) {
@@ -229,8 +262,29 @@ export async function runPipeline({
 
       if (completedQuestions.has(qId)) {
         console.info(`Skipping already completed question: ${qId}`);
-        results.push({ questionId: qId, skipped: true });
-        continue;
+        if (dryRun) {
+          results.push({ questionId: qId, dryRun: true });
+          continue;
+        }
+
+        const completedResult = getCompletedStage3Result(runId, qId);
+        if (completedResult) {
+          const metadata = question.metadata || {};
+          const postProcessedResult = postProcess(completedResult, {
+            categoryName: metadata.categoryName || question.categoryName,
+            categoryIndex: metadata.categoryIndex !== undefined
+              ? metadata.categoryIndex
+              : question.categoryIndex,
+            problemIndex: metadata.problemIndex !== undefined
+              ? metadata.problemIndex
+              : question.problemIndex,
+          });
+          mergedTopics.push(postProcessedResult);
+          results.push({ questionId: qId, skipped: true });
+          continue;
+        } else {
+          console.warn(`Could not retrieve completed result for question: ${qId} from DB. Will re-process.`);
+        }
       }
 
       if (dryRun) {
@@ -294,16 +348,8 @@ export async function runPipeline({
             : question.problemIndex,
         });
 
-        const sanitizedQId = sanitizeFilename(qId);
-        const jsonFilename = `${runId}_${sanitizedQId}.json`;
-        const jsonPath = path.join(outputDir, jsonFilename);
-
-        if (!fs.existsSync(outputDir)) {
-          fs.mkdirSync(outputDir, { recursive: true });
-        }
-
-        fs.writeFileSync(jsonPath, JSON.stringify(postProcessedResult, null, 2), 'utf8');
-        results.push({ questionId: qId, jsonPath });
+        mergedTopics.push(postProcessedResult);
+        results.push({ questionId: qId });
       } catch (error) {
         console.error(`Error processing question "${qId}":`, error);
         hasFailures = true;
@@ -311,53 +357,62 @@ export async function runPipeline({
     }
 
     // Compile successfully processed files
-    const compileResults = results.filter((r) => r.jsonPath);
-    if (!dryRun && compileResults.length > 0) {
-      const compilationPromises = compileResults.map(async (res) => {
-        const sanitizedQId = sanitizeFilename(res.questionId);
-        let outputApkgPath;
+    if (!dryRun && mergedTopics.length > 0) {
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
 
-        if (outputPath) {
-          let isDirectory = false;
-          if (fs.existsSync(outputPath)) {
-            isDirectory = fs.statSync(outputPath).isDirectory();
-          } else {
-            isDirectory = !path.extname(outputPath);
-          }
+      const safeIsoDate = createdAtIso.replace(/[:.]/g, '-');
+      const jsonFilename = `${safeIsoDate}_${runId}.json`;
+      const jsonPath = path.join(outputDir, jsonFilename);
 
-          if (isDirectory) {
-            if (!fs.existsSync(outputPath)) {
-              fs.mkdirSync(outputPath, { recursive: true });
-            }
-            outputApkgPath = path.join(outputPath, `${sanitizedQId}.apkg`);
-          } else if (compileResults.length > 1) {
-            const ext = path.extname(outputPath);
-            const dir = path.dirname(outputPath);
-            const base = path.basename(outputPath, ext);
-            outputApkgPath = path.join(dir, `${base}_${sanitizedQId}${ext}`);
-          } else {
-            outputApkgPath = outputPath;
-          }
+      fs.writeFileSync(jsonPath, JSON.stringify(mergedTopics, null, 2), 'utf8');
+
+      // Update results list with the jsonPath
+      for (const res of results) {
+        res.jsonPath = jsonPath;
+      }
+
+      let outputApkgPath;
+      const defaultApkgFilename = `${safeIsoDate}_${runId}.apkg`;
+
+      if (outputPath) {
+        let isDirectory = false;
+        if (fs.existsSync(outputPath)) {
+          isDirectory = fs.statSync(outputPath).isDirectory();
         } else {
-          outputApkgPath = res.jsonPath.replace(/\.json$/, '.apkg');
+          isDirectory = !path.extname(outputPath);
         }
 
-        try {
-          console.info(`Compiling deck for: ${res.questionId}`);
-          await spawnCompiler(res.jsonPath, outputApkgPath, {
-            deckName,
-            subject,
-            source,
-            timeout: config?.global?.compiler_timeout,
-          });
+        if (isDirectory) {
+          if (!fs.existsSync(outputPath)) {
+            fs.mkdirSync(outputPath, { recursive: true });
+          }
+          outputApkgPath = path.join(outputPath, defaultApkgFilename);
+        } else {
+          outputApkgPath = outputPath;
+        }
+      } else {
+        outputApkgPath = path.join(outputDir, defaultApkgFilename);
+      }
+
+      try {
+        console.info(`Compiling deck for run: ${runId}`);
+        await spawnCompiler(jsonPath, outputApkgPath, {
+          deckName,
+          subject,
+          source,
+          timeout: config?.global?.compiler_timeout,
+        });
+
+        // Update results list with the apkgPath
+        for (const res of results) {
           res.apkgPath = outputApkgPath;
-        } catch (err) {
-          console.error(`Compilation failed for ${res.questionId}:`, err);
-          hasFailures = true;
         }
-      });
-
-      await Promise.all(compilationPromises);
+      } catch (err) {
+        console.error(`Compilation failed for run ${runId}:`, err);
+        hasFailures = true;
+      }
     }
 
     if (!dryRun) {

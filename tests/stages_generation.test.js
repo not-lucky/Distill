@@ -432,5 +432,77 @@ global:
         }),
       ).rejects.toThrow('Cerebras API Error');
     });
+
+    it('should generate a topic-based user prompt when content is empty or not provided', async () => {
+      const openaiClient = clients.get('openai');
+      const cerebrasClient = clients.get('cerebras');
+
+      const mockOpenaiCreate = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: 'OpenAI output' } }],
+      });
+      vi.spyOn(cerebrasClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: 'Cerebras output' } }],
+      });
+
+      const runId = 'run-parallel-empty-content';
+      createRun({
+        runId,
+        subject: 'General',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash123',
+      });
+
+      await runStage1({
+        runId,
+        questionId: 'some_topic_name',
+        content: '',
+        topicName: 'Custom Topic Name',
+        deckPath: 'Deck::Path',
+        cardType: 'standard',
+        subject: 'General',
+        prompts: {},
+        config,
+        keys,
+        clients,
+        throttledFetch,
+      });
+
+      // Verify prompt uses topicName
+      expect(mockOpenaiCreate.mock.calls[0][0]).toEqual(expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'user',
+            content: 'Please generate comprehensive flashcards for the following topic: Custom Topic Name',
+          }),
+        ]),
+      }));
+
+      // Test fallback to questionId if topicName is also missing
+      await runStage1({
+        runId,
+        questionId: 'fallback_question_id',
+        content: '',
+        topicName: '',
+        deckPath: 'Deck::Path',
+        cardType: 'standard',
+        subject: 'General',
+        prompts: {},
+        config,
+        keys,
+        clients,
+        throttledFetch,
+      });
+
+      // Verify prompt uses normalized questionId
+      expect(mockOpenaiCreate.mock.calls[1][0]).toEqual(expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'user',
+            content: 'Please generate comprehensive flashcards for the following topic: fallback question id',
+          }),
+        ]),
+      }));
+    });
   });
 });
