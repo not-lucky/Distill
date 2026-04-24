@@ -336,7 +336,8 @@ export function cleanJsonOutput(text) {
   if (typeof text !== 'string') return '';
   let cleaned = text.trim();
 
-  // Try to match the content inside markdown code fence (with any word-based language identifier like json, javascript, etc.)
+  // Try to match the content inside markdown code fence (with any word-based
+  // language identifier like json, javascript, etc.)
   const codeBlockMatch = cleaned.match(/```[a-z]*\s*([\s\S]*?)\s*```/i);
   if (codeBlockMatch) {
     cleaned = codeBlockMatch[1].trim();
@@ -542,6 +543,29 @@ export async function runStage3({
 
       return jsonObj;
     }
+
+    // Log failed attempt to pipeline_steps and run_questions for auditing/debugging
+    const errorString = errorsList.join('\n');
+    addPipelineStep({
+      runId,
+      questionId,
+      stage: 'enforcement',
+      provider,
+      model,
+      inputData: JSON.stringify(messages),
+      outputData: rawOutput,
+      status: 'failed',
+      errors: errorString,
+    });
+
+    upsertQuestionEntry({
+      runId,
+      questionId,
+      currentStage: 'synthesis', // Keep as synthesis so resumption knows it is not fully completed
+      latestPrompt: JSON.stringify(messages),
+      latestResponse: rawOutput,
+      errors: errorString,
+    });
 
     // Failed validation/audit: prepare feedback and append history for retry
     lastErrorMsg = errorsList.join('\n');
