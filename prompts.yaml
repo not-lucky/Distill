@@ -22,5 +22,4 @@ subjects:
     categories:
       - name: "Basics"
         topics:
-          # - "Closures"
-          - "Event Loop"
+          - "Closures"

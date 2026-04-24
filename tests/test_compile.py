@@ -522,7 +522,7 @@ def test_compile_multiple_topics_in_list():
                     "explanation": "Topic 2 Explanation",
                 }
             ],
-        }
+        },
     ]
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -581,7 +581,7 @@ def test_compile_topic_list_with_invalid_items():
                     "explanation": "Exp",
                 }
             ],
-        }
+        },
     ]
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -612,7 +612,7 @@ def test_compile_topic_list_missing_cards_field():
             "topic": "Null Cards",
             "difficulty": "Easy",
             "cards": None,
-        }
+        },
     ]
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -651,5 +651,3 @@ def test_compile_topic_list_custom_deck_name():
 
         assert os.path.exists(apkg_path)
         assert os.path.getsize(apkg_path) > 0
-
-

@@ -81,6 +81,9 @@ describe('Stage 3 - JSON Translation & AJV Schema Enforcement', () => {
       const inputWithJson = '```json\n{"key": "value"}\n```';
       expect(cleanJsonOutput(inputWithJson)).toBe('{"key": "value"}');
 
+      const inputWithJs = '```javascript\n{"key": "value"}\n```';
+      expect(cleanJsonOutput(inputWithJs)).toBe('{"key": "value"}');
+
       const inputPlainFence = '```\n{"key": "value"}\n```';
       expect(cleanJsonOutput(inputPlainFence)).toBe('{"key": "value"}');
 
