@@ -17,7 +17,8 @@ Rules:
 - Keep all unique facts, variations, and approaches (maximizing detail density).
 - Eliminate exact duplicate cards.
 - Refine question phrasing for clarity and conciseness to maximize Active Recall, but do not truncate technical details, code blocks, or paths.
-- Enforce atomic structuring on consolidated cards, splitting combined items if the previous stage merged distinct facts.`;
+- Enforce atomic structuring on consolidated cards, splitting combined items if the previous stage merged distinct facts.
+- OUTPUT ONLY the final consolidated list of flashcards. Do not include any introductory text, concluding remarks, explanations of changes, meta-commentary, or conversational filler (e.g., do not say "As a senior technical editor, I have consolidated..."). Start immediately with the first flashcard.`;
 
 export const DEFAULT_TRANSLATION = 'You are a parser. Translate the following unstructured text Q&A list into a standard JSON list. Do not change, summarize, or omit any details. Format code blocks correctly using double-escape newline characters. Do not validate fields against strict type schemas; focus purely on matching structure.';
 

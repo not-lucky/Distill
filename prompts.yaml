@@ -1,0 +1,26 @@
+subjects:
+  leetcode:
+    generation: |
+      Special Guidelines for LeetCode:
+      - Target Complexity to Constraint mapping
+      - Recurrence Relations for Dynamic Programming
+    synthesis: |
+      Consolidate algorithmic insights. Retain complexity trade-offs.
+    categories:
+      - name: "Arrays & Hashing"
+        topics:
+          - "Two Sum"
+          - "Group Anagrams"
+      - name: "Two Pointers"
+        topics:
+          - "Valid Palindrome"
+
+  javascript:
+    generation: |
+      Special Guidelines for JavaScript:
+      - Predict execution output (closures, scopes, event loop queues)
+    categories:
+      - name: "Basics"
+        topics:
+          - "Closures"
+          - "Event Loop"
