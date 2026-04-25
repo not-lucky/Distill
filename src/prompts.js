@@ -24,9 +24,19 @@ export const DEFAULT_ENFORCEMENT = 'You are a schema compliance engine. You will
 
 export const FORMAT_STANDARD = `Format Instruction:
 You must output the cards in a clean, plain text/markdown format. Do not use JSON.
-For each card, output using the following format:
+For each card, choose the most appropriate layout: either a Basic Q&A card or a Cloze deletion card.
+
+For each card, output using one of the following formats:
+
+Format 1: Basic Q&A Card
 ---
-Front: [The active recall question or statement with {{c1::cloze deletion}} syntax]
+Front: [A clear, active recall question that does not use cloze deletion syntax]
+Back: [The short, punchy answer to the question]
+Explanation: [Detailed background explanation, code examples, trade-offs, why the answer is correct, and common pitfalls]
+
+Format 2: Cloze Deletion Card
+---
+Front: [An active recall statement containing one or more cloze deletions using {{c1::cloze deletion}} syntax]
 Back: [The short, punchy answer. If using cloze deletion, you can omit the back or make it a brief summary of the deleted word/phrase]
 Explanation: [Detailed background explanation, code examples, trade-offs, why the answer is correct, and common pitfalls]`;
 
