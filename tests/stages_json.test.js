@@ -31,7 +31,7 @@ vi.mock('openai', () => {
   };
 });
 
-describe('Stage 3 - JSON Translation & AJV Schema Enforcement', () => {
+describe('Stage 3 - AJV Schema Enforcement', () => {
   let config;
   let keys;
   let clients;
@@ -593,61 +593,6 @@ Card 2 Front: What is JSX?
           maxEnforcementRetries: 2,
         }),
       ).rejects.toThrow('Stage 3 Schema Enforcement failed after 2 attempts');
-    });
-
-    it('should fall back to translation model if schema_enforcement model is not configured', async () => {
-      const fallbackConfig = {
-        global: config.global,
-        providers: config.providers,
-        pipeline: {
-          translation: {
-            model: 'openai/gpt-3.5-turbo-fallback',
-          },
-        },
-      };
-
-      const mockResultObj = {
-        title: 'Fallback Model',
-        topic: 'React',
-        difficulty: 'Basic',
-        cards: [
-          {
-            card_format: 'Basic',
-            card_type: 'Concept',
-            tags: ['react'],
-            front: 'What is React?',
-            back: 'A library',
-            explanation: 'Details',
-          },
-        ],
-      };
-
-      const openaiClient = clients.get('openai');
-      const mockCompletions = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
-        choices: [{ message: { content: JSON.stringify(mockResultObj) } }],
-      });
-
-      const runId = 'run-fallback';
-      createRun({
-        runId,
-        subject: 'ReactPreset',
-        cardType: 'standard',
-        status: 'running',
-        configHash: 'hash-fallback',
-      });
-
-      const result = await runStage3({
-        runId,
-        questionId: 'q-fallback',
-        synthesisResult: 'Front: What is React?',
-        config: fallbackConfig,
-        keys,
-        clients,
-        throttledFetch,
-      });
-
-      expect(result).toEqual(mockResultObj);
-      expect(mockCompletions.mock.calls[0][0].model).toBe('gpt-3.5-turbo-fallback');
     });
 
     it('should save failed recovery attempts to the database pipeline steps and run questions tables', async () => {

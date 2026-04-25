@@ -411,8 +411,9 @@ export function verifyContentLoss(stage2Questions, stage3Cards) {
 }
 
 /**
- * Executes Stage 3 of the pipeline: JSON Translation & Schema Enforcement.
- * Translates consolidated text from Stage 2 into valid polymorphic JSON cards.
+ * Executes Stage 3 of the pipeline: AJV Schema Enforcement.
+ * Enforces schema compliance and translates consolidated text from Stage 2
+ * into valid polymorphic JSON cards.
  * Uses an AJV compiler for validation and run a recovery re-prompt loop on failures.
  *
  * @param {Object} params
@@ -446,9 +447,8 @@ export async function runStage3({
     throw new Error('Stage 2 synthesis result is missing or empty');
   }
 
-  // Retrieve schema enforcement model config, fallback to translation model
-  const modelString = config?.pipeline?.schema_enforcement?.model
-    || config?.pipeline?.translation?.model;
+  // Retrieve schema enforcement model config
+  const modelString = config?.pipeline?.schema_enforcement?.model;
   if (!modelString) {
     throw new Error('No schema enforcement model configured in config.pipeline.schema_enforcement.model');
   }

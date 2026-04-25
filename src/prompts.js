@@ -20,8 +20,6 @@ Rules:
 - Enforce atomic structuring on consolidated cards, splitting combined items if the previous stage merged distinct facts.
 - OUTPUT ONLY the final consolidated list of flashcards. Do not include any introductory text, concluding remarks, explanations of changes, meta-commentary, or conversational filler (e.g., do not say "As a senior technical editor, I have consolidated..."). Start immediately with the first flashcard.`;
 
-export const DEFAULT_TRANSLATION = 'You are a parser. Translate the following unstructured text Q&A list into a standard JSON list. Do not change, summarize, or omit any details. Format code blocks correctly using double-escape newline characters. Do not validate fields against strict type schemas; focus purely on matching structure.';
-
 export const DEFAULT_ENFORCEMENT = 'You are a schema compliance engine. You will be provided a raw JSON object and a target JSON Schema. Your job is to correct field names, types, array lengths, and tags to strictly conform to the schema. Ensure no educational, contextual, or explanation details are modified or deleted.';
 
 export const FORMAT_STANDARD = `Format Instruction:
@@ -59,7 +57,7 @@ export function resolvePrompts(promptsConfig, subject = '', cardType = 'standard
   // Resolve base stage prompts (defaults/overrides)
   const genBase = defaults.generation || DEFAULT_GENERATION;
   const synthBase = defaults.synthesis || DEFAULT_SYNTHESIS;
-  const translation = defaults.translation || DEFAULT_TRANSLATION;
+
   const enforcement = defaults.schema_enforcement || DEFAULT_ENFORCEMENT;
 
   // Resolve subject-specific modifications. Subject parameter is checked case-insensitively.
@@ -103,7 +101,6 @@ export function resolvePrompts(promptsConfig, subject = '', cardType = 'standard
   return {
     generation,
     synthesis,
-    translation,
     enforcement,
   };
 }

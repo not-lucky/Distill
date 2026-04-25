@@ -347,9 +347,6 @@ describe('Orchestrator Module', () => {
           synthesis: {
             model: 'openai/gpt-4',
           },
-          translation: {
-            model: 'openai/gpt-4',
-          },
         },
       };
 

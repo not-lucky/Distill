@@ -62,8 +62,6 @@ pipeline:
       - "openai/gpt-3.5-turbo"
   synthesis:
     model: "openai/gpt-4o"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 `;
@@ -109,8 +107,6 @@ pipeline:
       - "openai/gpt-3.5-turbo"
   synthesis:
     model: "openai/gpt-4o"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 `;
@@ -235,8 +231,6 @@ pipeline:
       - "openai/gpt-3.5-turbo"
   synthesis:
     model: "openai/gpt-4o"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 `;
@@ -269,8 +263,6 @@ pipeline:
       - "openai/gpt-3.5-turbo"
   synthesis:
     model: "openai/gpt-4o"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 `;
@@ -301,8 +293,6 @@ pipeline:
     models:
       - "ollama_local/llama3"
   synthesis:
-    model: "ollama_local/llama3"
-  translation:
     model: "ollama_local/llama3"
   schema_enforcement:
     model: "ollama_local/llama3"
@@ -584,8 +574,6 @@ pipeline:
       - "openai/gpt-4"
   synthesis:
     model: "openai/gpt-4"
-  translation:
-    model: "openai/gpt-4"
   schema_enforcement:
     model: "openai/gpt-4"
 `;
@@ -767,8 +755,6 @@ pipeline:
       - "openai/gpt-3.5-turbo"
   synthesis:
     model: "openai/gpt-4o"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 `;
@@ -796,8 +782,6 @@ pipeline:
   generation:
     models:
       - "openai/gpt-3.5-turbo"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 `;
@@ -822,8 +806,6 @@ pipeline:
       - ""
   synthesis:
     model: "openai/gpt-4o"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 `;
@@ -850,8 +832,6 @@ pipeline:
       - "openai/gpt-3.5-turbo"
   synthesis:
     model: "openai/gpt-4o"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 `;

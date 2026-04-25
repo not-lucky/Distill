@@ -33,10 +33,7 @@ pipeline:
   synthesis:
     model: "gemini/gemini-flash-lite-latest"
   
-  # Stage 3: Loose JSON Translation
-  translation:
-    model: "gemini/gemini-flash-lite-latest"
-  
-  # Stage 4: Strict JSON Schema Enforcement
+
+  # Stage 3: Strict JSON Schema Enforcement
   schema_enforcement:
     model: "gemini/gemini-flash-lite-latest"
