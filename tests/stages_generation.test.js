@@ -99,7 +99,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
 
     it('should inject format templates correctly', () => {
       const standard = resolvePrompts({}, '', 'standard');
-      expect(standard.generation).toContain('Front: [The active recall question or statement');
+      expect(standard.generation).toContain('Front: [A clear, active recall question');
 
       const mcq = resolvePrompts({}, '', 'mcq');
       expect(mcq.generation).toContain('Correct: [The correct option letter: A, B, C, or D]');
