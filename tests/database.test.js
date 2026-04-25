@@ -433,7 +433,7 @@ describe('Database Module & SQLite Operations', () => {
       configHash: 'hash',
     });
 
-    // Stage CHECK constraint: must be ('generation', 'synthesis', 'translation', 'enforcement')
+    // Stage CHECK constraint: must be ('generation', 'synthesis', 'enforcement')
     expect(() => {
       addPipelineStep({
         runId,

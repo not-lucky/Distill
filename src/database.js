@@ -74,7 +74,7 @@ export function initDatabase(dbPath) {
         step_id INTEGER PRIMARY KEY AUTOINCREMENT,
         run_id TEXT NOT NULL,
         question_id TEXT NOT NULL,
-        stage TEXT NOT NULL CHECK(stage IN ('generation', 'synthesis', 'translation', 'enforcement')),
+        stage TEXT NOT NULL CHECK(stage IN ('generation', 'synthesis', 'enforcement')),
         provider TEXT NOT NULL,
         model TEXT NOT NULL,
         input_data TEXT NOT NULL,
@@ -204,7 +204,7 @@ export function deleteRun(runId) {
  * @param {Object} params
  * @param {string} params.runId
  * @param {string} params.questionId
- * @param {string} params.stage ('generation', 'synthesis', 'translation', 'enforcement')
+ * @param {string} params.stage ('generation', 'synthesis', 'enforcement')
  * @param {string} params.provider
  * @param {string} params.model
  * @param {string} params.inputData

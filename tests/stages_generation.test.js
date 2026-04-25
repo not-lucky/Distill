@@ -12,7 +12,6 @@ import {
   resolvePrompts,
   DEFAULT_GENERATION,
   DEFAULT_SYNTHESIS,
-  DEFAULT_TRANSLATION,
   DEFAULT_ENFORCEMENT,
 } from '../src/prompts.js';
 import {
@@ -95,7 +94,6 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
       const prompts = resolvePrompts({}, '', 'standard');
       expect(prompts.generation).toContain(DEFAULT_GENERATION);
       expect(prompts.synthesis).toBe(DEFAULT_SYNTHESIS);
-      expect(prompts.translation).toBe(DEFAULT_TRANSLATION);
       expect(prompts.enforcement).toBe(DEFAULT_ENFORCEMENT);
     });
 
@@ -136,7 +134,6 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
         defaults: {
           generation: 'YAML Gen Override',
           synthesis: 'YAML Synth Override',
-          translation: 'YAML Trans Override',
           schema_enforcement: 'YAML Enforce Override',
         },
       };
@@ -144,7 +141,6 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
       const prompts = resolvePrompts(yamlConfig, '', 'standard');
       expect(prompts.generation).toContain('YAML Gen Override');
       expect(prompts.synthesis).toBe('YAML Synth Override');
-      expect(prompts.translation).toBe('YAML Trans Override');
       expect(prompts.enforcement).toBe('YAML Enforce Override');
     });
 

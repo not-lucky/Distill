@@ -113,10 +113,6 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
     warnings.push('Missing configuration: Pipeline stage "synthesis" has no model configured.');
   }
 
-  if (!pipeline.translation || typeof pipeline.translation.model !== 'string' || !pipeline.translation.model.trim()) {
-    warnings.push('Missing configuration: Pipeline stage "translation" has no model configured.');
-  }
-
   if (!pipeline.schema_enforcement || typeof pipeline.schema_enforcement.model !== 'string' || !pipeline.schema_enforcement.model.trim()) {
     warnings.push('Missing configuration: Pipeline stage "schema_enforcement" has no model configured.');
   }
