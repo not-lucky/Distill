@@ -93,7 +93,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
     it('should resolve standard stage prompts by default', () => {
       const prompts = resolvePrompts({}, '', 'standard');
       expect(prompts.generation).toContain(DEFAULT_GENERATION);
-      expect(prompts.synthesis).toBe(DEFAULT_SYNTHESIS);
+      expect(prompts.synthesis).toContain(DEFAULT_SYNTHESIS);
       expect(prompts.enforcement).toBe(DEFAULT_ENFORCEMENT);
     });
 
@@ -140,7 +140,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
 
       const prompts = resolvePrompts(yamlConfig, '', 'standard');
       expect(prompts.generation).toContain('YAML Gen Override');
-      expect(prompts.synthesis).toBe('YAML Synth Override');
+      expect(prompts.synthesis).toContain('YAML Synth Override');
       expect(prompts.enforcement).toBe('YAML Enforce Override');
     });
 
@@ -171,7 +171,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
       };
       const prompts = resolvePrompts(yamlConfig, 'leetcode', 'standard');
       expect(prompts.generation).toContain(DEFAULT_GENERATION);
-      expect(prompts.synthesis).toBe(DEFAULT_SYNTHESIS);
+      expect(prompts.synthesis).toContain(DEFAULT_SYNTHESIS);
     });
 
     it('should fall back to hardcoded defaults when subject is not in subjects config map', () => {

@@ -9,6 +9,7 @@ import {
 } from '../src/providers.js';
 import {
   DEFAULT_SYNTHESIS,
+  FORMAT_STANDARD,
 } from '../src/prompts.js';
 import {
   runStage2,
@@ -282,7 +283,7 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
 
     const combinedContent = '--- Provider: openai, Model: gpt-3.5-turbo ---\nCard 1';
     const messages = [
-      { role: 'system', content: DEFAULT_SYNTHESIS },
+      { role: 'system', content: `${DEFAULT_SYNTHESIS}\n\n${FORMAT_STANDARD}` },
       { role: 'user', content: `Flashcard lists to consolidate:\n\n${combinedContent}` },
     ];
 
