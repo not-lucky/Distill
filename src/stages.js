@@ -385,11 +385,18 @@ export function cleanJsonOutput(text) {
   if (typeof text !== 'string') return '';
   let cleaned = text.trim();
 
-  // Try to match the content inside markdown code fence (with any word-based
-  // language identifier like json, javascript, etc.)
-  const codeBlockMatch = cleaned.match(/```[a-z]*\s*([\s\S]*?)\s*```/i);
-  if (codeBlockMatch) {
-    cleaned = codeBlockMatch[1].trim();
+  // If the text already starts with a JSON object or array delimiter,
+  // skip code-fence stripping. The regex below would incorrectly match
+  // triple-backtick code blocks embedded *inside* JSON string values
+  // (e.g. explanation fields containing ```javascript ... ```),
+  // extracting inner code instead of the actual JSON object.
+  if (!cleaned.startsWith('{') && !cleaned.startsWith('[')) {
+    // Try to match the content inside a top-level markdown code fence
+    // (with any word-based language identifier like json, javascript, etc.)
+    const codeBlockMatch = cleaned.match(/```[a-z]*\s*([\s\S]*?)\s*```/i);
+    if (codeBlockMatch) {
+      cleaned = codeBlockMatch[1].trim();
+    }
   }
 
   return cleaned;
