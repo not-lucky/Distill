@@ -107,8 +107,9 @@ export function resolvePrompts(promptsConfig, subject = '', cardType = 'standard
   // Base Generation + Subject-specific guidelines + Format rules
   const generation = [genBase, subjectGenPrompt, formatPrompt].filter(Boolean).join('\n\n');
 
-  // For Stage 2 synthesis prompt, if a subject-specific combiner is defined, we can append it
-  const synthesis = [synthBase, subjectSynthPrompt].filter(Boolean).join('\n\n');
+  // For Stage 2 synthesis prompt, we join the base synthesis prompt, subject-specific combiner,
+  // and the target formatting rules (Basic/Cloze or MCQ) to ensure output format is preserved.
+  const synthesis = [synthBase, subjectSynthPrompt, formatPrompt].filter(Boolean).join('\n\n');
 
   return {
     generation,
