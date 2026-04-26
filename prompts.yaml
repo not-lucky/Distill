@@ -17,8 +17,7 @@ subjects:
 
   javascript:
     generation: |
-      Special Guidelines for JavaScript:
-      - Predict execution output (closures, scopes, event loop queues)
+      Javascript closures
     categories:
       - name: "Basics"
         topics:

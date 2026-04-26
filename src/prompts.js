@@ -20,7 +20,9 @@ Rules:
 - Enforce atomic structuring on consolidated cards, splitting combined items if the previous stage merged distinct facts.
 - OUTPUT ONLY the final consolidated list of flashcards. Do not include any introductory text, concluding remarks, explanations of changes, meta-commentary, or conversational filler (e.g., do not say "As a senior technical editor, I have consolidated..."). Start immediately with the first flashcard.`;
 
-export const DEFAULT_ENFORCEMENT = 'You are a schema compliance engine. You will be provided a raw JSON object and a target JSON Schema. Your job is to correct field names, types, array lengths, and tags to strictly conform to the schema. Ensure no educational, contextual, or explanation details are modified or deleted.';
+// The enforcement engine is provided a plain text/markdown list from the synthesis stage (Stage 2)
+// and converts it into a compliant JSON structure matching CARD_JSON_SCHEMA.
+export const DEFAULT_ENFORCEMENT = 'You are a schema compliance engine. You will be provided a plain text/markdown list of consolidated flashcards and a target JSON Schema. Your job is to parse and convert this list into a JSON object that strictly conforms to the schema, correcting any field names, types, array lengths, or formats to meet the schema requirements. Ensure no educational, contextual, or explanation details are modified or deleted.';
 
 export const FORMAT_STANDARD = `Format Instruction:
 You must output the cards in a clean, plain text/markdown format. Do not use JSON.

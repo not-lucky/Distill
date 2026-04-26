@@ -168,7 +168,7 @@ export function getCompletedQuestions(runId) {
  * @param {boolean} [params.dryRun=false] If true, validate and log without LLM queries/compilation.
  * @param {string} [params.deckName] Optional override for compiled deck name.
  * @param {string} [params.source] Optional override for source file.
- * @param {number} [params.maxEnforcementRetries=5] Max Stage 3 schema recovery attempts.
+ * @param {number} [params.maxEnforcementRetries=3] Max Stage 3 schema recovery attempts.
  * @returns {Promise<{ runId: string, results: Array<Object>, hasFailures: boolean }>}
  */
 export async function runPipeline({
@@ -184,7 +184,7 @@ export async function runPipeline({
   dryRun = false,
   deckName = null,
   source = null,
-  maxEnforcementRetries = 5,
+  maxEnforcementRetries = 3,
 }) {
   if (!config) {
     throw new Error('Configuration object is required.');

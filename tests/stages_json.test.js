@@ -12,6 +12,8 @@ import {
   parseStage2Questions,
   verifyContentLoss,
   runStage3,
+  removeNullValues,
+  CARD_ZOD_SCHEMA,
 } from '../src/stages.js';
 
 vi.mock('openai', () => {
@@ -765,6 +767,116 @@ Card 2 Front: What is JSX?
           maxEnforcementRetries: 1,
         }),
       ).rejects.toThrow("/: must have required property 'cards'");
+    });
+  });
+
+  describe('removeNullValues helper', () => {
+    it('should recursively strip null and undefined fields', () => {
+      const input = {
+        title: 'Title',
+        topic: 'Topic',
+        difficulty: 'Basic',
+        cards: [
+          {
+            card_format: 'Basic',
+            front: 'What is A?',
+            back: 'B',
+            options: null,
+            correct_answer: null,
+            explanation: 'Expl',
+          },
+          {
+            card_format: 'MCQ',
+            front: 'What is MCQ?',
+            back: null,
+            options: ['A', 'B'],
+            correct_answer: 'A',
+            explanation: 'Expl 2',
+          },
+        ],
+        extraField: undefined,
+      };
+
+      const expected = {
+        title: 'Title',
+        topic: 'Topic',
+        difficulty: 'Basic',
+        cards: [
+          {
+            card_format: 'Basic',
+            front: 'What is A?',
+            back: 'B',
+            explanation: 'Expl',
+          },
+          {
+            card_format: 'MCQ',
+            front: 'What is MCQ?',
+            options: ['A', 'B'],
+            correct_answer: 'A',
+            explanation: 'Expl 2',
+          },
+        ],
+      };
+
+      expect(removeNullValues(input)).toEqual(expected);
+    });
+
+    it('should handle primitives and arrays correctly', () => {
+      expect(removeNullValues(null)).toBeNull();
+      expect(removeNullValues(undefined)).toBeUndefined();
+      expect(removeNullValues('string')).toBe('string');
+      expect(removeNullValues(123)).toBe(123);
+      expect(removeNullValues([1, null, 2, { a: null, b: 3 }])).toEqual([1, null, 2, { b: 3 }]);
+    });
+  });
+
+  describe('CARD_ZOD_SCHEMA parse verification', () => {
+    it('should parse valid card decks with nullable fields', () => {
+      const validDeck = {
+        title: 'JS Basics',
+        topic: 'Javascript',
+        difficulty: 'Basic',
+        cards: [
+          {
+            card_format: 'Basic',
+            card_type: 'Concept',
+            tags: ['javascript', 'basics'],
+            front: 'What is a closure?',
+            back: 'A closure is a function combined with its lexical environment.',
+            options: null,
+            correct_answer: null,
+            explanation: 'Closures are created at function creation time.',
+          },
+          {
+            card_format: 'MCQ',
+            card_type: 'Syntax',
+            tags: ['js', 'syntax'],
+            front: 'Which keyword defines a constant?',
+            back: null,
+            options: ['var', 'let', 'const'],
+            correct_answer: 'C',
+            explanation: 'const is block scoped and cannot be reassigned.',
+          },
+        ],
+      };
+
+      const result = CARD_ZOD_SCHEMA.safeParse(validDeck);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual(validDeck);
+      }
+    });
+
+    it('should fail parsing if required fields are missing', () => {
+      const invalidDeck = {
+        title: 'JS Basics',
+        topic: 'Javascript',
+        // difficulty is missing
+        cards: [],
+      };
+
+      const result = CARD_ZOD_SCHEMA.safeParse(invalidDeck);
+      expect(result.success).toBe(false);
     });
   });
 });
