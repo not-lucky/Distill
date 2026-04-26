@@ -20,6 +20,9 @@ providers:
     temperature: 0.0
   gemini:
     base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  omniroute:
+    base_url: "https://omniroute.notlucky.dedyn.io/v1"
+
 
 # Assignment of models to pipeline stages using the "provider/model" convention.
 # Format: <provider_name>/<model_name_path>
@@ -27,13 +30,13 @@ pipeline:
   # Stage 1: Parallel Initial Generation (raw text extraction)
   generation:
     models:
-      - "gemini/gemini-flash-lite-latest"
+      - "omniroute/gemini-flash-lite-latest"
   
   # Stage 2: Synthesis (frontier model merges and deduplicates)
   synthesis:
-    model: "gemini/gemini-flash-lite-latest"
+    model: "omniroute/gemini-flash-lite-latest"
   
 
   # Stage 3: Strict JSON Schema Enforcement
   schema_enforcement:
-    model: "gemini/gemini-flash-lite-latest"
+    model: "omniroute/gemini-flash-lite-latest"

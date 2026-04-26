@@ -1,4 +1,5 @@
 import Ajv from 'ajv';
+import { z } from 'zod';
 import { resolveProviderModel, callLLM } from './providers.js';
 import { addPipelineStep, upsertQuestionEntry } from './database.js';
 import { resolvePrompts } from './prompts.js';
@@ -208,6 +209,54 @@ export async function runStage2({
 
   return output;
 }
+/**
+ * Recursively removes keys with null or undefined values from an object or array.
+ * This is necessary because OpenAI's Structured Outputs (enforced via Zod schema)
+ * require all properties to be present in the schema, making optional fields nullable.
+ * However, the legacy AJV JSON schema expects optional properties (like back, options,
+ * correct_answer for Cloze or MCQ cards) to be completely absent from the object
+ * rather than having null values, otherwise it triggers validation errors.
+ *
+ * @param {*} obj - The input object, array, or primitive.
+ * @returns {*} The input with all null and undefined fields stripped out.
+ */
+export function removeNullValues(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(removeNullValues);
+  } if (obj !== null && typeof obj === 'object') {
+    const newObj = {};
+    for (const key of Object.keys(obj)) {
+      if (obj[key] !== null && obj[key] !== undefined) {
+        newObj[key] = removeNullValues(obj[key]);
+      }
+    }
+    return newObj;
+  }
+  return obj;
+}
+
+// Zod schemas defining the structured output format for flashcards.
+// These mirror CARD_JSON_SCHEMA, but mark optional fields as nullable()
+// to satisfy OpenAI's Structured Outputs requirement that all properties are required.
+
+const CardItemSchema = z.object({
+  card_format: z.enum(['Basic', 'Cloze', 'MCQ']).describe('The structural layout of the card in Anki.'),
+  card_type: z.enum(['Concept', 'Code', 'Procedure', 'Syntax', 'Behavior', 'Constraint', 'ErrorHandling', 'TradeOff']).describe('Pedagogical tag for sorting and styled headers.'),
+  tags: z.array(z.string().regex(/^[A-Za-z0-9-_/]+$/)).describe('Alphanumeric, hyphen, underscore, and slash tags (no spaces allowed).'),
+  front: z.string().describe('Front/question side of the card, or statement with {{c1::hidden text}} syntax for Cloze.'),
+  back: z.string().nullable().describe('Short, punchy answer. Required for Basic card format; prohibited in MCQ or Cloze.'),
+  options: z.array(z.string()).min(2).max(4).nullable()
+    .describe('2 to 4 choices. Required only for MCQ.'),
+  correct_answer: z.enum(['A', 'B', 'C', 'D']).nullable().describe('Correct choice letter index. Required only for MCQ.'),
+  explanation: z.string().describe('Detailed background explanation, code examples, or trade-offs shown on the back side of all card formats.'),
+});
+
+export const CARD_ZOD_SCHEMA = z.object({
+  title: z.string().describe('Title of the concept, problem, or document section.'),
+  topic: z.string().describe('Main category hierarchy or path.'),
+  difficulty: z.enum(['Basic', 'Intermediate', 'Advanced']).describe('Standardized difficulty level for database sorting.'),
+  cards: z.array(CardItemSchema),
+});
 
 export const CARD_JSON_SCHEMA = {
   $schema: 'http://json-schema.org/draft-07/schema#',
@@ -460,7 +509,7 @@ export async function runStage3({
   const enforcementBase = resolvedPrompts.enforcement;
 
   // Inject target JSON Schema to guide enforcement
-  const systemPrompt = `${enforcementBase}\n\nYou must output a JSON object conforming strictly to this JSON Schema:\n${JSON.stringify(CARD_JSON_SCHEMA, null, 2)}`;
+  const systemPrompt = `${enforcementBase}\n\nYou must output a JSON object conforming strictly to this JSON Schema:\n${JSON.stringify(CARD_JSON_SCHEMA, null, 2)}\n\nIMPORTANT: Output ONLY the raw JSON string. Do NOT wrap the JSON in markdown code blocks or backticks (e.g. do NOT use \`\`\`json ... \`\`\`).`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -481,6 +530,7 @@ export async function runStage3({
       provider,
       model,
       messages,
+      schema: CARD_ZOD_SCHEMA,
       config,
       keys,
       clients,
@@ -494,6 +544,9 @@ export async function runStage3({
     // 1. JSON Parsing Check
     try {
       jsonObj = JSON.parse(cleanedOutput);
+      if (jsonObj) {
+        jsonObj = removeNullValues(jsonObj);
+      }
     } catch (parseError) {
       errorsList.push(`JSON Parsing Error: ${parseError.message}`);
     }

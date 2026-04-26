@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import OpenAI from 'openai';
+import { zodTextFormat, zodResponseFormat } from 'openai/helpers/zod';
 import pLimit from 'p-limit';
 import { getCache, setCache } from './database.js';
 
@@ -231,18 +232,45 @@ export async function callLLM({
       : 0.3;
   }
 
-  // Build the request body params
+  // Check if the schema provided is a Zod schema (has safeParse function).
+  const isZod = schema && typeof schema.safeParse === 'function';
+
+  // Determine if we should use the new OpenAI Responses API.
+  // This is used for OpenAI model calls that support structured text output.
+  // We check if the schema is a Zod schema and if the client SDK supports Responses API.
+  const isResponsesApi = isZod && client.responses && typeof client.responses.create === 'function';
+
+  // Build the request body params.
+  // The Responses API uses different parameters (input/text.format) compared to
+  // standard chat completions (messages/response_format).
   const params = {
     model,
-    messages,
     temperature: actualTemperature,
   };
 
-  if (schema) {
-    params.response_format = {
-      type: 'json_schema',
-      json_schema: schema,
+  if (isResponsesApi) {
+    // For the Responses API, the prompt history goes into the 'input' parameter,
+    // and the format goes into 'text.format' utilizing 'zodTextFormat'.
+    params.input = messages;
+    params.text = {
+      format: zodTextFormat(schema, 'card_deck'),
     };
+  } else {
+    // Fall back to standard Chat Completions parameters.
+    params.messages = messages;
+    if (schema) {
+      if (isZod) {
+        // If it's a Zod schema but the client doesn't support the Responses API,
+        // use OpenAI's zodResponseFormat helper.
+        params.response_format = zodResponseFormat(schema, 'card_deck');
+      } else {
+        // Fall back to the traditional JSON Schema response format object.
+        params.response_format = {
+          type: 'json_schema',
+          json_schema: schema,
+        };
+      }
+    }
   }
 
   // 2. Setup options per-request including rotated key
@@ -270,10 +298,22 @@ export async function callLLM({
 
   while (true) {
     try {
-      const completion = await throttledFetch(
-        () => client.chat.completions.create(params, options),
-      );
-      const content = completion.choices?.[0]?.message?.content;
+      let content;
+      if (isResponsesApi) {
+        // Use Responses API client method. The resulting structured text response
+        // is populated inside the `output_text` field.
+        const completion = await throttledFetch(
+          () => client.responses.create(params, options),
+        );
+        content = completion.output_text;
+      } else {
+        // Fall back to the traditional chat completions flow and pull content
+        // from the standard chat choices array.
+        const completion = await throttledFetch(
+          () => client.chat.completions.create(params, options),
+        );
+        content = completion.choices?.[0]?.message?.content;
+      }
 
       if (content === null || content === undefined || content.trim() === '') {
         throw new Error('Empty response payload');

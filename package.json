@@ -29,7 +29,8 @@
     "commander": "^15.0.0",
     "js-yaml": "^4.1.1",
     "openai": "^6.39.1",
-    "p-limit": "^7.3.0"
+    "p-limit": "^7.3.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.7",

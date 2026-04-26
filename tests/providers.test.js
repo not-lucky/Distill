@@ -2,6 +2,7 @@ import {
   vi, describe, it, expect, beforeEach, beforeAll, afterAll,
 } from 'vitest';
 import OpenAI from 'openai';
+import { z } from 'zod';
 import {
   initDatabase, closeDatabase, clearCache, getCacheStats,
 } from '../src/database.js';
@@ -774,6 +775,86 @@ describe('Providers Module', () => {
       expect(createSpy).toHaveBeenCalledWith(
         expect.any(Object),
         expect.not.objectContaining({ apiKey: expect.any(String) }),
+      );
+    });
+
+    it('should call client.responses.create when isResponsesApi is true', async () => {
+      const messages = [{ role: 'user', content: 'test schema' }];
+      const dummySchema = z.object({
+        cards: z.array(z.string()),
+      });
+
+      const openaiClient = clients.get('openai');
+      // Temporarily mock responses object on the client
+      openaiClient.responses = {
+        create: vi.fn().mockResolvedValue({ output_text: '{"cards":[]}' }),
+      };
+
+      const result = await callLLM({
+        provider: 'openai',
+        model: 'gpt-4o-2024-08-06',
+        messages,
+        schema: dummySchema,
+        config,
+        keys,
+        clients,
+        throttledFetch,
+      });
+
+      expect(result).toBe('{"cards":[]}');
+      expect(openaiClient.responses.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gpt-4o-2024-08-06',
+          input: messages,
+          text: expect.objectContaining({
+            format: expect.any(Object),
+          }),
+        }),
+        expect.any(Object),
+      );
+
+      // Clean up mock
+      delete openaiClient.responses;
+    });
+
+    it('should call chat.completions.create with zodResponseFormat when client.responses is not defined', async () => {
+      const messages = [{ role: 'user', content: 'test schema' }];
+      const dummySchema = z.object({
+        cards: z.array(z.string()),
+      });
+
+      const openaiClient = clients.get('openai');
+      // Ensure client.responses is not defined
+      delete openaiClient.responses;
+
+      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: '{"cards":[]}' } }],
+      });
+
+      const result = await callLLM({
+        provider: 'openai',
+        model: 'gpt-4o-2024-08-06',
+        messages,
+        schema: dummySchema,
+        config,
+        keys,
+        clients,
+        throttledFetch,
+      });
+
+      expect(result).toBe('{"cards":[]}');
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gpt-4o-2024-08-06',
+          messages,
+          response_format: expect.objectContaining({
+            type: 'json_schema',
+            json_schema: expect.objectContaining({
+              name: 'card_deck',
+            }),
+          }),
+        }),
+        expect.any(Object),
       );
     });
   });
