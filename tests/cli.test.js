@@ -11,7 +11,7 @@ import {
   initDatabase, closeDatabase, clearCache, getCacheStats,
 } from '../src/database.js';
 import { runPipeline, spawnCompiler } from '../src/orchestrator.js';
-import { ingestDirectory, loadPreset } from '../src/ingestion.js';
+import { ingestDirectory, loadPreset, ingestDocumentSources } from '../src/ingestion.js';
 
 // Mocking dependencies first
 vi.mock('../src/config.js', () => ({
@@ -30,6 +30,8 @@ vi.mock('../src/orchestrator.js', () => ({
 vi.mock('../src/ingestion.js', () => ({
   ingestDirectory: vi.fn(),
   loadPreset: vi.fn(),
+  ingestFiles: vi.fn(),
+  ingestDocumentSources: vi.fn(),
   formatNamespaceComponent: (val) => (val ? val.replace(/\s+/g, '_') : ''),
 }));
 
@@ -421,6 +423,246 @@ describe('CLI Commands Integration', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('No questions/topics found to process'),
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('should route document mode preset subjects correctly', async () => {
+      const mockPrompts = {
+        subjects: {
+          my_docs: {
+            mode: 'document',
+            files: ['./doc1.txt'],
+          },
+        },
+      };
+
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { global: { cache_db_path: './llm2deck.db', output_dir: './output' } },
+        keys: { openai: 'key' },
+        prompts: mockPrompts,
+      });
+
+      const mockQuestions = [
+        { filePath: path.resolve('./doc1.txt'), deckPath: 'Doc1', content: 'document content' },
+      ];
+      vi.mocked(ingestDocumentSources).mockResolvedValue(mockQuestions);
+
+      vi.mocked(runPipeline).mockResolvedValue({
+        runId: 'test-doc-run-id',
+        results: [],
+        hasFailures: false,
+      });
+
+      await program.parseAsync(['node', 'src/cli.js', 'run', 'my_docs']);
+
+      expect(ingestDocumentSources).toHaveBeenCalledWith({
+        files: [path.resolve('./doc1.txt')],
+      });
+
+      expect(runPipeline).toHaveBeenCalledWith({
+        config: expect.any(Object),
+        keys: { openai: 'key' },
+        prompts: mockPrompts,
+        questions: [
+          {
+            questionId: 'my_docs::Doc1',
+            topic: 'Doc1',
+            categoryName: 'Doc1',
+            content: 'document content',
+          },
+        ],
+        subject: 'my_docs',
+        cardType: 'standard',
+        resumeRunId: null,
+        dryRun: false,
+        outputPath: null,
+        outputDir: path.resolve('./output'),
+      });
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('should print error and exit with 1 if document mode preset subject is missing both files and folder', async () => {
+      const mockPrompts = {
+        subjects: {
+          my_invalid_docs: {
+            mode: 'document',
+          },
+        },
+      };
+
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { global: { cache_db_path: './llm2deck.db' } },
+        keys: {},
+        prompts: mockPrompts,
+      });
+
+      await program.parseAsync(['node', 'src/cli.js', 'run', 'my_invalid_docs']);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('configured in document mode but is missing both "files" and "folder" settings'),
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle standalone yaml presets in document mode correctly', async () => {
+      existsSyncSpy.mockReturnValue(true);
+      statSyncSpy.mockImplementation(() => ({
+        isDirectory: () => false,
+        isFile: () => true,
+      }));
+
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { global: { cache_db_path: './llm2deck.db', output_dir: './output' } },
+        keys: {},
+        prompts: {},
+      });
+
+      vi.mocked(loadPreset).mockResolvedValue({
+        name: 'MyPreset',
+        mode: 'document',
+        folder: './docs',
+      });
+
+      const mockQuestions = [
+        { filePath: path.resolve('./docs/info.txt'), deckPath: 'Docs::Info', content: 'standalone info content' },
+      ];
+      vi.mocked(ingestDocumentSources).mockResolvedValue(mockQuestions);
+
+      vi.mocked(runPipeline).mockResolvedValue({
+        runId: 'standalone-doc-run',
+        results: [],
+        hasFailures: false,
+      });
+
+      await program.parseAsync(['node', 'src/cli.js', 'run', './my-preset.yaml']);
+
+      expect(loadPreset).toHaveBeenCalledWith(path.resolve('./my-preset.yaml'));
+      expect(ingestDocumentSources).toHaveBeenCalledWith({
+        folder: path.resolve(path.dirname(path.resolve('./my-preset.yaml')), './docs'),
+      });
+
+      expect(runPipeline).toHaveBeenCalledWith({
+        config: expect.any(Object),
+        keys: expect.any(Object),
+        prompts: {},
+        questions: [
+          {
+            questionId: 'MyPreset::Docs::Info',
+            topic: 'Docs::Info',
+            categoryName: 'Docs::Info',
+            content: 'standalone info content',
+          },
+        ],
+        subject: 'MyPreset',
+        cardType: 'standard',
+        resumeRunId: null,
+        dryRun: false,
+        outputPath: null,
+        outputDir: path.resolve('./output'),
+      });
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('should route document mode preset subjects with folder setting correctly', async () => {
+      const mockPrompts = {
+        subjects: {
+          my_folder_docs: {
+            mode: 'document',
+            folder: './some-folder',
+          },
+        },
+      };
+
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { global: { cache_db_path: './llm2deck.db', output_dir: './output' } },
+        keys: { openai: 'key' },
+        prompts: mockPrompts,
+      });
+
+      const mockQuestions = [
+        { filePath: path.resolve('./some-folder/doc.txt'), deckPath: 'Doc', content: 'folder content' },
+      ];
+      vi.mocked(ingestDocumentSources).mockResolvedValue(mockQuestions);
+
+      vi.mocked(runPipeline).mockResolvedValue({
+        runId: 'test-doc-folder-run-id',
+        results: [],
+        hasFailures: false,
+      });
+
+      await program.parseAsync(['node', 'src/cli.js', 'run', 'my_folder_docs']);
+
+      expect(ingestDocumentSources).toHaveBeenCalledWith({
+        folder: path.resolve('./some-folder'),
+      });
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('should handle standalone yaml presets with files list setting correctly', async () => {
+      existsSyncSpy.mockReturnValue(true);
+      statSyncSpy.mockImplementation(() => ({
+        isDirectory: () => false,
+        isFile: () => true,
+      }));
+
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { global: { cache_db_path: './llm2deck.db', output_dir: './output' } },
+        keys: {},
+        prompts: {},
+      });
+
+      vi.mocked(loadPreset).mockResolvedValue({
+        name: 'MyFilesPreset',
+        mode: 'document',
+        files: ['./doc1.md', './doc2.txt'],
+      });
+
+      const mockQuestions = [
+        { filePath: path.resolve('./doc1.md'), deckPath: 'Doc1', content: 'content1' },
+      ];
+      vi.mocked(ingestDocumentSources).mockResolvedValue(mockQuestions);
+
+      vi.mocked(runPipeline).mockResolvedValue({
+        runId: 'standalone-files-run',
+        results: [],
+        hasFailures: false,
+      });
+
+      await program.parseAsync(['node', 'src/cli.js', 'run', './my-files-preset.yaml']);
+
+      const presetDir = path.dirname(path.resolve('./my-files-preset.yaml'));
+      expect(ingestDocumentSources).toHaveBeenCalledWith({
+        files: [
+          path.resolve(presetDir, './doc1.md'),
+          path.resolve(presetDir, './doc2.txt'),
+        ],
+      });
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('should print error and exit with 1 if standalone document preset has missing files and folder', async () => {
+      existsSyncSpy.mockReturnValue(true);
+      statSyncSpy.mockImplementation(() => ({
+        isDirectory: () => false,
+        isFile: () => true,
+      }));
+
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { global: { cache_db_path: './llm2deck.db' } },
+        keys: {},
+        prompts: {},
+      });
+
+      vi.mocked(loadPreset).mockResolvedValue({
+        name: 'InvalidDocPreset',
+        mode: 'document',
+      });
+
+      await program.parseAsync(['node', 'src/cli.js', 'run', './invalid-preset.yaml']);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('configured in document mode but is missing both "files" and "folder" settings'),
       );
       expect(exitSpy).toHaveBeenCalledWith(1);
     });

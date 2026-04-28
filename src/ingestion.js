@@ -222,3 +222,65 @@ export async function loadPreset(filePath) {
   const content = await fs.readFile(filePath, 'utf8');
   return parsePreset(content);
 }
+
+/**
+ * Ingests a list of file paths, reading their contents and mapping filenames to deck paths.
+ *
+ * @param {string[]} filePaths Array of file paths to ingest.
+ * @returns {Promise<Array<{ filePath: string, deckPath: string, content: string }>>}
+ */
+export async function ingestFiles(filePaths) {
+  if (!Array.isArray(filePaths)) {
+    throw new Error('filePaths parameter must be an array.');
+  }
+
+  const results = [];
+  for (const rawPath of filePaths) {
+    // Gracefully ignore non-string paths in the input list
+    if (typeof rawPath !== 'string') continue;
+
+    // Resolve absolute path to ensure consistent database references and logs
+    const resolvedPath = path.resolve(rawPath);
+
+    // Attempt decoding with UTF-8 first, falling back to Latin-1
+    const content = await readFileWithFallback(resolvedPath);
+
+    // Skip missing files, unreadable files, or files containing only whitespace
+    if (content === null || content.trim().length === 0) {
+      continue;
+    }
+
+    // Strip extension and format filename as Title Case underscore components
+    // (e.g. "my-doc.md" -> "My_Doc")
+    const fileComponent = path.basename(resolvedPath);
+    const ext = path.extname(fileComponent);
+    const filenameWithoutExt = fileComponent.slice(0, fileComponent.length - ext.length);
+    const deckPath = formatNamespaceComponent(filenameWithoutExt);
+
+    results.push({
+      filePath: resolvedPath,
+      deckPath,
+      content,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Orchestrates ingestion for document sources, supporting either a list of files or a folder.
+ *
+ * @param {Object} sources Object containing either files or folder property.
+ * @param {string[]} [sources.files] Array of file paths.
+ * @param {string} [sources.folder] Folder path to scan recursively.
+ * @returns {Promise<Array<{ filePath: string, deckPath: string, content: string }>>}
+ */
+export async function ingestDocumentSources({ files, folder }) {
+  if (folder) {
+    return ingestDirectory(folder);
+  }
+  if (files) {
+    return ingestFiles(files);
+  }
+  return [];
+}

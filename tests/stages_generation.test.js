@@ -13,6 +13,8 @@ import {
   DEFAULT_GENERATION,
   DEFAULT_SYNTHESIS,
   DEFAULT_ENFORCEMENT,
+  DEFAULT_GENERATION_DOCUMENT,
+  DEFAULT_GENERATION_TOPIC,
 } from '../src/prompts.js';
 import {
   runStage1,
@@ -97,6 +99,48 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
       expect(prompts.enforcement).toBe(DEFAULT_ENFORCEMENT);
     });
 
+    it('should resolve topic mode specifically', () => {
+      const prompts = resolvePrompts({}, '', 'standard', 'topic');
+      expect(prompts.generation).toContain(DEFAULT_GENERATION_TOPIC);
+    });
+
+    it('should resolve document mode specifically', () => {
+      const prompts = resolvePrompts({}, '', 'standard', 'document');
+      expect(prompts.generation).toContain(DEFAULT_GENERATION_DOCUMENT);
+    });
+
+    it('should resolve document mode from subject config', () => {
+      const promptsConfig = {
+        subjects: {
+          my_docs: {
+            mode: 'document',
+          },
+        },
+      };
+      const prompts = resolvePrompts(promptsConfig, 'my_docs', 'standard');
+      expect(prompts.generation).toContain(DEFAULT_GENERATION_DOCUMENT);
+    });
+
+    it('should support defaults.generation_document override for document mode', () => {
+      const promptsConfig = {
+        defaults: {
+          generation_document: 'OVERRIDDEN DOCUMENT PROMPT',
+        },
+      };
+      const prompts = resolvePrompts(promptsConfig, '', 'standard', 'document');
+      expect(prompts.generation).toContain('OVERRIDDEN DOCUMENT PROMPT');
+    });
+
+    it('should support defaults.generation_topic override for topic mode', () => {
+      const promptsConfig = {
+        defaults: {
+          generation_topic: 'OVERRIDDEN TOPIC PROMPT',
+        },
+      };
+      const prompts = resolvePrompts(promptsConfig, '', 'standard', 'topic');
+      expect(prompts.generation).toContain('OVERRIDDEN TOPIC PROMPT');
+    });
+
     it('should inject format templates correctly', () => {
       const standard = resolvePrompts({}, '', 'standard');
       expect(standard.generation).toContain('Front: [A clear, active recall question');
@@ -125,6 +169,31 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
 
       const pNullSubjects = resolvePrompts({ subjects: null }, 'test', 'standard');
       expect(pNullSubjects.generation).toContain(DEFAULT_GENERATION);
+    });
+
+    it('should fallback to defaults.generation override in document mode if defaults.generation_document is missing', () => {
+      const promptsConfig = {
+        defaults: {
+          generation: 'FALLBACK GEN FOR ALL',
+        },
+      };
+      const prompts = resolvePrompts(promptsConfig, '', 'standard', 'document');
+      expect(prompts.generation).toContain('FALLBACK GEN FOR ALL');
+    });
+
+    it('should fallback to defaults.generation override in topic mode if defaults.generation_topic is missing', () => {
+      const promptsConfig = {
+        defaults: {
+          generation: 'FALLBACK GEN FOR ALL',
+        },
+      };
+      const prompts = resolvePrompts(promptsConfig, '', 'standard', 'topic');
+      expect(prompts.generation).toContain('FALLBACK GEN FOR ALL');
+    });
+
+    it('should fallback to topic mode if mode parameter is an unrecognized string', () => {
+      const prompts = resolvePrompts({}, '', 'standard', 'invalid-mode');
+      expect(prompts.generation).toContain(DEFAULT_GENERATION_TOPIC);
     });
   });
 

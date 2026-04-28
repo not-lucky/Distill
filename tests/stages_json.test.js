@@ -730,7 +730,7 @@ Card 2 Front: What is JSX?
           throttledFetch,
           maxEnforcementRetries: 1,
         }),
-      ).rejects.toThrow("/title: Invalid input: expected string, received undefined");
+      ).rejects.toThrow('/title: Invalid input: expected string, received undefined');
     });
 
     it('runStage3 edge cases: cards array is missing in json response', async () => {
@@ -766,7 +766,7 @@ Card 2 Front: What is JSX?
           throttledFetch,
           maxEnforcementRetries: 1,
         }),
-      ).rejects.toThrow("/cards: Invalid input: expected array, received undefined");
+      ).rejects.toThrow('/cards: Invalid input: expected array, received undefined');
     });
   });
 

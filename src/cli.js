@@ -13,7 +13,9 @@ import {
   getCacheStats,
 } from './database.js';
 import { runPipeline, spawnCompiler } from './orchestrator.js';
-import { ingestDirectory, loadPreset, formatNamespaceComponent } from './ingestion.js';
+import {
+  ingestDirectory, loadPreset, formatNamespaceComponent, ingestDocumentSources,
+} from './ingestion.js';
 
 const program = new Command();
 
@@ -55,7 +57,34 @@ program
       if (matchedSubjectKey) {
         activeSubject = activeSubject || matchedSubjectKey;
         const subjectPreset = prompts.subjects[matchedSubjectKey];
-        if (subjectPreset && Array.isArray(subjectPreset.categories)) {
+        // Handle Document Digestion Mode for subject presets configured in prompts.yaml
+        if (subjectPreset && subjectPreset.mode === 'document') {
+          const { files, folder } = subjectPreset;
+          if (!files && !folder) {
+            console.error(`Error: Subject preset "${matchedSubjectKey}" is configured in document mode but is missing both "files" and "folder" settings.`);
+            process.exit(1);
+          }
+          const sources = {};
+          // Resolve folders/files relative to CLI process CWD
+          if (folder) {
+            sources.folder = path.resolve(process.cwd(), folder);
+          }
+          if (files) {
+            sources.files = files.map((f) => path.resolve(process.cwd(), f));
+          }
+          const docs = await ingestDocumentSources(sources);
+          // Map digested documents to the question format required by the pipeline orchestrator.
+          // By populating 'content' with file text, Stage 1 will branch into document-based
+          // digestion.
+          for (const doc of docs) {
+            questions.push({
+              questionId: `${matchedSubjectKey}::${doc.deckPath}`,
+              topic: doc.deckPath,
+              content: doc.content,
+              categoryName: doc.deckPath,
+            });
+          }
+        } else if (subjectPreset && Array.isArray(subjectPreset.categories)) {
           for (const cat of subjectPreset.categories) {
             if (cat && Array.isArray(cat.topics)) {
               for (const topic of cat.topics) {
@@ -86,7 +115,32 @@ program
           if (ext === '.yaml' || ext === '.yml') {
             const preset = await loadPreset(resolvedPath);
             activeSubject = activeSubject || preset.name;
-            if (preset.categories && Array.isArray(preset.categories)) {
+            // Handle Document Digestion Mode for standalone YAML preset files
+            if (preset.mode === 'document') {
+              const { files, folder } = preset;
+              if (!files && !folder) {
+                console.error(`Error: Preset file "${preset.name}" is configured in document mode but is missing both "files" and "folder" settings.`);
+                process.exit(1);
+              }
+              const sources = {};
+              // Resolve relative folders/files paths relative to the preset file's directory
+              if (folder) {
+                sources.folder = path.resolve(path.dirname(resolvedPath), folder);
+              }
+              if (files) {
+                sources.files = files.map((f) => path.resolve(path.dirname(resolvedPath), f));
+              }
+              const docs = await ingestDocumentSources(sources);
+              const fmtPresetName = formatNamespaceComponent(preset.name);
+              for (const doc of docs) {
+                questions.push({
+                  questionId: `${fmtPresetName}::${doc.deckPath}`,
+                  topic: doc.deckPath,
+                  content: doc.content,
+                  categoryName: doc.deckPath,
+                });
+              }
+            } else if (preset.categories && Array.isArray(preset.categories)) {
               for (const cat of preset.categories) {
                 if (cat && Array.isArray(cat.topics)) {
                   for (const topic of cat.topics) {

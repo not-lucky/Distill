@@ -123,17 +123,28 @@ cerebras:
 ### 3. Prompt Overrides & Subjects Mapping (`prompts.yaml`)
 Overwrites default prompts for any stage and sets up study subjects with nested topic paths, generation instructions, and additional stage 2 combiner prompts.
 
+Supports two generation modes:
+- **Topic Mode** (default): Generates cards systematically from topic names.
+- **Document Mode**: Ingests files or directories, digesting their contents directly.
+
 ```yaml
 # Default prompt overrides for stages
 defaults:
+  # General default override (acts as fallback)
   generation: |
     You are a world-class educator. Extract concepts...
+  # Mode-specific overrides (highly recommended)
+  generation_topic: |
+    You are a world-class educator... [special guidelines for topic coverages]
+  generation_document: |
+    You are a world-class document digestion engine... [special guidelines for document coverage]
   synthesis: |
     You are a senior technical editor. Consolidate and merge...
 
 # Subject presets mapping. 
 # Match directly via CLI argument (e.g. `node src/cli.js run leetcode`).
 subjects:
+  # 1. Example Topic Mode subject
   leetcode:
     generation: |
       Special Guidelines for LeetCode:
@@ -150,15 +161,16 @@ subjects:
         topics:
           - "Valid Palindrome"
 
-  javascript:
+  # 2. Example Document Mode subject
+  document_notes:
+    mode: document
     generation: |
-      Special Guidelines for JavaScript:
-      - Predict execution output (closures, scopes, event loop queues)
-    categories:
-      - name: "Basics"
-        topics:
-          - "Closures"
-          - "Event Loop"
+      Focus on extracting clear terminology definitions and syntax details.
+    files:
+      - "./scratch/doc1.txt"
+      - "./scratch/doc2.md"
+    # OR configure folder instead:
+    # folder: "./scratch/notes"
 ```
 
 ---
@@ -170,10 +182,13 @@ LLM2Deck exposes a command-line interface:
 ### Run Pipeline Generation
 Generate flashcards for a configured subject preset or local folder:
 ```bash
-# Run a preset subject defined in prompts.yaml
+# Run a preset topic-based subject defined in prompts.yaml
 node src/cli.js run leetcode --card-type standard
 
-# Run ingestion on a custom directory of local documents
+# Run a preset document digestion subject defined in prompts.yaml
+node src/cli.js run document_notes --card-type standard
+
+# Run ingestion on a custom directory of local documents directly
 node src/cli.js run ./study_material --card-type mcq
 ```
 
