@@ -515,7 +515,7 @@ export async function runStage3({
       if (!valResult.success) {
         const schemaErrors = valResult.error.issues.map((issue) => {
           const pathStr = issue.path.length > 0
-            ? '/' + issue.path.join('/')
+            ? `/${issue.path.join('/')}`
             : '/';
           return `${pathStr}: ${issue.message}`;
         });

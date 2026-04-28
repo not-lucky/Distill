@@ -9,6 +9,8 @@ import {
   ingestDirectory,
   parsePreset,
   loadPreset,
+  ingestFiles,
+  ingestDocumentSources,
 } from '../src/ingestion.js';
 
 const FIXTURES_DIR = path.resolve('./tests/fixtures_ingestion');
@@ -686,5 +688,156 @@ describe('Ingestion - Uncovered Branch Coverage', () => {
       fs.chmodSync(filePath, 0o644);
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe('Ingestion - Document Mode Helpers', () => {
+  beforeAll(() => {
+    if (!fs.existsSync(FIXTURES_DIR)) {
+      fs.mkdirSync(FIXTURES_DIR, { recursive: true });
+    }
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(FIXTURES_DIR)) {
+      fs.rmSync(FIXTURES_DIR, { recursive: true, force: true });
+    }
+  });
+
+  it('should throw an error if ingestFiles is not called with an array', async () => {
+    await expect(ingestFiles(null)).rejects.toThrow(/must be an array/);
+    await expect(ingestFiles('not-an-array')).rejects.toThrow(/must be an array/);
+  });
+
+  it('should ingest a list of valid files and generate proper deck paths', async () => {
+    const file1 = path.join(FIXTURES_DIR, '01-chapter-one.txt');
+    const file2 = path.join(FIXTURES_DIR, '02-advanced_notes.md');
+
+    fs.writeFileSync(file1, 'Introduction content', 'utf8');
+    fs.writeFileSync(file2, 'Advanced details', 'utf8');
+
+    const results = await ingestFiles([file1, file2]);
+    expect(results.length).toBe(2);
+
+    expect(results[0].filePath).toBe(file1);
+    expect(results[0].deckPath).toBe('01_Chapter_One');
+    expect(results[0].content).toBe('Introduction content');
+
+    expect(results[1].filePath).toBe(file2);
+    expect(results[1].deckPath).toBe('02_Advanced_Notes');
+    expect(results[1].content).toBe('Advanced details');
+  });
+
+  it('should skip files that do not exist, are empty, or fail to read', async () => {
+    const file1 = path.join(FIXTURES_DIR, 'valid_doc.md');
+    const fileEmpty = path.join(FIXTURES_DIR, 'empty_doc.md');
+    const fileMissing = path.join(FIXTURES_DIR, 'missing_doc.md');
+
+    fs.writeFileSync(file1, 'valid text', 'utf8');
+    fs.writeFileSync(fileEmpty, '   ', 'utf8');
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const results = await ingestFiles([file1, fileEmpty, fileMissing, 42]);
+      expect(results.length).toBe(1);
+      expect(results[0].deckPath).toBe('Valid_Doc');
+      expect(results[0].content).toBe('valid text');
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should ingest folder sources via ingestDocumentSources', async () => {
+    const folderPath = path.join(FIXTURES_DIR, 'doc-folder');
+    fs.mkdirSync(folderPath, { recursive: true });
+
+    const file = path.join(folderPath, 'info.txt');
+    fs.writeFileSync(file, 'Some info', 'utf8');
+
+    const results = await ingestDocumentSources({ folder: folderPath });
+    expect(results.length).toBe(1);
+    expect(results[0].deckPath).toBe('Doc_Folder::Info');
+  });
+
+  it('should ingest files via ingestDocumentSources', async () => {
+    const filePath = path.join(FIXTURES_DIR, 'direct.txt');
+    fs.writeFileSync(filePath, 'direct details', 'utf8');
+
+    const results = await ingestDocumentSources({ files: [filePath] });
+    expect(results.length).toBe(1);
+    expect(results[0].deckPath).toBe('Direct');
+  });
+
+  it('should return empty array for empty options in ingestDocumentSources', async () => {
+    const results = await ingestDocumentSources({});
+    expect(results).toEqual([]);
+  });
+
+  it('should return empty array for empty array input to ingestFiles', async () => {
+    const results = await ingestFiles([]);
+    expect(results).toEqual([]);
+  });
+
+  it('should ignore null, undefined, boolean, and object values in ingestFiles list', async () => {
+    const file = path.join(FIXTURES_DIR, 'valid_item.txt');
+    fs.writeFileSync(file, 'some text content', 'utf8');
+
+    const results = await ingestFiles([null, undefined, true, { path: file }, file]);
+    expect(results.length).toBe(1);
+    expect(results[0].deckPath).toBe('Valid_Item');
+    expect(results[0].content).toBe('some text content');
+  });
+
+  it('should support Latin-1 encoded file fallback in ingestFiles', async () => {
+    const file = path.join(FIXTURES_DIR, 'latin1_ingest.txt');
+    // Write high-ASCII Latin-1 bytes that are invalid in UTF-8
+    const buffer = Buffer.from([0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0xE9, 0xF1]);
+    fs.writeFileSync(file, buffer);
+
+    const results = await ingestFiles([file]);
+    expect(results.length).toBe(1);
+    expect(results[0].content).toBe('Hello éñ');
+  });
+
+  it('should skip folder path passed inside the filePaths array of ingestFiles', async () => {
+    const dirPath = path.join(FIXTURES_DIR, 'dummy-dir');
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const results = await ingestFiles([dirPath]);
+      // Directory cannot be read as a file, so it should be skipped
+      expect(results).toEqual([]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('should prioritize folder option over files option in ingestDocumentSources', async () => {
+    const folderPath = path.join(FIXTURES_DIR, 'priority-folder');
+    fs.mkdirSync(folderPath, { recursive: true });
+    const folderFile = path.join(folderPath, 'folder-file.txt');
+    fs.writeFileSync(folderFile, 'content from folder', 'utf8');
+
+    const directFile = path.join(FIXTURES_DIR, 'direct-file.txt');
+    fs.writeFileSync(directFile, 'content from files list', 'utf8');
+
+    // Call ingestDocumentSources with both properties
+    const results = await ingestDocumentSources({
+      folder: folderPath,
+      files: [directFile],
+    });
+
+    // Should prioritize folder, returning folder-file
+    expect(results.length).toBe(1);
+    expect(results[0].deckPath).toBe('Priority_Folder::Folder_File');
+    expect(results[0].content).toBe('content from folder');
+  });
+
+  it('should propagate errors from ingestDirectory when folder path does not exist in ingestDocumentSources', async () => {
+    const nonexistentFolder = path.join(FIXTURES_DIR, 'nonexistent-folder-path');
+    await expect(ingestDocumentSources({ folder: nonexistentFolder })).rejects.toThrow();
   });
 });

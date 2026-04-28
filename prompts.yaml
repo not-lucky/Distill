@@ -22,3 +22,11 @@ subjects:
       - name: "Basics"
         topics:
           - "Closures"
+
+  document_notes:
+    mode: document
+    generation: |
+      Focus on extracting clear terminology definitions and syntax details.
+    files:
+      - "./scratch/doc1.txt"
+      - "./scratch/doc2.md"
