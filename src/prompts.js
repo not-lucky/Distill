@@ -117,3 +117,120 @@ export function resolvePrompts(promptsConfig, subject = '', cardType = 'standard
     enforcement,
   };
 }
+
+export const CARD_JSON_SCHEMA = {
+  $schema: 'http://json-schema.org/draft-07/schema#',
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'Title of the concept, problem, or document section.' },
+    topic: { type: 'string', description: 'Main category hierarchy or path.' },
+    difficulty: {
+      type: 'string',
+      enum: ['Basic', 'Intermediate', 'Advanced'],
+      description: 'Standardized difficulty level for database sorting.',
+    },
+    cards: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          card_format: {
+            type: 'string',
+            enum: ['Basic', 'Cloze', 'MCQ'],
+            description: 'The structural layout of the card in Anki.',
+          },
+          card_type: {
+            type: 'string',
+            enum: ['Concept', 'Code', 'Procedure', 'Syntax', 'Behavior', 'Constraint', 'ErrorHandling', 'TradeOff'],
+            description: 'Pedagogical tag for sorting and styled headers.',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string', pattern: '^[A-Za-z0-9-_/]+$' },
+            description: 'Alphanumeric, hyphen, underscore, and slash tags (no spaces allowed).',
+          },
+          front: { type: 'string', description: 'Front/question side of the card, or statement with {{c1::hidden text}} syntax for Cloze.' },
+          back: { type: 'string', description: 'Short, punchy answer. Required for Basic card format; prohibited in MCQ or Cloze.' },
+          options: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 2,
+            maxItems: 4,
+            description: '2 to 4 choices. Required only for MCQ.',
+          },
+          correct_answer: {
+            type: 'string',
+            enum: ['A', 'B', 'C', 'D'],
+            description: 'Correct choice letter index. Required only for MCQ.',
+          },
+          explanation: {
+            type: 'string',
+            description: 'Detailed background explanation, code examples, or trade-offs shown on the back side of all card formats.',
+          },
+        },
+        required: ['card_format', 'card_type', 'tags', 'explanation'],
+        additionalProperties: false,
+        oneOf: [
+          {
+            properties: {
+              card_format: { const: 'Basic' },
+              options: { not: {} },
+              correct_answer: { not: {} },
+            },
+            required: ['front', 'back'],
+          },
+          {
+            properties: {
+              card_format: { const: 'Cloze' },
+              front: { pattern: '\\{\\{c[0-9]+::' },
+              back: { not: {} },
+              options: { not: {} },
+              correct_answer: { not: {} },
+            },
+            required: ['front'],
+            description: 'front must contain at least one cloze deletion using {{c1::word}} syntax.',
+          },
+          {
+            properties: {
+              card_format: { const: 'MCQ' },
+              back: { not: {} },
+            },
+            required: ['front', 'options', 'correct_answer'],
+          },
+        ],
+        allOf: [
+          {
+            if: {
+              properties: {
+                card_format: { const: 'MCQ' },
+                correct_answer: { const: 'C' },
+              },
+              required: ['card_format', 'correct_answer'],
+            },
+            then: {
+              properties: {
+                options: { minItems: 3 },
+              },
+            },
+          },
+          {
+            if: {
+              properties: {
+                card_format: { const: 'MCQ' },
+                correct_answer: { const: 'D' },
+              },
+              required: ['card_format', 'correct_answer'],
+            },
+            then: {
+              properties: {
+                options: { minItems: 4 },
+              },
+            },
+          },
+        ],
+      },
+    },
+  },
+  required: ['title', 'topic', 'difficulty', 'cards'],
+  additionalProperties: false,
+};
