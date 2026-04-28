@@ -245,8 +245,14 @@ export async function ingestFiles(filePaths) {
     // Attempt decoding with UTF-8 first, falling back to Latin-1
     const content = await readFileWithFallback(resolvedPath);
 
-    // Skip missing files, unreadable files, or files containing only whitespace
-    if (content === null || content.trim().length === 0) {
+    // Skip missing files, unreadable files, or files containing only whitespace,
+    // logging warnings to help users debug typos in config files.
+    if (content === null) {
+      console.warn(`[Ingestion Warning] Requested file "${rawPath}" was skipped because it could not be read or decoded.`);
+      continue;
+    }
+    if (content.trim().length === 0) {
+      console.warn(`[Ingestion Warning] Requested file "${rawPath}" was skipped because it is empty or contains only whitespace.`);
       continue;
     }
 
