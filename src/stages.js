@@ -1,8 +1,7 @@
-import Ajv from 'ajv';
 import { z } from 'zod';
 import { resolveProviderModel, callLLM } from './providers.js';
 import { addPipelineStep, upsertQuestionEntry } from './database.js';
-import { resolvePrompts } from './prompts.js';
+import { resolvePrompts, CARD_JSON_SCHEMA } from './prompts.js';
 
 /**
  * Executes Stage 1 of the pipeline: Parallel Generation.
@@ -258,122 +257,77 @@ export const CARD_ZOD_SCHEMA = z.object({
   cards: z.array(CardItemSchema),
 });
 
-export const CARD_JSON_SCHEMA = {
-  $schema: 'http://json-schema.org/draft-07/schema#',
-  type: 'object',
-  properties: {
-    title: { type: 'string', description: 'Title of the concept, problem, or document section.' },
-    topic: { type: 'string', description: 'Main category hierarchy or path.' },
-    difficulty: {
-      type: 'string',
-      enum: ['Basic', 'Intermediate', 'Advanced'],
-      description: 'Standardized difficulty level for database sorting.',
-    },
-    cards: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          card_format: {
-            type: 'string',
-            enum: ['Basic', 'Cloze', 'MCQ'],
-            description: 'The structural layout of the card in Anki.',
-          },
-          card_type: {
-            type: 'string',
-            enum: ['Concept', 'Code', 'Procedure', 'Syntax', 'Behavior', 'Constraint', 'ErrorHandling', 'TradeOff'],
-            description: 'Pedagogical tag for sorting and styled headers.',
-          },
-          tags: {
-            type: 'array',
-            items: { type: 'string', pattern: '^[A-Za-z0-9-_/]+$' },
-            description: 'Alphanumeric, hyphen, underscore, and slash tags (no spaces allowed).',
-          },
-          front: { type: 'string', description: 'Front/question side of the card, or statement with {{c1::hidden text}} syntax for Cloze.' },
-          back: { type: 'string', description: 'Short, punchy answer. Required for Basic card format; prohibited in MCQ or Cloze.' },
-          options: {
-            type: 'array',
-            items: { type: 'string' },
-            minItems: 2,
-            maxItems: 4,
-            description: '2 to 4 choices. Required only for MCQ.',
-          },
-          correct_answer: {
-            type: 'string',
-            enum: ['A', 'B', 'C', 'D'],
-            description: 'Correct choice letter index. Required only for MCQ.',
-          },
-          explanation: {
-            type: 'string',
-            description: 'Detailed background explanation, code examples, or trade-offs shown on the back side of all card formats.',
-          },
-        },
-        required: ['card_format', 'card_type', 'tags', 'explanation'],
-        additionalProperties: false,
-        oneOf: [
-          {
-            properties: {
-              card_format: { const: 'Basic' },
-              options: { not: {} },
-              correct_answer: { not: {} },
-            },
-            required: ['front', 'back'],
-          },
-          {
-            properties: {
-              card_format: { const: 'Cloze' },
-              front: { pattern: '\\{\\{c[0-9]+::' },
-              back: { not: {} },
-              options: { not: {} },
-              correct_answer: { not: {} },
-            },
-            required: ['front'],
-            description: 'front must contain at least one cloze deletion using {{c1::word}} syntax.',
-          },
-          {
-            properties: {
-              card_format: { const: 'MCQ' },
-              back: { not: {} },
-            },
-            required: ['front', 'options', 'correct_answer'],
-          },
-        ],
-        allOf: [
-          {
-            if: {
-              properties: {
-                card_format: { const: 'MCQ' },
-                correct_answer: { const: 'C' },
-              },
-              required: ['card_format', 'correct_answer'],
-            },
-            then: {
-              properties: {
-                options: { minItems: 3 },
-              },
-            },
-          },
-          {
-            if: {
-              properties: {
-                card_format: { const: 'MCQ' },
-                correct_answer: { const: 'D' },
-              },
-              required: ['card_format', 'correct_answer'],
-            },
-            then: {
-              properties: {
-                options: { minItems: 4 },
-              },
-            },
-          },
-        ],
-      },
-    },
-  },
-  required: ['title', 'topic', 'difficulty', 'cards'],
-  additionalProperties: false,
-};
+// Strict Zod schema used to validate polymorphic card types after null/undefined values
+// are stripped. It ensures format-specific properties are correctly structured.
+const CardTypeSchema = z.enum([
+  'Concept',
+  'Code',
+  'Procedure',
+  'Syntax',
+  'Behavior',
+  'Constraint',
+  'ErrorHandling',
+  'TradeOff',
+]);
+
+const BasicCardSchema = z.object({
+  card_format: z.literal('Basic'),
+  card_type: CardTypeSchema,
+  tags: z.array(z.string().regex(/^[A-Za-z0-9-_/]+$/)),
+  front: z.string(),
+  back: z.string(),
+  explanation: z.string(),
+}).strict();
+
+const ClozeCardSchema = z.object({
+  card_format: z.literal('Cloze'),
+  card_type: CardTypeSchema,
+  tags: z.array(z.string().regex(/^[A-Za-z0-9-_/]+$/)),
+  front: z.string().refine((val) => /\{\{c[0-9]+::/.test(val), {
+    message: 'front must contain at least one cloze deletion using {{c1::word}} syntax.',
+  }),
+  explanation: z.string(),
+}).strict();
+
+const MCQCardSchema = z.object({
+  card_format: z.literal('MCQ'),
+  card_type: CardTypeSchema,
+  tags: z.array(z.string().regex(/^[A-Za-z0-9-_/]+$/)),
+  front: z.string(),
+  options: z.array(z.string()).min(2).max(4),
+  correct_answer: z.enum(['A', 'B', 'C', 'D']),
+  explanation: z.string(),
+}).strict().superRefine((data, ctx) => {
+  if (data.correct_answer === 'C' && (!data.options || data.options.length < 3)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'options must NOT have fewer than 3 items when correct_answer is C',
+      path: ['options'],
+    });
+  }
+  if (data.correct_answer === 'D' && (!data.options || data.options.length < 4)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'options must NOT have fewer than 4 items when correct_answer is D',
+      path: ['options'],
+    });
+  }
+});
+
+const ValidationCardSchema = z.discriminatedUnion('card_format', [
+  BasicCardSchema,
+  ClozeCardSchema,
+  MCQCardSchema,
+]);
+
+export const CARD_VALIDATION_SCHEMA = z.object({
+  title: z.string(),
+  topic: z.string(),
+  difficulty: z.enum(['Basic', 'Intermediate', 'Advanced']),
+  cards: z.array(ValidationCardSchema),
+}).strict();
+
+// CARD_JSON_SCHEMA was moved to src/prompts.js to separate prompt engineering schemas from logic.
 
 /**
  * Cleans markdown code block wraps from raw text returned by the LLM.
@@ -523,9 +477,6 @@ export async function runStage3({
     { role: 'user', content: `Consolidated Text Flashcard List:\n\n${synthesisResult}` },
   ];
 
-  const ajv = new Ajv({ allErrors: true, strict: false });
-  const validate = ajv.compile(CARD_JSON_SCHEMA);
-
   const stage2Questions = parseStage2Questions(synthesisResult);
 
   let attempt = 0;
@@ -558,13 +509,16 @@ export async function runStage3({
       errorsList.push(`JSON Parsing Error: ${parseError.message}`);
     }
 
-    // 2. AJV Validation Check
+    // 2. Zod Validation Check
     if (jsonObj) {
-      const valid = validate(jsonObj);
-      if (!valid) {
-        const schemaErrors = validate.errors.map(
-          (err) => `${err.instancePath || '/'}: ${err.message} (${JSON.stringify(err.params)})`,
-        );
+      const valResult = CARD_VALIDATION_SCHEMA.safeParse(jsonObj);
+      if (!valResult.success) {
+        const schemaErrors = valResult.error.issues.map((issue) => {
+          const pathStr = issue.path.length > 0
+            ? '/' + issue.path.join('/')
+            : '/';
+          return `${pathStr}: ${issue.message}`;
+        });
         errorsList.push(...schemaErrors);
       }
     }

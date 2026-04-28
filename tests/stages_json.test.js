@@ -481,7 +481,7 @@ Card 2 Front: What is JSX?
       expect(mockCompletions).toHaveBeenCalledTimes(2);
 
       const secondCallParams = mockCompletions.mock.calls[1][0];
-      expect(secondCallParams.messages[3].content).toContain('must have required property');
+      expect(secondCallParams.messages[3].content).toContain('Invalid input: expected string, received undefined');
     });
 
     it('should trigger recovery loop on Content Loss Audit failure and succeed on retry', async () => {
@@ -730,7 +730,7 @@ Card 2 Front: What is JSX?
           throttledFetch,
           maxEnforcementRetries: 1,
         }),
-      ).rejects.toThrow("/: must have required property 'title'");
+      ).rejects.toThrow("/title: Invalid input: expected string, received undefined");
     });
 
     it('runStage3 edge cases: cards array is missing in json response', async () => {
@@ -766,7 +766,7 @@ Card 2 Front: What is JSX?
           throttledFetch,
           maxEnforcementRetries: 1,
         }),
-      ).rejects.toThrow("/: must have required property 'cards'");
+      ).rejects.toThrow("/cards: Invalid input: expected array, received undefined");
     });
   });
 
