@@ -175,6 +175,34 @@ subjects:
 
 ---
 
+## Example Configurations
+
+Ready-to-use example files live in the [`examples/`](examples/) directory at three levels of detail:
+
+| File | Purpose |
+|------|---------|
+| `examples/config.minimal.yaml`   | One provider, one model per stage, low concurrency. |
+| `examples/config.standard.yaml`  | Three providers (OpenAI + Cerebras + local Ollama) with two parallel generation models. |
+| `examples/config.full.yaml`      | Every documented option: all 8 `global` keys, per-provider `timeout`/`temperature`, multiple stage-1 models, every pipeline stage commented. |
+| `examples/keys.minimal.yaml`     | Single OpenAI key. |
+| `examples/keys.standard.yaml`    | OpenAI (two-key rotation) + Cerebras + Ollama placeholder. |
+| `examples/keys.full.yaml`        | One entry per provider declared in `config.full.yaml`, mix of single-string and array-of-strings formats. |
+| `examples/prompts.minimal.yaml`  | One topic-mode subject, no defaults. |
+| `examples/prompts.standard.yaml` | All five `defaults` keys (short) + `leetcode` (topic) and `notes` (document) subjects. |
+| `examples/prompts.full.yaml`     | All five `defaults` keys populated with the **verbatim** hard-coded prompts shipped in `src/prompts.js` + fully worked `leetcode` and `notes` subjects. |
+
+The `full` prompts file matches the in-source defaults byte-for-byte, so it is a safe drop-in replacement if you want every option in one place.
+
+To use an example, copy it over the corresponding real file:
+```bash
+cp examples/config.full.yaml    config.yaml
+cp examples/keys.full.yaml      keys.yaml
+cp examples/prompts.full.yaml   prompts.yaml
+```
+Then edit the placeholders (API keys, file paths, subjects) to match your setup.
+
+---
+
 ## How to Run
 
 LLM2Deck exposes a command-line interface:

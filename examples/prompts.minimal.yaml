@@ -1,0 +1,13 @@
+# Minimal LLM2Deck prompts file.
+# One subject, topic mode, no global defaults. The pipeline will fall back to
+# the hard-coded prompts in src/prompts.js for any missing fields.
+
+subjects:
+  demo:
+    # Topic mode is the default when `mode` is omitted. The pipeline walks
+    # categories[].topics[] to build the question list.
+    categories:
+      - name: "Basics"
+        topics:
+          - "Hello World"
+          - "Variables and Types"

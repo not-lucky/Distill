@@ -1,0 +1,20 @@
+# Standard LLM2Deck keys file.
+# Mirrors providers declared in examples/config.standard.yaml.
+#
+# Format: provider_name -> string (single key) OR list of strings (round-robin
+# rotation in src/providers.js:281-283). The first key in a list is also used
+# to initialize the OpenAI client (src/providers.js:108-117).
+#
+# `ollama_local` is exempted from key validation in src/config.js:83, so its
+# value may be omitted entirely or set to a placeholder.
+
+# Multiple keys enable automatic round-robin rotation to spread rate limits.
+openai:
+  - "sk-replace-with-primary-openai-key"
+  - "sk-replace-with-rotation-openai-key"
+cerebras:
+  - "csk-replace-with-your-cerebras-key"
+# Ollama runs locally; the literal string "ollama" is hard-coded in
+# src/providers.js:108 as a default placeholder.
+ollama_local:
+  - "ollama"

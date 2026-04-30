@@ -1,0 +1,6 @@
+# Minimal LLM2Deck keys file.
+# Single provider, single placeholder key. Replace with a real key before
+# running. Keep this file out of version control (see .gitignore).
+
+openai:
+  - "sk-replace-with-your-openai-key"

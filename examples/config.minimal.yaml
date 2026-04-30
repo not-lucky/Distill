@@ -1,0 +1,26 @@
+# Minimal LLM2Deck configuration.
+# Smallest viable setup: one provider, one model per stage, low concurrency.
+# Use as a starting point; see config.standard.yaml / config.full.yaml for more.
+
+global:
+  concurrency_limit: 1
+  request_delay: 0.0
+  default_timeout: 120.0
+  output_dir: "./output"
+  cache_db_path: "./llm2deck.db"
+  keys_file_path: "./keys.yaml"
+  prompts_file_path: "./prompts.yaml"
+
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+    temperature: 0.3
+
+pipeline:
+  generation:
+    models:
+      - "openai/gpt-3.5-turbo"
+  synthesis:
+    model: "openai/gpt-3.5-turbo"
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"

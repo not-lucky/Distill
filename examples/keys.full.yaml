@@ -1,0 +1,25 @@
+# Full LLM2Deck keys file.
+# Mirrors every provider declared in examples/config.full.yaml.
+#
+# Format: provider_name -> string (single key) OR list of strings (round-robin
+# rotation in src/providers.js:281-283).
+#
+# Rules enforced at config load time (src/config.js:82-97):
+#   - Every provider referenced in `pipeline.*` must have at least one
+#     non-empty key configured here.
+#   - `ollama_local` is the lone exception: it is skipped entirely.
+#   - Keys may be a single string OR a non-empty array of strings.
+#   - An empty / missing key produces a console warning at startup.
+
+openai:
+  - "sk-replace-with-primary-openai-key"
+  - "sk-replace-with-secondary-openai-key"
+cerebras:
+  - "csk-replace-with-your-cerebras-key"
+# Local Ollama daemon. Exempted from key validation in src/config.js:83.
+ollama_local:
+  - "ollama"
+gemini:
+  - "AIza-replace-with-your-gemini-key"
+omniroute:
+  - "sk-replace-with-your-omniroute-key"
