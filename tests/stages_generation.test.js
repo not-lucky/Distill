@@ -14,7 +14,6 @@ import {
   DEFAULT_SYNTHESIS,
   DEFAULT_ENFORCEMENT,
   DEFAULT_GENERATION_DOCUMENT,
-  DEFAULT_GENERATION_TOPIC,
 } from '../src/prompts.js';
 import {
   runStage1,
@@ -101,7 +100,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
 
     it('should resolve topic mode specifically', () => {
       const prompts = resolvePrompts({}, '', 'standard', 'topic');
-      expect(prompts.generation).toContain(DEFAULT_GENERATION_TOPIC);
+      expect(prompts.generation).toContain(DEFAULT_GENERATION);
     });
 
     it('should resolve document mode specifically', () => {
@@ -129,16 +128,6 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
       };
       const prompts = resolvePrompts(promptsConfig, '', 'standard', 'document');
       expect(prompts.generation).toContain('OVERRIDDEN DOCUMENT PROMPT');
-    });
-
-    it('should support defaults.generation_topic override for topic mode', () => {
-      const promptsConfig = {
-        defaults: {
-          generation_topic: 'OVERRIDDEN TOPIC PROMPT',
-        },
-      };
-      const prompts = resolvePrompts(promptsConfig, '', 'standard', 'topic');
-      expect(prompts.generation).toContain('OVERRIDDEN TOPIC PROMPT');
     });
 
     it('should inject format templates correctly', () => {
@@ -181,7 +170,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
       expect(prompts.generation).toContain('FALLBACK GEN FOR ALL');
     });
 
-    it('should fallback to defaults.generation override in topic mode if defaults.generation_topic is missing', () => {
+    it('should support defaults.generation override in topic mode', () => {
       const promptsConfig = {
         defaults: {
           generation: 'FALLBACK GEN FOR ALL',
@@ -193,7 +182,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
 
     it('should fallback to topic mode if mode parameter is an unrecognized string', () => {
       const prompts = resolvePrompts({}, '', 'standard', 'invalid-mode');
-      expect(prompts.generation).toContain(DEFAULT_GENERATION_TOPIC);
+      expect(prompts.generation).toContain(DEFAULT_GENERATION);
     });
   });
 
