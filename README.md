@@ -10,11 +10,11 @@
 
 **LLM2Deck** is an orchestrated system designed to convert complex technical study materials (codebases, Textbook chapters, LeetCode algorithms, language specifications) into high-quality, pedagogically optimized Anki flashcards (`.apkg`). 
 
-Rather than relying on a single, expensive LLM prompt that suffers from low detail density and high syntax failures, LLM2Deck uses a **five-stage parallel execution and synthesis pipeline** built in Node.js (ESM), utilizing an SQLite database cache and spawning a Python script for final deck compilation.
+Rather than relying on a single, expensive LLM prompt that suffers from low detail density and high syntax failures, LLM2Deck uses a **four-stage parallel execution and synthesis pipeline** built in Node.js (ESM), utilizing an SQLite database cache and spawning a Python script for final deck compilation.
 
 ---
 
-## How It Works: The Five-Stage Pipeline
+## How It Works: The Four-Stage Pipeline
 
 ```
 [Source Material] 
@@ -23,27 +23,24 @@ Rather than relying on a single, expensive LLM prompt that suffers from low deta
        │
        ├─► [Stage 2: Synthesis] (Frontier LLM Deduplication & Consolidation)
        │
-       ├─► [Stage 3: Translation] (Standard JSON Converter)
+       ├─► [Stage 3: Schema Enforcement] (Strict Zod Polymorphic Validation & Correction)
        │
-       ├─► [Stage 4: Schema Enforcement] (Strict AJV Polymorphic Validation & Correction)
-       │
-       └─► [Stage 5: Anki Compilation] (Python subprocess using genanki & Catppuccin CSS)
+       └─► [Stage 4: Anki Compilation] (Python subprocess using genanki & Catppuccin CSS)
 ```
 
 1. **Stage 1 (Parallel Generation)**: Multiple cheap or fast LLMs query the document chunks in parallel, extracting raw question-and-answer pairs in normal text format to conserve token costs.
 2. **Stage 2 (High-Density Synthesis)**: A top-tier frontier model consolidates all raw card sets into a single, high-density, and deduplicated markdown list.
-3. **Stage 3 (JSON Translation)**: A reliable model parses the consolidated normal text into a loose JSON list array.
-4. **Stage 4 (Schema Enforcement)**: A cost-efficient model corrects the loose JSON to conform strictly to the polymorphic JSON Schema, executing a cheap LLM retry loop if validation fails.
-5. **Stage 5 (Compilation)**: Spawns a Python bridge executing `src/compile.py` which uses the `genanki` library to build and compile the deck into Anki `.apkg` format, complete with responsive Catppuccin theme styling and option shuffling for MCQs.
+3. **Stage 3 (Schema Enforcement)**: A cost-efficient model parses and corrects the text to conform strictly to the polymorphic Zod Schema, automatically executing a cheap LLM retry loop if validation fails and sanitizing null values.
+4. **Stage 4 (Compilation)**: Spawns a Python bridge executing `src/compile.py` which uses the `genanki` library to build and compile the deck into Anki `.apkg` format, complete with responsive Catppuccin theme styling and option shuffling for MCQs.
 
 ---
 
 ## Technical Highlights
 
-- **Hybrid Design**: Core orchestration, async throttling, and AJV schema validation in Node.js (ESM) integrated with Anki deck compilation via Python subprocess spawning.
+- **Hybrid Design**: Core orchestration, async throttling, and Zod schema validation in Node.js (ESM) integrated with Anki deck compilation via Python subprocess spawning.
 - **Relational Runs Resumption**: Runs, steps, and API outputs are tracked in a SQLite database. If a run crashes, the system skips already completed questions.
 - **SHA256 Caching Layer**: Requests are hashed using `(provider + model + prompts + parameters)` to prevent redundant API fees on unchanged source documents.
-- **AJV Strict Validation**: Enforces polymorphic card types (Basic Q&A, Cloze deletions, Multiple Choice Questions) at schema validation level.
+- **Zod Strict Validation**: Enforces polymorphic card types (Basic Q&A, Cloze deletions, Multiple Choice Questions) at schema validation level, with built-in null value sanitization.
 
 ---
 
@@ -103,8 +100,6 @@ pipeline:
       - "cerebras/llama3.1-70b"
   synthesis:
     model: "openai/gpt-4o"
-  translation:
-    model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
 ```
