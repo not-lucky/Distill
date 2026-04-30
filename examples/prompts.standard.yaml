@@ -1,19 +1,13 @@
 # Standard LLM2Deck prompts file.
-# All five `defaults` keys are overridden with short illustrative text.
+# All four `defaults` keys are overridden with short illustrative text.
 # Two subjects are configured: one in topic mode, one in document mode.
 #
 # Code reference: src/prompts.js:77-156 (resolvePrompts).
 
 defaults:
-  # Fallback used when neither generation_topic nor generation_document applies.
+  # Base prompt for standard topic-mode card generation.
   generation: |-
     You are an expert tutor. Produce high-quality, atomic flashcards.
-
-  # Topic-mode default. Used when a subject does not set `mode: document`.
-  # See src/prompts.js:120.
-  generation_topic: |-
-    You are an expert tutor. Generate flashcards that systematically cover
-    the given topic with clear, atomic, active-recall questions.
 
   # Document-mode default. Used when a subject sets `mode: document`.
   # See src/prompts.js:118.

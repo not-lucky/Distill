@@ -1,11 +1,11 @@
 # Full LLM2Deck prompts file.
-# All five `defaults` keys are populated with the VERBATIM hard-coded prompts
-# shipped in src/prompts.js (DEFAULT_GENERATION_TOPIC, DEFAULT_GENERATION_DOCUMENT,
+# All four `defaults` keys are populated with the VERBATIM hard-coded prompts
+# shipped in src/prompts.js (DEFAULT_GENERATION, DEFAULT_GENERATION_DOCUMENT,
 # DEFAULT_SYNTHESIS, DEFAULT_ENFORCEMENT). Two fully worked subjects demonstrate
 # both topic mode and document mode.
 #
 # Override resolution (src/prompts.js:77-156):
-#   - Topic mode    -> defaults.generation_topic ?? defaults.generation ?? DEFAULT_GENERATION_TOPIC
+#   - Topic mode    -> defaults.generation ?? DEFAULT_GENERATION
 #   - Document mode -> defaults.generation_document ?? defaults.generation ?? DEFAULT_GENERATION_DOCUMENT
 #   - Synthesis     -> defaults.synthesis ?? DEFAULT_SYNTHESIS
 #   - Enforcement   -> defaults.schema_enforcement ?? DEFAULT_ENFORCEMENT
@@ -13,21 +13,9 @@
 # defaults before the format-rules block.
 
 defaults:
-  # Used when neither generation_topic nor generation_document applies.
+  # Base prompt for standard topic-mode card generation.
   # (See src/prompts.js:5-12.)
   generation: |-
-    You are a world-class educator and domain-specific technical expert.
-    Your objective is to generate comprehensive, highly detailed flashcards to exhaustively cover the given topic, explaining the core concepts, syntax, rules, and best practices. Your goal is to systematically build, expand, and solidify the user's knowledge on this subject using active recall.
-
-    Cognitive Science Principles & Granularity Rules:
-    1. Active Recall Enforcement: Questions (the Front) must be phrased to force active retrieval from memory rather than recognition. Avoid binary yes/no questions, leading questions, or recognition-based hints.
-    2. Minimum Information Principle (Atomicity): Never merge two distinct, independent facts into a single card. Each card must test exactly one fact or concept.
-    3. Exception for Algorithms & Large Code: While cards must be atomic in what they test, large code snippets or algorithms can remain intact to preserve crucial context. In these cases, the card's question must target a *single, specific aspect* of the code.
-    4. Elaborative Interrogation: Every card must include a detailed explanation on the back. The explanation must address *why* the fact/answer is correct, highlight structural trade-offs, and outline common pitfalls.
-
-  # Topic-mode base prompt. Used when a subject's `mode` is not "document".
-  # (See src/prompts.js:5-12.)
-  generation_topic: |-
     You are a world-class educator and domain-specific technical expert.
     Your objective is to generate comprehensive, highly detailed flashcards to exhaustively cover the given topic, explaining the core concepts, syntax, rules, and best practices. Your goal is to systematically build, expand, and solidify the user's knowledge on this subject using active recall.
 

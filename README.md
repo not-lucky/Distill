@@ -130,12 +130,10 @@ Supports two generation modes:
 ```yaml
 # Default prompt overrides for stages
 defaults:
-  # General default override (acts as fallback)
+  # Base prompt for standard topic-mode card generation
   generation: |
     You are a world-class educator. Extract concepts...
-  # Mode-specific overrides (highly recommended)
-  generation_topic: |
-    You are a world-class educator... [special guidelines for topic coverages]
+  # Document-mode base prompt
   generation_document: |
     You are a world-class document digestion engine... [special guidelines for document coverage]
   synthesis: |
@@ -188,8 +186,8 @@ Ready-to-use example files live in the [`examples/`](examples/) directory at thr
 | `examples/keys.standard.yaml`    | OpenAI (two-key rotation) + Cerebras + Ollama placeholder. |
 | `examples/keys.full.yaml`        | One entry per provider declared in `config.full.yaml`, mix of single-string and array-of-strings formats. |
 | `examples/prompts.minimal.yaml`  | One topic-mode subject, no defaults. |
-| `examples/prompts.standard.yaml` | All five `defaults` keys (short) + `leetcode` (topic) and `notes` (document) subjects. |
-| `examples/prompts.full.yaml`     | All five `defaults` keys populated with the **verbatim** hard-coded prompts shipped in `src/prompts.js` + fully worked `leetcode` and `notes` subjects. |
+| `examples/prompts.standard.yaml` | All four `defaults` keys (short) + `leetcode` (topic) and `notes` (document) subjects. |
+| `examples/prompts.full.yaml`     | All four `defaults` keys populated with the **verbatim** hard-coded prompts shipped in `src/prompts.js` + fully worked `leetcode` and `notes` subjects. |
 
 The `full` prompts file matches the in-source defaults byte-for-byte, so it is a safe drop-in replacement if you want every option in one place.
 
