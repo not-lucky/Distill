@@ -1,0 +1,85 @@
+# Full LLM2Deck configuration.
+# Exercises every documented option across global, providers, and pipeline.
+# Use as a reference; copy to ./config.yaml and trim to your needs.
+#
+# Code references:
+#   - Defaults applied:  src/config.js:4-13
+#   - Per-provider fields read: src/providers.js:104-105, 229
+#   - Pipeline stage keys read: src/stages.js:38, 136, 461
+#   - compiler_timeout read at: src/orchestrator.js:405
+
+global:
+  # Max parallel API requests across all providers (p-limit pool size).
+  # Lower this if you hit 429 rate limits; raise it for high-throughput runs.
+  concurrency_limit: 8
+  # Seconds to wait between starting successive requests. Used as a soft
+  # throttle independent of concurrency_limit.
+  request_delay: 1.0
+  # Default per-request network timeout in seconds. Providers can override
+  # this via their own `timeout` field below.
+  default_timeout: 500.0
+  # Where final compiled .apkg and intermediate JSON files land.
+  output_dir: "./output"
+  # SQLite cache for runs, steps, and LLM response cache.
+  cache_db_path: "./llm2deck.db"
+  # Where API keys live (kept separate from version control).
+  keys_file_path: "./keys.yaml"
+  # Custom prompts + subject presets.
+  prompts_file_path: "./prompts.yaml"
+  # Python compiler subprocess timeout in ms (src/orchestrator.js:405).
+  # When omitted, the spawnCompiler default of 60000 ms is used.
+  compiler_timeout: 180000
+
+providers:
+  # OpenAI: pass apiKey via keys.yaml. Multiple keys rotate round-robin.
+  openai:
+    base_url: "https://api.openai.com/v1"
+    temperature: 0.3
+    # Per-provider override of global.default_timeout (seconds).
+    timeout: 300.0
+  # Cerebras: OpenAI-compatible fast inference.
+  cerebras:
+    base_url: "https://api.cerebras.ai/v1"
+    temperature: 0.2
+    timeout: 180.0
+  # Local Ollama server. Exempted from API key validation in src/config.js:83.
+  # Set base_url to wherever your Ollama daemon listens.
+  ollama_local:
+    base_url: "http://localhost:11434/v1"
+    temperature: 0.0
+    timeout: 600.0
+  # Google Gemini via its OpenAI-compatible endpoint.
+  gemini:
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    temperature: 0.2
+    timeout: 300.0
+  # A self-hosted OpenAI-compatible proxy / aggregator.
+  omniroute:
+    base_url: "https://omniroute.example.com/v1"
+    temperature: 0.1
+    timeout: 600.0
+
+pipeline:
+  # Stage 1: Parallel raw text extraction. Multiple models run concurrently;
+  # their outputs are concatenated and handed to Stage 2.
+  generation:
+    models:
+      - "openai/gpt-3.5-turbo"
+      - "cerebras/llama3.1-70b"
+      - "ollama_local/llama3.1"
+  # Stage 2: Frontier model consolidates Stage 1 outputs and deduplicates.
+  synthesis:
+    model: "openai/gpt-4o"
+  # Stage 4: Converts the consolidated text into strict JSON matching
+  # CARD_JSON_SCHEMA (src/prompts.js). Includes a recovery retry loop on
+  # validation/content-loss failures.
+  schema_enforcement:
+    model: "openai/gpt-3.5-turbo"
+
+  # NOTE: A `translation` stage appears in README.md and the legacy v1 schema,
+  # but the current code (src/stages.js) implements only the three stages
+  # above. Uncommenting `translation` will trigger a "Undeclared provider" or
+  # "Invalid model format" warning at config load time.
+  #
+  # translation:
+  #   model: "openai/gpt-3.5-turbo"

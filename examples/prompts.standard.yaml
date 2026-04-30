@@ -1,0 +1,69 @@
+# Standard LLM2Deck prompts file.
+# All five `defaults` keys are overridden with short illustrative text.
+# Two subjects are configured: one in topic mode, one in document mode.
+#
+# Code reference: src/prompts.js:77-156 (resolvePrompts).
+
+defaults:
+  # Fallback used when neither generation_topic nor generation_document applies.
+  generation: |-
+    You are an expert tutor. Produce high-quality, atomic flashcards.
+
+  # Topic-mode default. Used when a subject does not set `mode: document`.
+  # See src/prompts.js:120.
+  generation_topic: |-
+    You are an expert tutor. Generate flashcards that systematically cover
+    the given topic with clear, atomic, active-recall questions.
+
+  # Document-mode default. Used when a subject sets `mode: document`.
+  # See src/prompts.js:118.
+  generation_document: |-
+    You are a document analysis engine. Exhaustively extract every rule,
+    command, syntax, and constraint from the provided content and turn each
+    into a flashcard. Do not summarize.
+
+  # Stage 2 prompt. Merged with the per-subject `synthesis` override below.
+  synthesis: |-
+    You are a senior editor. Consolidate and deduplicate the provided
+    flashcard lists into a single high-density markdown list.
+
+  # Stage 4 prompt (recovery / re-prompt feedback is appended by the code).
+  schema_enforcement: |-
+    You are a schema compliance engine. Convert the provided markdown
+    flashcard list into JSON matching the supplied schema.
+
+subjects:
+  # ---- Topic mode subject ----
+  # Active when: `node src/cli.js run leetcode`
+  # Stage 1 walks categories[].topics[]; each (category, topic) pair becomes
+  # one pipeline run.
+  leetcode:
+    generation: |
+      Special Guidelines for LeetCode:
+      - Target Complexity to Constraint mapping
+      - Recurrence Relations for Dynamic Programming
+    synthesis: |
+      Consolidate algorithmic insights. Retain complexity trade-offs.
+    categories:
+      - name: "Arrays & Hashing"
+        topics:
+          - "Two Sum"
+          - "Group Anagrams"
+      - name: "Two Pointers"
+        topics:
+          - "Valid Palindrome"
+
+  # ---- Document mode subject ----
+  # Active when: `node src/cli.js run notes`
+  # `mode: document` switches Stage 1 from topic enumeration to file ingestion
+  # (src/ingestion.js:284-291). Provide EITHER `files` (list of paths) OR
+  # `folder` (recursive directory). Paths are resolved relative to the
+  # process CWD (src/cli.js:69-74).
+  notes:
+    mode: document
+    generation: |
+      Focus on extracting clear terminology definitions and syntax details.
+    files:
+      - "./scratch/doc1.txt"
+      - "./scratch/doc2.md"
+    # folder: "./scratch/notes"
