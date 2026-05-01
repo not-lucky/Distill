@@ -331,7 +331,8 @@ describe('Orchestrator Module', () => {
       mockConfig = {
         global: {
           cache_db_path: ':memory:',
-          concurrency_limit: 2,
+          model_concurrency: 0,
+          topic_concurrency: 1,
           request_delay: 0.05,
           default_timeout: 30,
         },
@@ -1070,6 +1071,56 @@ describe('Orchestrator Module', () => {
       // Since it couldn't retrieve from DB, it should have re-processed the question and succeeded
       expect(res.results).toHaveLength(1);
       expect(res.results[0].skipped).toBeUndefined();
+    });
+
+    it('should respect topic_concurrency limit when processing questions', async () => {
+      const stages = await import('../src/stages.js');
+      const originalStage1 = stages.runStage1;
+      const originalStage2 = stages.runStage2;
+      const originalStage3 = stages.runStage3;
+
+      let activeTopics = 0;
+      let maxActiveTopics = 0;
+
+      vi.mocked(originalStage1).mockImplementation(async () => {
+        activeTopics++;
+        maxActiveTopics = Math.max(maxActiveTopics, activeTopics);
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        return [{ provider: 'mock', model: 'model', output: 'ok' }];
+      });
+
+      vi.mocked(originalStage2).mockImplementation(async () => 'synthesis');
+      vi.mocked(originalStage3).mockImplementation(async () => {
+        activeTopics--;
+        return { cards: [] };
+      });
+
+      const questions = [
+        { questionId: 'q-topic-con-1', content: 'content 1' },
+        { questionId: 'q-topic-con-2', content: 'content 2' },
+        { questionId: 'q-topic-con-3', content: 'content 3' },
+      ];
+
+      const conConfig = {
+        ...mockConfig,
+        global: {
+          ...mockConfig.global,
+          topic_concurrency: 2,
+        },
+      };
+
+      const res = await runPipeline({
+        config: conConfig,
+        keys: mockKeys,
+        questions,
+        subject: 'Algorithms',
+        cardType: 'standard',
+        outputDir: tempOutputDir,
+      });
+
+      expect(res.hasFailures).toBe(false);
+      expect(maxActiveTopics).toBeLessThanOrEqual(2);
+      expect(maxActiveTopics).toBeGreaterThan(0);
     });
   });
 });

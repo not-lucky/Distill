@@ -53,7 +53,8 @@ describe('Stage 3 - AJV Schema Enforcement', () => {
 
     config = {
       global: {
-        concurrency_limit: 2,
+        model_concurrency: 0,
+        topic_concurrency: 1,
         request_delay: 0.05,
         default_timeout: 30.0,
       },
@@ -349,6 +350,53 @@ Card 2 Front: What is JSX?
           maxEnforcementRetries: 1,
         }),
       ).rejects.toThrow('must NOT have fewer than 3 items');
+    });
+
+    it('should enforce MCQ correct_answer D rules correctly', async () => {
+      // MCQ with correct_answer "D" but only 3 options (invalid)
+      const mockInvalidD = {
+        title: 'Invalid MCQ D',
+        topic: 'JS',
+        difficulty: 'Basic',
+        cards: [
+          {
+            card_format: 'MCQ',
+            card_type: 'Behavior',
+            tags: ['types'],
+            front: 'Question',
+            options: ['Option A', 'Option B', 'Option C'],
+            correct_answer: 'D',
+            explanation: 'Explanation',
+          },
+        ],
+      };
+
+      const openaiClient = clients.get('openai');
+      vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify(mockInvalidD) } }],
+      });
+
+      const runId = 'run-mcq-invalid-d';
+      createRun({
+        runId,
+        subject: 'JSPreset',
+        cardType: 'mcq',
+        status: 'running',
+        configHash: 'hash-mcq-inv-d',
+      });
+
+      await expect(
+        runStage3({
+          runId: 'run-mcq-invalid-d',
+          questionId: 'q-mcq-d',
+          synthesisResult: 'Front: Question',
+          config,
+          keys,
+          clients,
+          throttledFetch,
+          maxEnforcementRetries: 1,
+        }),
+      ).rejects.toThrow('options must NOT have fewer than 4 items');
     });
 
     it('should trigger recovery loop on malformed JSON and succeed on retry', async () => {
@@ -767,6 +815,37 @@ Card 2 Front: What is JSX?
           maxEnforcementRetries: 1,
         }),
       ).rejects.toThrow('/cards: Invalid input: expected array, received undefined');
+    });
+
+    it('runStage3 edge cases: root-level validation error (empty path)', async () => {
+      const mockResultObj = 'not-an-object-just-a-string';
+
+      const openaiClient = clients.get('openai');
+      vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify(mockResultObj) } }],
+      });
+
+      const runId = 'run-root-val-error';
+      createRun({
+        runId,
+        subject: 'ReactPreset',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash-root-val-error',
+      });
+
+      await expect(
+        runStage3({
+          runId,
+          questionId: 'q-root-val-error',
+          synthesisResult: 'Front: What is React?',
+          config,
+          keys,
+          clients,
+          throttledFetch,
+          maxEnforcementRetries: 1,
+        }),
+      ).rejects.toThrow('/: Invalid input: expected object, received string');
     });
   });
 

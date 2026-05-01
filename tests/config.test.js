@@ -30,7 +30,8 @@ describe('Configuration Loader - Edge Cases & Robustness', () => {
     const { config, keys, warnings } = loadConfig(nonExistentConfig, nonExistentKeys);
 
     // Verify default fallback configuration properties
-    expect(config.global.concurrency_limit).toBe(8);
+    expect(config.global.model_concurrency).toBe(0);
+    expect(config.global.topic_concurrency).toBe(1);
     expect(config.global.request_delay).toBe(1.0);
     expect(config.global.default_timeout).toBe(500.0);
     expect(config.global.output_dir).toBe('./output');
@@ -50,7 +51,8 @@ describe('Configuration Loader - Edge Cases & Robustness', () => {
 
     const configContent = `
 global:
-  concurrency_limit: 4
+  model_concurrency: 3
+  topic_concurrency: 2
   request_delay: 2.5
   default_timeout: 90.0
 providers:
@@ -75,7 +77,8 @@ openai:
 
     const { config, keys, warnings } = loadConfig(configPath, keysPath);
 
-    expect(config.global.concurrency_limit).toBe(4);
+    expect(config.global.model_concurrency).toBe(3);
+    expect(config.global.topic_concurrency).toBe(2);
     expect(config.global.request_delay).toBe(2.5);
     expect(config.global.default_timeout).toBe(90.0);
     expect(config.global.output_dir).toBe('./output'); // fell back to default
@@ -151,7 +154,8 @@ openai:
     const { config, keys, warnings } = loadConfig(configPath, keysPath);
 
     // Should fall back to standard defaults for global config
-    expect(config.global.concurrency_limit).toBe(8);
+    expect(config.global.model_concurrency).toBe(0);
+    expect(config.global.topic_concurrency).toBe(1);
     expect(keys).toEqual({});
 
     // Warn about empty/invalid structures
@@ -399,7 +403,8 @@ openai:
 
     const { config, warnings } = loadConfig(configPath, keysPath);
 
-    expect(config.global.concurrency_limit).toBe(8); // fell back to default
+    expect(config.global.model_concurrency).toBe(0);
+    expect(config.global.topic_concurrency).toBe(1);
     expect(warnings.some((w) => w.includes('Error reading config file') || w.includes('invalid'))).toBe(true);
     expect(warnings.some((w) => w.includes('Error reading keys file') || w.includes('invalid'))).toBe(true);
   });
@@ -410,7 +415,8 @@ openai:
 
     const configContent = `
 global:
-  concurrency_limit: 10
+  model_concurrency: 2
+  topic_concurrency: 3
   custom_field: "custom-value"
 providers:
   openai:
@@ -423,7 +429,8 @@ providers:
     const { config } = loadConfig(configPath, keysPath);
 
     // Verify fields merged correctly
-    expect(config.global.concurrency_limit).toBe(10);
+    expect(config.global.model_concurrency).toBe(2);
+    expect(config.global.topic_concurrency).toBe(3);
     expect(config.global.request_delay).toBe(1.0); // default preserved
     expect(config.global.custom_field).toBe('custom-value'); // custom field allowed
     expect(config.providers.openai.base_url).toBe('https://custom.openai.api');
@@ -543,13 +550,15 @@ describe('Configuration Loader - Uncovered Branch Coverage', () => {
     // Config with no pipeline section at all — pipeline defaults to {}
     const configContent = `
 global:
-  concurrency_limit: 2
+  model_concurrency: 1
+  topic_concurrency: 2
 `;
     fs.writeFileSync(configPath, configContent, 'utf8');
     fs.writeFileSync(keysPath, '', 'utf8');
 
     const { config, warnings } = loadConfig(configPath, keysPath);
-    expect(config.global.concurrency_limit).toBe(2);
+    expect(config.global.model_concurrency).toBe(1);
+    expect(config.global.topic_concurrency).toBe(2);
     // Should not throw and should have no provider-related warnings
     const providerWarnings = warnings.filter((w) => w.includes('Missing API key'));
     expect(providerWarnings.length).toBe(0);
@@ -643,7 +652,8 @@ openai: "   "
     fs.writeFileSync(keysPath, '', 'utf8');
 
     const { config, warnings } = loadConfig(configPath, keysPath);
-    expect(config.global.concurrency_limit).toBe(8); // defaults
+    expect(config.global.model_concurrency).toBe(0); // defaults
+    expect(config.global.topic_concurrency).toBe(1);
     expect(warnings.some((w) => w.includes('empty or invalid'))).toBe(true);
   });
 
@@ -655,7 +665,8 @@ openai: "   "
     fs.writeFileSync(keysPath, '', 'utf8');
 
     const { config, warnings } = loadConfig(configPath, keysPath);
-    expect(config.global.concurrency_limit).toBe(8);
+    expect(config.global.model_concurrency).toBe(0);
+    expect(config.global.topic_concurrency).toBe(1);
     expect(warnings.some((w) => w.includes('empty or invalid'))).toBe(true);
   });
 
@@ -665,7 +676,8 @@ openai: "   "
 
     const configContent = `
 global:
-  concurrency_limit: 4
+  model_concurrency: 2
+  topic_concurrency: 3
 `;
     fs.writeFileSync(configPath, configContent, 'utf8');
     fs.writeFileSync(keysPath, 'just a string not an object', 'utf8');

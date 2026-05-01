@@ -57,7 +57,8 @@ describe('Providers Module', () => {
     // Standard mock configurations
     config = {
       global: {
-        concurrency_limit: 2,
+        model_concurrency: 0,
+        topic_concurrency: 1,
         request_delay: 0.1, // Short delay for testing
         default_timeout: 30.0,
       },
@@ -273,8 +274,7 @@ describe('Providers Module', () => {
   });
 
   describe('createThrottledFetcher', () => {
-    it('should limit concurrency to global concurrency limit', async () => {
-      config.global.concurrency_limit = 2;
+    it('should not limit concurrency when request_delay is 0', async () => {
       config.global.request_delay = 0; // Disable delay for this test
       const throttledFetch = createThrottledFetcher(config);
 
@@ -292,11 +292,10 @@ describe('Providers Module', () => {
       const tasks = Array.from({ length: 5 }, () => throttledFetch(task));
       await Promise.all(tasks);
 
-      expect(maxActiveCount).toBeLessThanOrEqual(2);
+      expect(maxActiveCount).toBe(5);
     });
 
     it('should enforce request_delay between starts of successive tasks', async () => {
-      config.global.concurrency_limit = 5;
       config.global.request_delay = 0.05; // 50ms delay
       const throttledFetch = createThrottledFetcher(config);
 
@@ -317,7 +316,7 @@ describe('Providers Module', () => {
       expect(diff2).toBeGreaterThanOrEqual(40);
     });
 
-    it('should fallback to default concurrency limit of 8 and delay of 1.0 if missing in config', () => {
+    it('should fallback to default delay of 1.0 if missing in config', () => {
       const configNoConcurrency = {
         global: {},
       };

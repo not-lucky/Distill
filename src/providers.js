@@ -129,24 +129,32 @@ export function createProviderClients(config, keys) {
 }
 
 /**
- * Creates a throttled fetcher using p-limit that enforces concurrency limits
- * and staggers request start times.
+ * Creates a throttled fetcher that staggers the start times of requests
+ * to avoid rate limits, without enforcing a hard global concurrency limit.
  *
  * @param {Object} config The system configuration object.
- * @returns {Function} A wrapper function that limits concurrent executions.
+ * @returns {Function} A wrapper function that staggers successive task execution.
  */
 export function createThrottledFetcher(config) {
-  const concurrencyLimit = config.global.concurrency_limit || 8;
   const requestDelay = config.global.request_delay !== undefined
     ? config.global.request_delay
     : 1.0;
 
-  const limit = pLimit(concurrencyLimit);
+  // Serializes the start-time calculation and scheduling.
+  // Using pLimit(1) ensures that delayMs timeout schedules are computed
+  // sequentially relative to the last scheduled request start time.
+  const delayLimit = pLimit(1);
   let lastStartTime = 0;
 
-  return (fn) => limit(async () => {
-    const delayMs = requestDelay * 1000;
-    if (delayMs > 0) {
+  return (fn) => {
+    if (requestDelay <= 0) {
+      return fn();
+    }
+    // We queue the scheduling/delay inside the limit. Once the delay resolves,
+    // we execute fn() outside the limit so actual network requests can execute
+    // concurrently without capping the maximum active request count.
+    return delayLimit(async () => {
+      const delayMs = requestDelay * 1000;
       const now = Date.now();
       const nextStart = lastStartTime + delayMs;
       const diff = nextStart - now;
@@ -157,9 +165,8 @@ export function createThrottledFetcher(config) {
       } else {
         lastStartTime = now;
       }
-    }
-    return fn();
-  });
+    }).then(() => fn());
+  };
 }
 
 /**

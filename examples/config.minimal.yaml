@@ -3,7 +3,8 @@
 # Use as a starting point; see config.standard.yaml / config.full.yaml for more.
 
 global:
-  concurrency_limit: 1
+  model_concurrency: 1
+  topic_concurrency: 1
   request_delay: 0.0
   default_timeout: 120.0
   output_dir: "./output"

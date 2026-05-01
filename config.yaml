@@ -1,6 +1,7 @@
 # Global defaults and concurrency controls
 global:
-  concurrency_limit: 8          # Maximum parallel API requests to prevent rate limit issues
+  model_concurrency: 3          # Maximum generation models running simultaneously per topic (0 = unlimited)
+  topic_concurrency: 5          # Maximum topics/documents processed through pipeline simultaneously (1 = sequential)
   request_delay: 1.0            # Delay in seconds between starting requests
   default_timeout: 500.0        # Default network request timeout in seconds
   output_dir: "./output"        # Where final compiled .apkg files land
