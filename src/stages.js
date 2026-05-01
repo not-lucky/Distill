@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import pLimit from 'p-limit';
 import { resolveProviderModel, callLLM } from './providers.js';
 import { addPipelineStep, upsertQuestionEntry } from './database.js';
 import { resolvePrompts, CARD_JSON_SCHEMA } from './prompts.js';
@@ -57,46 +58,59 @@ export async function runStage1({
     { role: 'user', content: userPrompt },
   ];
 
+  // Retrieve model_concurrency configuration. A value of 0 (or undefined)
+  // indicates unlimited concurrency (meaning all generation models run in parallel).
+  // Handles invalid, negative, or non-numeric values defensively by falling back to 0 (unlimited).
+  let modelConcurrency = config.global?.model_concurrency;
+  if (typeof modelConcurrency !== 'number' || modelConcurrency < 0 || Number.isNaN(modelConcurrency)) {
+    modelConcurrency = 0;
+  }
+  const limit = modelConcurrency > 0 ? pLimit(modelConcurrency) : null;
+
   // Maps each configured model to an asynchronous generation promise.
-  // These promises execute concurrently when resolved with Promise.all.
-  const promises = models.map(async (modelString) => {
-    // Resolve model identifier into provider name and specific model name
-    const { provider, model } = resolveProviderModel(modelString);
+  // These promises execute concurrently up to the model_concurrency limit.
+  const promises = models.map((modelString) => {
+    const task = async () => {
+      // Resolve model identifier into provider name and specific model name
+      const { provider, model } = resolveProviderModel(modelString);
 
-    // Call the LLM provider. callLLM handles concurrency throttling,
-    // network timeouts, exponential backoff retries, and API key cycling.
-    const output = await callLLM({
-      provider,
-      model,
-      messages,
-      config,
-      keys,
-      clients,
-      throttledFetch,
-    });
+      // Call the LLM provider. callLLM handles concurrency throttling,
+      // network timeouts, exponential backoff retries, and API key cycling.
+      const output = await callLLM({
+        provider,
+        model,
+        messages,
+        config,
+        keys,
+        clients,
+        throttledFetch,
+      });
 
-    // Log the completed step to the pipeline_steps table.
-    // This allows run auditing and run resumption (skipping already completed queries on crash).
-    addPipelineStep({
-      runId,
-      questionId,
-      stage: 'generation',
-      provider,
-      model,
-      inputData: JSON.stringify(messages),
-      outputData: output,
-    });
+      // Log the completed step to the pipeline_steps table.
+      // This allows run auditing and run resumption (skipping already completed queries on crash).
+      addPipelineStep({
+        runId,
+        questionId,
+        stage: 'generation',
+        provider,
+        model,
+        inputData: JSON.stringify(messages),
+        outputData: output,
+      });
 
-    upsertQuestionEntry({
-      runId,
-      questionId,
-      currentStage: 'generation',
-      inputContent: content,
-      latestPrompt: JSON.stringify(messages),
-      latestResponse: output,
-    });
+      upsertQuestionEntry({
+        runId,
+        questionId,
+        currentStage: 'generation',
+        inputContent: content,
+        latestPrompt: JSON.stringify(messages),
+        latestResponse: output,
+      });
 
-    return { provider, model, output };
+      return { provider, model, output };
+    };
+
+    return limit ? limit(task) : task();
   });
 
   // Await execution of all concurrent model requests

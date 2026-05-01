@@ -52,7 +52,8 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
 
     config = {
       global: {
-        concurrency_limit: 2,
+        model_concurrency: 0,
+        topic_concurrency: 1,
         request_delay: 0.05,
         default_timeout: 30.0,
       },

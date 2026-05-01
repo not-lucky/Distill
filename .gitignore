@@ -20,6 +20,7 @@ llm2deck.db
 # Python venv
 .venv/
 
+.archived/
 coverage/
 output/
 scratch/

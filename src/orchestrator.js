@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
+import pLimit from 'p-limit';
 import {
   initDatabase,
   getDb,
@@ -250,21 +251,33 @@ export async function runPipeline({
     const mergedTopics = [];
     let hasFailures = false;
 
-    for (const question of questions) {
+    // Read topic_concurrency (defaulting to 1 for sequential topic processing).
+    // Handles invalid, zero, negative, or non-numeric values defensively by falling back to 1.
+    // Creates a p-limit pool to process multiple topics/documents concurrently.
+    let topicConcurrency = config.global?.topic_concurrency;
+    if (typeof topicConcurrency !== 'number' || topicConcurrency < 1 || Number.isNaN(topicConcurrency)) {
+      topicConcurrency = 1;
+    }
+    const limit = pLimit(topicConcurrency);
+
+    // Map each question/topic to a concurrency-limited pipeline execution task.
+    // Note that while topics are processed concurrently up to topic_concurrency,
+    // the individual stages for any single topic (Stage 1 -> Stage 2 -> Stage 3)
+    // execute in strict sequential order.
+    const promises = questions.map((question) => limit(async () => {
       const qId = question.questionId || question.topic || question.deckPath || '';
       const qContent = question.content || '';
 
       if (!qId) {
         console.warn('Skipping question because it is missing a valid identifier.');
         hasFailures = true;
-        continue;
+        return { failure: true };
       }
 
       if (completedQuestions.has(qId)) {
         console.info(`Skipping already completed question: ${qId}`);
         if (dryRun) {
-          results.push({ questionId: qId, dryRun: true });
-          continue;
+          return { questionId: qId, dryRun: true };
         }
 
         const completedResult = getCompletedStage3Result(runId, qId);
@@ -279,18 +292,14 @@ export async function runPipeline({
               ? metadata.problemIndex
               : question.problemIndex,
           });
-          mergedTopics.push(postProcessedResult);
-          results.push({ questionId: qId, skipped: true });
-          continue;
-        } else {
-          console.warn(`Could not retrieve completed result for question: ${qId} from DB. Will re-process.`);
+          return { questionId: qId, skipped: true, postProcessedResult };
         }
+        console.warn(`Could not retrieve completed result for question: ${qId} from DB. Will re-process.`);
       }
 
       if (dryRun) {
         console.info(`[Dry-Run] Would process question: ${qId}`);
-        results.push({ questionId: qId, dryRun: true });
-        continue;
+        return { questionId: qId, dryRun: true };
       }
 
       try {
@@ -348,12 +357,42 @@ export async function runPipeline({
             : question.problemIndex,
         });
 
-        mergedTopics.push(postProcessedResult);
-        results.push({ questionId: qId });
+        return { questionId: qId, postProcessedResult };
       } catch (error) {
         console.error(`Error processing question "${qId}":`, error);
         hasFailures = true;
+        return { questionId: qId, error: true };
       }
+    }));
+
+    const taskResults = await Promise.all(promises);
+
+    for (const res of taskResults) {
+      /* v8 ignore next */
+      if (!res) continue;
+      if (res.failure) {
+        continue;
+      }
+      if (res.dryRun) {
+        results.push({ questionId: res.questionId, dryRun: true });
+        continue;
+      }
+      if (res.skipped) {
+        /* v8 ignore next 3 */
+        if (res.postProcessedResult) {
+          mergedTopics.push(res.postProcessedResult);
+        }
+        results.push({ questionId: res.questionId, skipped: true });
+        continue;
+      }
+      if (res.error) {
+        continue;
+      }
+      /* v8 ignore next 3 */
+      if (res.postProcessedResult) {
+        mergedTopics.push(res.postProcessedResult);
+      }
+      results.push({ questionId: res.questionId });
     }
 
     // Compile successfully processed files

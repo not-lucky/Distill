@@ -9,9 +9,11 @@
 #   - compiler_timeout read at: src/orchestrator.js:405
 
 global:
-  # Max parallel API requests across all providers (p-limit pool size).
+  # Max generation models running simultaneously per topic (0 = unlimited).
   # Lower this if you hit 429 rate limits; raise it for high-throughput runs.
-  concurrency_limit: 8
+  model_concurrency: 3
+  # Max topics/documents processed through pipeline simultaneously (1 = sequential).
+  topic_concurrency: 5
   # Seconds to wait between starting successive requests. Used as a soft
   # throttle independent of concurrency_limit.
   request_delay: 1.0

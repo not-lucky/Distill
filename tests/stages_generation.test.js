@@ -57,7 +57,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
 
     config = {
       global: {
-        concurrency_limit: 2,
+        model_concurrency: 0,
         request_delay: 0.05,
         default_timeout: 30.0,
       },
@@ -557,6 +557,56 @@ global:
           }),
         ]),
       }));
+    });
+  });
+
+  describe('runStage1 concurrency limiting', () => {
+    it('should respect model_concurrency limit in Stage 1', async () => {
+      createRun({
+        runId: 'run-limit-models',
+        subject: 'General',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash123',
+      });
+      config.global.model_concurrency = 1; // Only 1 model at a time
+      config.pipeline.generation.models = [
+        'openai/gpt-3.5-turbo',
+        'cerebras/llama3.1-70b',
+      ];
+
+      const openaiClient = clients.get('openai');
+      const cerebrasClient = clients.get('cerebras');
+
+      let activeCalls = 0;
+      let maxActiveCalls = 0;
+
+      const mockCall = async () => {
+        activeCalls++;
+        maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        activeCalls--;
+        return { choices: [{ message: { content: 'mock output' } }] };
+      };
+
+      vi.spyOn(openaiClient.chat.completions, 'create').mockImplementation(mockCall);
+      vi.spyOn(cerebrasClient.chat.completions, 'create').mockImplementation(mockCall);
+
+      await runStage1({
+        runId: 'run-limit-models',
+        questionId: 'q-limit-models',
+        content: 'content',
+        deckPath: 'Deck',
+        cardType: 'standard',
+        subject: 'General',
+        prompts: {},
+        config,
+        keys,
+        clients,
+        throttledFetch,
+      });
+
+      expect(maxActiveCalls).toBe(1);
     });
   });
 });

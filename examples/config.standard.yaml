@@ -3,8 +3,10 @@
 # generation models, one model per downstream stage.
 
 global:
-  # Max parallel API requests across all providers.
-  concurrency_limit: 8
+  # Max generation models running simultaneously per topic.
+  model_concurrency: 3
+  # Max topics/documents processed through pipeline simultaneously.
+  topic_concurrency: 5
   # Seconds to wait between starting successive requests (rate-limit cushion).
   request_delay: 1.0
   # Default per-request network timeout in seconds. Providers can override via

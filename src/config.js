@@ -3,7 +3,8 @@ import yaml from 'js-yaml';
 
 const DEFAULTS = {
   global: {
-    concurrency_limit: 8,
+    model_concurrency: 0,
+    topic_concurrency: 1,
     request_delay: 1.0,
     default_timeout: 500.0,
     output_dir: './output',
