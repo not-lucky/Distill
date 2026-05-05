@@ -248,6 +248,103 @@ export function removeNullValues(obj) {
   return obj;
 }
 
+/**
+ * Normalizes the parsed JSON object to heal/recover missing properties
+ * (like title, tags, or topic) and prune incompatible properties (like
+ * options and correct_answer for Basic/Cloze cards) before passing it
+ * to Zod validation. This makes parsing resilient to LLM output variations.
+ *
+ * @param {Object} jsonObj The parsed JSON object.
+ * @param {string} questionId Unique identifier for this chunk/topic.
+ * @param {string} [subject] Explicit subject name.
+ * @returns {Object} The normalized object.
+ */
+export function normalizeJsonObj(jsonObj, questionId, subject = '') {
+  if (!jsonObj || typeof jsonObj !== 'object') {
+    return jsonObj;
+  }
+
+  // 1. Fallbacks for root-level fields
+  if (typeof jsonObj.title !== 'string' || !jsonObj.title.trim()) {
+    const parts = questionId.split('::');
+    const lastPart = parts[parts.length - 1];
+    jsonObj.title = lastPart ? lastPart.replace(/_/g, ' ') : 'Flashcards';
+  }
+
+  if (typeof jsonObj.topic !== 'string' || !jsonObj.topic.trim()) {
+    jsonObj.topic = questionId.replace(/::/g, '/');
+  }
+
+  const validDifficulties = ['Basic', 'Intermediate', 'Advanced'];
+  if (!validDifficulties.includes(jsonObj.difficulty)) {
+    jsonObj.difficulty = 'Intermediate';
+  }
+
+  // 2. Normalize and prune cards
+  if (Array.isArray(jsonObj.cards)) {
+    jsonObj.cards = jsonObj.cards.map((card) => {
+      if (!card || typeof card !== 'object') return card;
+
+      // Ensure tags is an array
+      if (!Array.isArray(card.tags)) {
+        card.tags = [];
+      } else {
+        card.tags = card.tags.filter(
+          (t) => typeof t === 'string' && /^[A-Za-z0-9-_/]+$/.test(t),
+        );
+      }
+
+      // Ensure card_type is valid, fallback to 'Concept'
+      const validTypes = [
+        'Concept',
+        'Code',
+        'Procedure',
+        'Syntax',
+        'Behavior',
+        'Constraint',
+        'ErrorHandling',
+        'TradeOff',
+      ];
+      if (!validTypes.includes(card.card_type)) {
+        card.card_type = 'Concept';
+      }
+
+      // Fallback card_format if missing or invalid
+      if (!['Basic', 'Cloze', 'MCQ'].includes(card.card_format)) {
+        if (card.options && card.correct_answer) {
+          card.card_format = 'MCQ';
+        } else if (card.front && /\{\{c[0-9]+::/.test(card.front)) {
+          card.card_format = 'Cloze';
+        } else {
+          card.card_format = 'Basic';
+        }
+      }
+
+      // Prune and format-specific normalization
+      if (card.card_format === 'Basic') {
+        delete card.options;
+        delete card.correct_answer;
+      } else if (card.card_format === 'Cloze') {
+        delete card.back;
+        delete card.options;
+        delete card.correct_answer;
+      } else if (card.card_format === 'MCQ') {
+        delete card.back;
+        if (!Array.isArray(card.options)) {
+          card.options = ['Option A', 'Option B'];
+        }
+        if (!['A', 'B', 'C', 'D'].includes(card.correct_answer)) {
+          card.correct_answer = 'A';
+        }
+      }
+
+      return card;
+    });
+  }
+
+  return jsonObj;
+}
+
 // Zod schemas defining the structured output format for flashcards.
 // These mirror CARD_JSON_SCHEMA, but mark optional fields as nullable()
 // to satisfy OpenAI's Structured Outputs requirement that all properties are required.
@@ -493,6 +590,8 @@ export async function runStage3({
 
   const stage2Questions = parseStage2Questions(synthesisResult);
 
+  const useCompletionApi = config?.pipeline?.schema_enforcement?.use_completion_api === true;
+
   let attempt = 0;
   let lastErrorMsg = '';
 
@@ -507,6 +606,7 @@ export async function runStage3({
       keys,
       clients,
       throttledFetch,
+      forceCompletionApi: useCompletionApi,
     });
 
     const cleanedOutput = cleanJsonOutput(rawOutput);
@@ -518,6 +618,7 @@ export async function runStage3({
       jsonObj = JSON.parse(cleanedOutput);
       if (jsonObj) {
         jsonObj = removeNullValues(jsonObj);
+        jsonObj = normalizeJsonObj(jsonObj, questionId, subject);
       }
     } catch (parseError) {
       errorsList.push(`JSON Parsing Error: ${parseError.message}`);

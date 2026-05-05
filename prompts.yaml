@@ -103,16 +103,16 @@ subjects:
       - name: "Arrays & Hashing"
         topics:
           - "Two Sum"
-          - "Group Anagrams"
-          - "Top K Frequent Elements"
-      - name: "Two Pointers"
-        topics:
-          - "Valid Palindrome"
-          - "Container With Most Water"
-      - name: "Dynamic Programming"
-        topics:
-          - "Climbing Stairs"
-          - "Longest Common Subsequence"
+      #     - "Group Anagrams"
+      #     - "Top K Frequent Elements"
+      # - name: "Two Pointers"
+      #   topics:
+      #     - "Valid Palindrome"
+      #     - "Container With Most Water"
+      # - name: "Dynamic Programming"
+      #   topics:
+      #     - "Climbing Stairs"
+      #     - "Longest Common Subsequence"
 
   # ---- Document mode subject ----
   # Active when: `node src/cli.js run notes`

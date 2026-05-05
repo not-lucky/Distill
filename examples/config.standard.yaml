@@ -50,3 +50,5 @@ pipeline:
   # CARD_JSON_SCHEMA (src/prompts.js). Includes a recovery retry loop.
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
+    # Bypass responses API and force traditional chat completions API (boolean, defaults to false)
+    use_completion_api: false

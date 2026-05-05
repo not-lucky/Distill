@@ -31,13 +31,14 @@ pipeline:
   # Stage 1: Parallel Initial Generation (raw text extraction)
   generation:
     models:
-      - "omniroute/gemini-flash-lite-latest"
+      - "gemini/gemini-flash-lite-latest"
   
   # Stage 2: Synthesis (frontier model merges and deduplicates)
   synthesis:
-    model: "omniroute/gemini-flash-lite-latest"
+    model: "gemini/gemini-flash-lite-latest"
   
 
   # Stage 3: Strict JSON Schema Enforcement
   schema_enforcement:
-    model: "omniroute/gemini-flash-lite-latest"
+    model: "gemini/gemini-flash-lite-latest"
+    use_completion_api: true   # Set to true to bypass Responses API and force Chat Completions API

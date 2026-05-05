@@ -856,5 +856,38 @@ describe('Providers Module', () => {
         expect.any(Object),
       );
     });
+
+    it('should call chat.completions.create when forceCompletionApi is true even if responses API exists', async () => {
+      const messages = [{ role: 'user', content: 'test schema' }];
+      const dummySchema = z.object({
+        cards: z.array(z.string()),
+      });
+
+      const openaiClient = clients.get('openai');
+      openaiClient.responses = {
+        create: vi.fn().mockResolvedValue({ output_text: '{"cards":[]}' }),
+      };
+      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: '{"cards":[]}' } }],
+      });
+
+      const result = await callLLM({
+        provider: 'openai',
+        model: 'gpt-4o-2024-08-06',
+        messages,
+        schema: dummySchema,
+        config,
+        keys,
+        clients,
+        throttledFetch,
+        forceCompletionApi: true,
+      });
+
+      expect(result).toBe('{"cards":[]}');
+      expect(createSpy).toHaveBeenCalledTimes(1);
+      expect(openaiClient.responses.create).not.toHaveBeenCalled();
+
+      delete openaiClient.responses;
+    });
   });
 });
