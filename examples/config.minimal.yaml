@@ -25,3 +25,4 @@ pipeline:
     model: "openai/gpt-3.5-turbo"
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
+    # use_completion_api: false

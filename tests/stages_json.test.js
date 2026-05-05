@@ -14,6 +14,7 @@ import {
   runStage3,
   removeNullValues,
   CARD_ZOD_SCHEMA,
+  normalizeJsonObj,
 } from '../src/stages.js';
 
 vi.mock('openai', () => {
@@ -135,6 +136,90 @@ Card 2 Front: What is JSX?
         { front: 'what is react?' },
       ];
       expect(verifyContentLoss(stage2, stage3Missing)).toEqual(['How does useEffect work?']);
+    });
+  });
+
+  describe('normalizeJsonObj helper', () => {
+    it('should pass non-objects straight through', () => {
+      expect(normalizeJsonObj(null, 'q')).toBeNull();
+      expect(normalizeJsonObj(123, 'q')).toBe(123);
+      expect(normalizeJsonObj('str', 'q')).toBe('str');
+    });
+
+    it('should recover missing title, topic, and difficulty properties', () => {
+      const input = {
+        cards: [],
+      };
+      const result = normalizeJsonObj(input, 'leetcode::Arrays_&_Hashing::Two_Sum');
+      expect(result.title).toBe('Two Sum');
+      expect(result.topic).toBe('leetcode/Arrays_&_Hashing/Two_Sum');
+      expect(result.difficulty).toBe('Intermediate');
+    });
+
+    it('should prune options and correct_answer from Basic and Cloze cards, and back from MCQ/Cloze cards', () => {
+      const input = {
+        title: 'Title',
+        topic: 'Topic',
+        difficulty: 'Basic',
+        cards: [
+          {
+            card_format: 'Basic',
+            card_type: 'Concept',
+            front: 'Q',
+            back: 'A',
+            options: ['Option A'],
+            correct_answer: 'A',
+          },
+          {
+            card_format: 'Cloze',
+            card_type: 'Concept',
+            front: '{{c1::Cloze}} statement',
+            back: 'should be pruned',
+            options: ['Option B'],
+            correct_answer: 'B',
+          },
+          {
+            card_format: 'MCQ',
+            card_type: 'Concept',
+            front: 'MCQ Q',
+            back: 'should be pruned',
+            options: ['Option A', 'Option B'],
+            correct_answer: 'A',
+          },
+        ],
+      };
+
+      const result = normalizeJsonObj(input, 'q');
+      expect(result.cards[0].options).toBeUndefined();
+      expect(result.cards[0].correct_answer).toBeUndefined();
+      expect(result.cards[0].back).toBe('A');
+
+      expect(result.cards[1].back).toBeUndefined();
+      expect(result.cards[1].options).toBeUndefined();
+      expect(result.cards[1].correct_answer).toBeUndefined();
+
+      expect(result.cards[2].back).toBeUndefined();
+      expect(result.cards[2].options).toEqual(['Option A', 'Option B']);
+      expect(result.cards[2].correct_answer).toBe('A');
+    });
+
+    it('should enforce tags array format and filter out invalid tags', () => {
+      const input = {
+        cards: [
+          {
+            card_format: 'Basic',
+            tags: null,
+          },
+          {
+            card_format: 'Basic',
+            tags: ['valid-tag', 'invalid tag with spaces'],
+          },
+        ],
+      };
+
+      const result = normalizeJsonObj(input, 'q');
+      expect(result.cards[0].tags).toEqual([]);
+      expect(result.cards[1].tags).toEqual(['valid-tag']);
     });
   });
 
@@ -744,11 +829,11 @@ Card 2 Front: What is JSX?
     });
 
     it('runStage3 edge cases: prompts.schema_enforcement override empty and root level AJV validation error', async () => {
-      // Missing 'title' root property, prompting a root-level error '/'
+      // Missing 'cards' root property, prompting a root-level error '/'
       const mockResultObj = {
+        title: 'React Basics',
         topic: 'React',
         difficulty: 'Basic',
-        cards: [],
       };
 
       const openaiClient = clients.get('openai');
@@ -778,7 +863,7 @@ Card 2 Front: What is JSX?
           throttledFetch,
           maxEnforcementRetries: 1,
         }),
-      ).rejects.toThrow('/title: Invalid input: expected string, received undefined');
+      ).rejects.toThrow('/cards: Invalid input: expected array, received undefined');
     });
 
     it('runStage3 edge cases: cards array is missing in json response', async () => {
@@ -836,7 +921,7 @@ Card 2 Front: What is JSX?
 
       await expect(
         runStage3({
-          runId,
+          runId: 'run-root-val-error',
           questionId: 'q-root-val-error',
           synthesisResult: 'Front: What is React?',
           config,
@@ -846,6 +931,69 @@ Card 2 Front: What is JSX?
           maxEnforcementRetries: 1,
         }),
       ).rejects.toThrow('/: Invalid input: expected object, received string');
+    });
+
+    it('should use chat.completions.create instead of client.responses.create when use_completion_api is true in config', async () => {
+      const mockResultObj = {
+        title: 'React Basics',
+        topic: 'React',
+        difficulty: 'Basic',
+        cards: [
+          {
+            card_format: 'Basic',
+            card_type: 'Concept',
+            tags: ['react'],
+            front: 'What is React?',
+            back: 'A library',
+            explanation: 'Details',
+          },
+        ],
+      };
+
+      const openaiClient = clients.get('openai');
+      // Mock both completions and responses so we can see which one gets called
+      openaiClient.responses = {
+        create: vi.fn().mockResolvedValue({ output_text: JSON.stringify(mockResultObj) }),
+      };
+      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify(mockResultObj) } }],
+      });
+
+      const configWithCompletion = {
+        ...config,
+        pipeline: {
+          schema_enforcement: {
+            model: 'openai/gpt-3.5-turbo',
+            use_completion_api: true,
+          },
+        },
+      };
+
+      const runId = 'run-completion-api-config';
+      createRun({
+        runId,
+        subject: 'ReactPreset',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash-completion-api',
+      });
+
+      const result = await runStage3({
+        runId,
+        questionId: 'q-completion-api',
+        synthesisResult: 'Front: What is React?',
+        config: configWithCompletion,
+        keys,
+        clients,
+        throttledFetch,
+      });
+
+      expect(result).toEqual(mockResultObj);
+      expect(createSpy).toHaveBeenCalledTimes(1);
+      expect(openaiClient.responses.create).not.toHaveBeenCalled();
+
+      // Clean up mock
+      delete openaiClient.responses;
     });
   });
 

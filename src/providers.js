@@ -216,6 +216,7 @@ export async function callLLM({
   clients,
   throttledFetch,
   retries = 5,
+  forceCompletionApi = false,
 }) {
   // 1. Check cache first
   const cacheKey = computeCacheKey({
@@ -245,7 +246,8 @@ export async function callLLM({
   // Determine if we should use the new OpenAI Responses API.
   // This is used for OpenAI model calls that support structured text output.
   // We check if the schema is a Zod schema and if the client SDK supports Responses API.
-  const isResponsesApi = isZod && client.responses && typeof client.responses.create === 'function';
+  // We also check if we want to force the chat completions API.
+  const isResponsesApi = isZod && client.responses && typeof client.responses.create === 'function' && !forceCompletionApi;
 
   // Build the request body params.
   // The Responses API uses different parameters (input/text.format) compared to

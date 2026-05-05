@@ -77,6 +77,8 @@ pipeline:
   # validation/content-loss failures.
   schema_enforcement:
     model: "openai/gpt-3.5-turbo"
+    # Bypass responses API and force traditional chat completions API (boolean, defaults to false)
+    use_completion_api: false
 
   # NOTE: A `translation` stage appears in README.md and the legacy v1 schema,
   # but the current code (src/stages.js) implements only the three stages
