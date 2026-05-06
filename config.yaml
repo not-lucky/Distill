@@ -7,6 +7,8 @@ global:
   output_dir: "./output"        # Where final compiled .apkg files land
   cache_db_path: "./llm2deck.db" # SQLite database path for runs, steps, and caching
   keys_file_path: "./keys.yaml" # Path to keys file where all providers' keys are stored
+  log_level: "info"             # Minimum log level: "debug", "info", "warning", "error", "fatal"
+  log_dir: "./logs"                 # Directory for rotating log files (e.g., "./logs")
 
 # Definition of available LLM providers (excluding raw keys)
 providers:

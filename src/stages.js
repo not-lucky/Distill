@@ -3,6 +3,9 @@ import pLimit from 'p-limit';
 import { resolveProviderModel, callLLM } from './providers.js';
 import { addPipelineStep, upsertQuestionEntry } from './database.js';
 import { resolvePrompts, CARD_JSON_SCHEMA } from './prompts.js';
+import { getLogger } from './logger.js';
+
+const logger = getLogger(['stages']);
 
 /**
  * Executes Stage 1 of the pipeline: Parallel Generation.
@@ -67,12 +70,16 @@ export async function runStage1({
   }
   const limit = modelConcurrency > 0 ? pLimit(modelConcurrency) : null;
 
+  logger.debug`Starting Stage 1 (Parallel Generation) for question ID: ${questionId} using ${models.length} model(s)`;
+
   // Maps each configured model to an asynchronous generation promise.
   // These promises execute concurrently up to the model_concurrency limit.
   const promises = models.map((modelString) => {
     const task = async () => {
       // Resolve model identifier into provider name and specific model name
       const { provider, model } = resolveProviderModel(modelString);
+
+      logger.debug`Stage 1 parallel call started for model ${modelString} on question ${questionId}`;
 
       // Call the LLM provider. callLLM handles concurrency throttling,
       // network timeouts, exponential backoff retries, and API key cycling.
@@ -106,6 +113,8 @@ export async function runStage1({
         latestPrompt: JSON.stringify(messages),
         latestResponse: output,
       });
+
+      logger.debug`Stage 1 call finished for model ${modelString} (response length: ${output.length} chars)`;
 
       return { provider, model, output };
     };
@@ -186,6 +195,8 @@ export async function runStage2({
   // Resolve the string configuration ("provider/model") to discrete fields.
   const { provider, model } = resolveProviderModel(modelString);
 
+  logger.debug`Starting Stage 2 (Frontier Synthesis) for ${questionId} using model ${modelString}. Input length: ${combinedContent.length} chars.`;
+
   // Invoke the synthesis model through the unified provider client.
   // Throttling, timeouts, key-rotation, and rate-limit backoffs are managed inside callLLM.
   const output = await callLLM({
@@ -219,6 +230,8 @@ export async function runStage2({
     latestPrompt: JSON.stringify(messages),
     latestResponse: output,
   });
+
+  logger.debug`Stage 2 synthesis finished for ${questionId}. Output length: ${output.length} chars.`;
 
   return output;
 }
@@ -592,11 +605,14 @@ export async function runStage3({
 
   const useCompletionApi = config?.pipeline?.schema_enforcement?.use_completion_api === true;
 
+  logger.debug`Starting Stage 3 (Schema Enforcement) for ${questionId} using model ${modelString} (max retries: ${maxEnforcementRetries}, useCompletionApi: ${useCompletionApi}). Parsed Stage 2 questions: ${stage2Questions.length}`;
+
   let attempt = 0;
   let lastErrorMsg = '';
 
   while (attempt < maxEnforcementRetries) {
     attempt++;
+    logger.debug`Stage 3 attempt ${attempt}/${maxEnforcementRetries} for ${questionId}...`;
     const rawOutput = await callLLM({
       provider,
       model,
@@ -621,6 +637,7 @@ export async function runStage3({
         jsonObj = normalizeJsonObj(jsonObj, questionId, subject);
       }
     } catch (parseError) {
+      logger.debug`Stage 3 JSON Parsing Error for attempt ${attempt}: ${parseError.message}`;
       errorsList.push(`JSON Parsing Error: ${parseError.message}`);
     }
 
@@ -634,6 +651,7 @@ export async function runStage3({
             : '/';
           return `${pathStr}: ${issue.message}`;
         });
+        logger.debug`Stage 3 Zod Validation failed for attempt ${attempt} with errors: ${schemaErrors.join(' | ')}`;
         errorsList.push(...schemaErrors);
       }
     }
@@ -643,6 +661,7 @@ export async function runStage3({
       const cards = jsonObj.cards || [];
       const missing = verifyContentLoss(stage2Questions, cards);
       if (missing.length > 0) {
+        logger.debug`Stage 3 Content Loss Audit failed for attempt ${attempt}: ${missing.length} missing questions`;
         errorsList.push(
           `Content Loss Audit Error: The following questions from Stage 2 are missing in the Stage 3 JSON cards array:\n${
             missing.map((q) => `- ${q}`).join('\n')}`,
@@ -651,6 +670,7 @@ export async function runStage3({
     }
 
     if (errorsList.length === 0) {
+      logger.debug`Stage 3 enforcement succeeded on attempt ${attempt}. Generated ${jsonObj.cards?.length} card(s).`;
       // Success! Log the trace to pipeline_steps and return the conforming object
       addPipelineStep({
         runId,
@@ -698,6 +718,7 @@ export async function runStage3({
 
     // Failed validation/audit: prepare feedback and append history for retry
     lastErrorMsg = errorsList.join('\n');
+    logger.debug`Stage 3 attempt ${attempt} failed. Retrying... Errors:\n${lastErrorMsg}`;
     messages.push({ role: 'assistant', content: rawOutput });
     messages.push({
       role: 'user',

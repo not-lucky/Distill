@@ -11,6 +11,9 @@ global:
   cache_db_path: "./llm2deck.db"
   keys_file_path: "./keys.yaml"
   prompts_file_path: "./prompts.yaml"
+  log_level: "info"
+  log_dir: null
+
 
 providers:
   openai:

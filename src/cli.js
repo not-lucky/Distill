@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable no-console */
 
 import { Command } from 'commander';
 import fs from 'fs';
@@ -16,6 +15,18 @@ import { runPipeline, spawnCompiler } from './orchestrator.js';
 import {
   ingestDirectory, loadPreset, formatNamespaceComponent, ingestDocumentSources,
 } from './ingestion.js';
+import { setupLogging, getLogger, dispose } from './logger.js';
+
+const logger = getLogger(['cli']);
+
+async function exit(code) {
+  try {
+    await dispose();
+  } catch (_) {
+    // ignore
+  }
+  process.exit(code);
+}
 
 const program = new Command();
 
@@ -32,15 +43,31 @@ program
   .option('--subject <subject>', 'Explicitly specifies the subject preset from prompts.yaml')
   .option('--resume <run_id>', 'Resumes an interrupted run')
   .option('--dry-run', 'Performs file/directory scanning and config validation without executing LLM requests', false)
+  .option('-v, --verbose', 'Enable verbose logging')
+  .option('-q, --quiet', 'Enable quiet logging (errors only)')
   .action(async (sourcePath, options) => {
     try {
       const { cardType } = options;
       if (cardType !== 'standard' && cardType !== 'mcq') {
         console.error(`Error: Invalid card-type "${cardType}". Must be 'standard' or 'mcq'.`);
-        process.exit(1);
+        await exit(1);
       }
 
       const { config, keys, prompts } = loadConfig(options.config);
+
+      let level = config.global.log_level || 'info';
+      if (options.verbose) {
+        level = 'debug';
+      } else if (options.quiet) {
+        level = 'error';
+      }
+
+      await setupLogging({
+        level,
+        logDir: config.global.log_dir || null,
+      });
+
+      logger.debug`Starting run command with sourcePath: ${sourcePath}, cardType: ${cardType}, resume: ${options.resume}, dryRun: ${options.dryRun}`;
 
       let questions = [];
       let activeSubject = options.subject || null;
@@ -62,7 +89,7 @@ program
           const { files, folder } = subjectPreset;
           if (!files && !folder) {
             console.error(`Error: Subject preset "${matchedSubjectKey}" is configured in document mode but is missing both "files" and "folder" settings.`);
-            process.exit(1);
+            await exit(1);
           }
           const sources = {};
           // Resolve folders/files relative to CLI process CWD
@@ -104,7 +131,7 @@ program
         const resolvedPath = path.resolve(sourcePath);
         if (!fs.existsSync(resolvedPath)) {
           console.error(`Error: Source path "${sourcePath}" does not exist, and is not a known subject preset.`);
-          process.exit(1);
+          await exit(1);
         }
 
         const stats = fs.statSync(resolvedPath);
@@ -120,7 +147,7 @@ program
               const { files, folder } = preset;
               if (!files && !folder) {
                 console.error(`Error: Preset file "${preset.name}" is configured in document mode but is missing both "files" and "folder" settings.`);
-                process.exit(1);
+                await exit(1);
               }
               const sources = {};
               // Resolve relative folders/files paths relative to the preset file's directory
@@ -159,17 +186,17 @@ program
             }
           } else {
             console.error(`Error: Source path "${sourcePath}" is a file but not a YAML/YML preset file.`);
-            process.exit(1);
+            await exit(1);
           }
         } else {
           console.error(`Error: Source path "${sourcePath}" is not a valid directory or preset file.`);
-          process.exit(1);
+          await exit(1);
         }
       }
 
       if (questions.length === 0) {
         console.error('Error: No questions/topics found to process.');
-        process.exit(1);
+        await exit(1);
       }
 
       const subjectParam = activeSubject || '';
@@ -193,10 +220,10 @@ program
 
       if (result.hasFailures) {
         console.error('Pipeline completed with failures.');
-        process.exit(1);
+        await exit(1);
       } else {
         console.log('Pipeline completed successfully.');
-        process.exit(0);
+        await exit(0);
       }
     } catch (error) {
       console.error(`Pipeline failed: ${error.message}`);
@@ -205,7 +232,7 @@ program
       } catch (_) {
         // ignore close error
       }
-      process.exit(1);
+      await exit(1);
     }
   });
 
@@ -213,15 +240,32 @@ program
   .command('compile <json_file>')
   .description('Compiles a pre-existing structured JSON file into the Anki package database format.')
   .option('-o, --output <path>', 'Directory or file path for the output .apkg file')
+  .option('-v, --verbose', 'Enable verbose logging')
+  .option('-q, --quiet', 'Enable quiet logging (errors only)')
   .action(async (jsonFile, options) => {
     try {
       const resolvedJson = path.resolve(jsonFile);
       if (!fs.existsSync(resolvedJson)) {
         console.error(`Error: JSON file "${jsonFile}" does not exist.`);
-        process.exit(1);
+        await exit(1);
       }
 
       const { config } = loadConfig();
+
+      let level = config.global.log_level || 'info';
+      if (options.verbose) {
+        level = 'debug';
+      } else if (options.quiet) {
+        level = 'error';
+      }
+
+      await setupLogging({
+        level,
+        logDir: config.global.log_dir || null,
+      });
+
+      logger.debug`Starting compile command with jsonFile: ${jsonFile}, outputPath: ${options.output}`;
+
       const defaultOutputDir = path.resolve(process.cwd(), config?.global?.output_dir || './output');
       const outputPath = options.output || defaultOutputDir;
 
@@ -230,24 +274,40 @@ program
       console.log('Compilation succeeded.');
       if (result.stdout) console.log(result.stdout);
       if (result.stderr) console.error(result.stderr);
-      process.exit(0);
+      await exit(0);
     } catch (error) {
       console.error(`Compilation failed: ${error.message}`);
-      process.exit(1);
+      await exit(1);
     }
   });
 
 program
   .command('cache <action>')
   .description('Manages cache SQLite DB tables. Action can be "clear" or "stats".')
-  .action((action) => {
+  .option('-v, --verbose', 'Enable verbose logging')
+  .option('-q, --quiet', 'Enable quiet logging (errors only)')
+  .action(async (action, options) => {
     try {
       if (action !== 'clear' && action !== 'stats') {
         console.error(`Error: Invalid action "${action}". Must be "clear" or "stats".`);
-        process.exit(1);
+        await exit(1);
       }
 
       const { config } = loadConfig();
+
+      let level = config.global.log_level || 'info';
+      if (options.verbose) {
+        level = 'debug';
+      } else if (options.quiet) {
+        level = 'error';
+      }
+
+      await setupLogging({
+        level,
+        logDir: config.global.log_dir || null,
+      });
+
+      logger.debug`Starting cache command with action: ${action}`;
       const dbPath = path.resolve(process.cwd(), config?.global?.cache_db_path || './llm2deck.db');
       initDatabase(dbPath);
 
@@ -260,7 +320,7 @@ program
       }
 
       closeDatabase();
-      process.exit(0);
+      await exit(0);
     } catch (error) {
       console.error(`Cache command failed: ${error.message}`);
       try {
@@ -268,7 +328,7 @@ program
       } catch (_) {
         // ignore close error
       }
-      process.exit(1);
+      await exit(1);
     }
   });
 

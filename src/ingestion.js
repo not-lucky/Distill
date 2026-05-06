@@ -1,6 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
+import { getLogger } from './logger.js';
+
+const logger = getLogger(['ingestion']);
 
 /**
  * Formats a directory or file name component according to FSD mapping rules:
@@ -55,13 +58,13 @@ export async function readFileWithFallback(filePath) {
         const latin1Decoder = new TextDecoder('windows-1252', { fatal: true });
         return latin1Decoder.decode(buffer);
       } catch (latin1Error) {
-        console.warn(`[Ingestion Warning] Failed to decode file ${filePath} with UTF-8 or Latin-1: ${latin1Error.message}`);
+        logger.warn`Failed to decode file ${filePath} with UTF-8 or Latin-1: ${latin1Error.message}`;
         return null;
       }
     }
   } catch (readError) {
     // If the file does not exist, lacks permission, or is a directory, log warning and return null.
-    console.warn(`[Ingestion Warning] Error reading file ${filePath}: ${readError.message}`);
+    logger.warn`Error reading file ${filePath}: ${readError.message}`;
     return null;
   }
 }
@@ -102,7 +105,7 @@ async function walkDirectory(dirPath, allowedExtensions) {
     const scannedLists = await Promise.all(scanPromises);
     files = scannedLists.flat();
   } catch (error) {
-    console.warn(`[Ingestion Warning] Error reading directory ${dirPath}: ${error.message}`);
+    logger.warn`Error reading directory ${dirPath}: ${error.message}`;
   }
   return files;
 }
@@ -248,11 +251,11 @@ export async function ingestFiles(filePaths) {
     // Skip missing files, unreadable files, or files containing only whitespace,
     // logging warnings to help users debug typos in config files.
     if (content === null) {
-      console.warn(`[Ingestion Warning] Requested file "${rawPath}" was skipped because it could not be read or decoded.`);
+      logger.warn`Requested file "${rawPath}" was skipped because it could not be read or decoded.`;
       continue;
     }
     if (content.trim().length === 0) {
-      console.warn(`[Ingestion Warning] Requested file "${rawPath}" was skipped because it is empty or contains only whitespace.`);
+      logger.warn`Requested file "${rawPath}" was skipped because it is empty or contains only whitespace.`;
       continue;
     }
 

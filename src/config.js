@@ -1,5 +1,8 @@
 import fs from 'fs';
 import yaml from 'js-yaml';
+import { getLogger } from './logger.js';
+
+const logger = getLogger(['config']);
 
 const DEFAULTS = {
   global: {
@@ -11,6 +14,8 @@ const DEFAULTS = {
     cache_db_path: './llm2deck.db',
     keys_file_path: './keys.yaml',
     prompts_file_path: './prompts.yaml',
+    log_level: 'info',
+    log_dir: null,
   },
   providers: {},
   pipeline: {},
@@ -137,7 +142,7 @@ export function loadConfig(configPath = './config.yaml', keysPath = null) {
 
   // Log warnings if not running inside a test environment
   if (warnings.length > 0 && process.env.NODE_ENV !== 'test') {
-    warnings.forEach((w) => console.warn(`[Config Warning] ${w}`));
+    warnings.forEach((w) => logger.warn`${w}`);
   }
 
   return {
