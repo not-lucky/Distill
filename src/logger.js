@@ -20,16 +20,18 @@ export async function setupLogging(options = {}) {
     console: getConsoleSink(),
   };
 
+  const isTest = process.env.NODE_ENV === 'test';
+
   const loggers = [
     {
       category: ['llm2deck'],
       sinks: ['console'],
-      lowestLevel: level,
+      lowestLevel: isTest ? null : level,
     },
     {
       category: ['logtape', 'meta'],
       sinks: ['console'],
-      lowestLevel: 'warning',
+      lowestLevel: isTest ? null : 'warning',
     },
   ];
 
