@@ -1,6 +1,9 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
+import { getLogger } from './logger.js';
+
+const logger = getLogger(['database']);
 
 /**
  * Module-level database connection state.
@@ -32,6 +35,7 @@ export function getDb() {
  * @returns {Database.Database} The initialized database connection.
  */
 export function initDatabase(dbPath) {
+  logger.debug`Initializing SQLite database at: ${dbPath}`;
   // Prevent resource leaks: close the current active connection if re-initializing
   if (dbConn) {
     try {
@@ -141,6 +145,7 @@ export function closeDatabase() {
 export function createRun({
   runId, subject, cardType, status, configHash, createdAt,
 }) {
+  logger.debug`Creating run record in DB: ${runId} (subject: ${subject}, cardType: ${cardType})`;
   const db = getDb();
   const dateVal = createdAt || new Date().toISOString();
   const stmt = db.prepare(`
@@ -159,6 +164,7 @@ export function createRun({
  * @throws {Error} If the run does not exist.
  */
 export function updateRunStatus(runId, status) {
+  logger.debug`Updating run status in DB for ${runId} to ${status}`;
   const db = getDb();
   const stmt = db.prepare(`
     UPDATE runs SET status = ? WHERE run_id = ?
@@ -214,6 +220,7 @@ export function deleteRun(runId) {
 export function addPipelineStep({
   runId, questionId, stage, provider, model, inputData, outputData, status = 'success', errors = null,
 }) {
+  logger.debug`Adding pipeline step in DB: run=${runId}, question=${questionId}, stage=${stage}, status=${status}`;
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO pipeline_steps (run_id, question_id, stage, provider, model, input_data, output_data, status, errors)
@@ -243,6 +250,7 @@ export function upsertQuestionEntry({
   latestResponse = null,
   errors = null,
 }) {
+  logger.debug`Upserting question entry in DB: run=${runId}, question=${questionId}, stage=${currentStage}`;
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO run_questions (run_id, question_id, current_stage, input_content, latest_prompt, latest_response, errors)

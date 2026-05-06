@@ -25,8 +25,8 @@ module.exports = {
     'no-underscore-dangle': 'off',
     // Allow await in retry/backoff loops
     'no-await-in-loop': 'off',
-    // Allow console.warn / console.error for logging warnings/errors in non-test envs
-    'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
+    // Allow console.log and console.error only for user-facing CLI output
+    'no-console': ['error', { allow: ['log', 'error'] }],
     // Relax rules for test files
     'no-unused-expressions': 'off',
     // Allow for...of loops in Node.js

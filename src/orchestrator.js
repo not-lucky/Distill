@@ -16,6 +16,9 @@ import {
   runStage1, runStage2, runStage3, cleanJsonOutput,
 } from './stages.js';
 import { postProcess } from './postProcess.js';
+import { getLogger } from './logger.js';
+
+const logger = getLogger(['orchestrator']);
 
 /**
  * Retrieves the enforcement step output from the database, parses it, and returns the JSON.
@@ -38,7 +41,7 @@ function getCompletedStage3Result(runId, questionId) {
     const cleaned = cleanJsonOutput(row.latest_response);
     return JSON.parse(cleaned);
   } catch (err) {
-    console.error(`Failed to parse completed question ${questionId} response from DB:`, err);
+    logger.error`Failed to parse completed question ${questionId} response from DB: ${err}`;
     return null;
   }
 }
@@ -269,13 +272,13 @@ export async function runPipeline({
       const qContent = question.content || '';
 
       if (!qId) {
-        console.warn('Skipping question because it is missing a valid identifier.');
+        logger.warn`Skipping question because it is missing a valid identifier.`;
         hasFailures = true;
         return { failure: true };
       }
 
       if (completedQuestions.has(qId)) {
-        console.info(`Skipping already completed question: ${qId}`);
+        logger.info`Skipping already completed question: ${qId}`;
         if (dryRun) {
           return { questionId: qId, dryRun: true };
         }
@@ -294,16 +297,16 @@ export async function runPipeline({
           });
           return { questionId: qId, skipped: true, postProcessedResult };
         }
-        console.warn(`Could not retrieve completed result for question: ${qId} from DB. Will re-process.`);
+        logger.warn`Could not retrieve completed result for question: ${qId} from DB. Will re-process.`;
       }
 
       if (dryRun) {
-        console.info(`[Dry-Run] Would process question: ${qId}`);
+        logger.info`[Dry-Run] Would process question: ${qId}`;
         return { questionId: qId, dryRun: true };
       }
 
       try {
-        console.info(`Processing question: ${qId}`);
+        logger.info`Processing question: ${qId}`;
 
         const stage1Results = await runStage1({
           runId,
@@ -359,7 +362,7 @@ export async function runPipeline({
 
         return { questionId: qId, postProcessedResult };
       } catch (error) {
-        console.error(`Error processing question "${qId}":`, error);
+        logger.error`Error processing question "${qId}": ${error}`;
         hasFailures = true;
         return { questionId: qId, error: true };
       }
@@ -436,7 +439,7 @@ export async function runPipeline({
       }
 
       try {
-        console.info(`Compiling deck for run: ${runId}`);
+        logger.info`Compiling deck for run: ${runId}`;
         await spawnCompiler(jsonPath, outputApkgPath, {
           deckName,
           subject,
@@ -449,7 +452,7 @@ export async function runPipeline({
           res.apkgPath = outputApkgPath;
         }
       } catch (err) {
-        console.error(`Compilation failed for run ${runId}:`, err);
+        logger.error`Compilation failed for run ${runId}: ${err}`;
         hasFailures = true;
       }
     }

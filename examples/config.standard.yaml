@@ -23,6 +23,11 @@ global:
   # Python compiler subprocess timeout in ms (src/orchestrator.js:405).
   # Omit to fall back to the spawnCompiler default of 60000 ms.
   compiler_timeout: 120000
+  # Minimum log level: "debug", "info", "warning", "error", "fatal"
+  log_level: "info"
+  # Directory for rotating log files (null to disable file logging, e.g., "./logs")
+  log_dir: null
+
 
 providers:
   openai:

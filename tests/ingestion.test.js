@@ -12,6 +12,7 @@ import {
   ingestFiles,
   ingestDocumentSources,
 } from '../src/ingestion.js';
+import { getLogger } from '../src/logger.js';
 
 const FIXTURES_DIR = path.resolve('./tests/fixtures_ingestion');
 
@@ -313,7 +314,7 @@ describe('Ingestion - Directory Ingestion', () => {
       symlinkCreated = true;
     } catch (e) {
       // Fallback in case sandbox does not allow symlink creation
-      console.warn('Skipping symlink test due to OS restrictions:', e.message);
+      console.log('Skipping symlink test due to OS restrictions:', e.message);
     }
 
     if (symlinkCreated) {
@@ -574,7 +575,8 @@ describe('Ingestion - Uncovered Branch Coverage', () => {
     // Remove read permission from subdirectory
     fs.chmodSync(unreadableDir, 0o000);
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const logger = getLogger(['ingestion']);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
     try {
       const results = await ingestDirectory(rootScanDir);
@@ -621,7 +623,8 @@ describe('Ingestion - Uncovered Branch Coverage', () => {
       }
     };
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const logger = getLogger(['ingestion']);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
     try {
       const filePath = path.join(FIXTURES_DIR, 'mock_decode_file.txt');
@@ -630,9 +633,8 @@ describe('Ingestion - Uncovered Branch Coverage', () => {
       const result = await readFileWithFallback(filePath);
       expect(result).toBeNull();
       expect(callCount).toBe(2); // Both UTF-8 and Latin-1 attempted
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to decode file'),
-      );
+      expect(warnSpy).toHaveBeenCalled();
+      expect(warnSpy.mock.calls.some((call) => Array.isArray(call[0]) && call[0][0] && call[0][0].includes('Failed to decode file'))).toBe(true);
     } finally {
       globalThis.TextDecoder = originalTextDecoder;
       warnSpy.mockRestore();
@@ -678,7 +680,8 @@ describe('Ingestion - Uncovered Branch Coverage', () => {
     // Remove read permission from the file itself
     fs.chmodSync(filePath, 0o000);
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const logger = getLogger(['ingestion']);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
     try {
       const results = await ingestDirectory(rootScanDir);
@@ -736,7 +739,8 @@ describe('Ingestion - Document Mode Helpers', () => {
     fs.writeFileSync(file1, 'valid text', 'utf8');
     fs.writeFileSync(fileEmpty, '   ', 'utf8');
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const logger = getLogger(['ingestion']);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     try {
       const results = await ingestFiles([file1, fileEmpty, fileMissing, 42]);
       expect(results.length).toBe(1);

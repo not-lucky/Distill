@@ -3,6 +3,9 @@ import OpenAI from 'openai';
 import { zodTextFormat, zodResponseFormat } from 'openai/helpers/zod';
 import pLimit from 'p-limit';
 import { getCache, setCache } from './database.js';
+import { getLogger } from './logger.js';
+
+const logger = getLogger(['providers']);
 
 // Counter map for round-robin key rotation per provider
 const _keyCounters = new Map();
@@ -59,9 +62,15 @@ export function computePromptHash(messages) {
 export async function checkCache(cacheKey) {
   try {
     const entry = getCache(cacheKey);
-    return entry ? entry.response : null;
+    if (entry) {
+      logger.debug`Cache hit for key: ${cacheKey}`;
+      return entry.response;
+    }
+    logger.debug`Cache miss for key: ${cacheKey}`;
+    return null;
   } catch (error) {
     // If database is not initialized, ignore cache read
+    logger.debug`Cache lookup ignored because DB is not initialized. Key: ${cacheKey}`;
     return null;
   }
 }
@@ -83,8 +92,10 @@ export async function writeCache({
     setCache({
       cacheKey, provider, model, promptHash, response,
     });
+    logger.debug`Cache write succeeded for key: ${cacheKey}`;
   } catch (error) {
     // If database is not initialized, ignore cache write
+    logger.debug`Cache write ignored because DB is not initialized. Key: ${cacheKey}`;
   }
 }
 
@@ -300,6 +311,9 @@ export async function callLLM({
     options.timeout = timeoutSec * 1000;
   }
 
+  const promptHash = computePromptHash(messages);
+  logger.debug`Calling LLM [${provider}/${model}] (Responses API: ${isResponsesApi}) with prompt hash: ${promptHash}, temp: ${actualTemperature}`;
+
   // 3. Retry loop with exponential backoff
   let attempt = 0;
   const baseDelay = 1000;
@@ -307,6 +321,7 @@ export async function callLLM({
 
   while (true) {
     try {
+      logger.debug`LLM Attempt ${attempt + 1}/${retries + 1} for [${provider}/${model}]...`;
       let content;
       if (isResponsesApi) {
         // Use Responses API client method. The resulting structured text response
@@ -328,8 +343,9 @@ export async function callLLM({
         throw new Error('Empty response payload');
       }
 
+      logger.debug`LLM [${provider}/${model}] call succeeded on attempt ${attempt + 1}. Response length: ${content.length} chars.`;
+
       // Write to cache
-      const promptHash = computePromptHash(messages);
       await writeCache({
         cacheKey, provider, model, promptHash, response: content,
       });
@@ -338,6 +354,7 @@ export async function callLLM({
     } catch (error) {
       attempt++;
       if (attempt > retries) {
+        logger.debug`LLM [${provider}/${model}] all attempts failed. Error: ${error.message}`;
         throw error;
       }
 
@@ -353,10 +370,12 @@ export async function callLLM({
       }
 
       if (!isRetryable) {
+        logger.debug`LLM [${provider}/${model}] failed with non-retryable error: ${error.message}`;
         throw error;
       }
 
       const delay = Math.min(baseDelay * 2 ** attempt, maxDelay);
+      logger.debug`LLM [${provider}/${model}] attempt ${attempt} failed with retryable error: ${error.message}. Retrying in ${delay}ms...`;
       await new Promise((resolve) => { setTimeout(resolve, delay); });
     }
   }

@@ -4,6 +4,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { loadConfig, deepMerge } from '../src/config.js';
+import { getLogger } from '../src/logger.js';
 
 // Absolute path to temporary test fixtures directory
 const FIXTURES_DIR = path.resolve('./tests/fixtures');
@@ -598,10 +599,11 @@ openai:
     expect(warnings.length).toBe(0);
   });
 
-  it('should log warnings via console.warn when NODE_ENV is not test', () => {
+  it('should log warnings via logger when NODE_ENV is not test', () => {
     // Missing config and keys files will generate warnings
     const originalNodeEnv = process.env.NODE_ENV;
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const logger = getLogger(['config']);
+    const warnSpy = vi.spyOn(logger, 'warn');
 
     try {
       process.env.NODE_ENV = 'development';
@@ -611,9 +613,9 @@ openai:
       );
 
       expect(warnings.length).toBeGreaterThan(0);
-      // console.warn should have been called for each warning
+      // logger.warn should have been called for each warning
       expect(warnSpy).toHaveBeenCalled();
-      expect(warnSpy.mock.calls.some((call) => call[0].includes('[Config Warning]'))).toBe(true);
+      expect(warnSpy.mock.calls.some((call) => typeof call[1] === 'string' && call[1].includes('Config file not found'))).toBe(true);
     } finally {
       process.env.NODE_ENV = originalNodeEnv;
       warnSpy.mockRestore();

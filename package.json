@@ -24,6 +24,8 @@
   },
   "homepage": "https://github.com/not-lucky/LLM2Deck#readme",
   "dependencies": {
+    "@logtape/file": "^2.1.1",
+    "@logtape/logtape": "^2.1.1",
     "better-sqlite3": "^12.10.0",
     "commander": "^15.0.0",
     "js-yaml": "^4.1.1",

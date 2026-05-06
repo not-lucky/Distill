@@ -166,6 +166,28 @@ subjects:
     # folder: "./scratch/notes"
 ```
 
+### 4. Logging Configuration
+
+Logging is powered by LogTape, supporting hierarchical category filtering, colored terminal output, and optional daily rotating log files.
+
+You can customize logging in the `global` section of `config.yaml`:
+
+```yaml
+global:
+  log_level: "info"       # Minimum log level: "debug", "info", "warning", "error", "fatal"
+  log_dir: null           # Directory for rotating log files (null to disable file logging, e.g., "./logs")
+```
+
+#### CLI Log Overrides
+You can override the log level on the fly for any command (`run`, `compile`, or `cache`):
+* `-v, --verbose`: Sets the log level to `debug` for detailed step-by-step trace logging.
+* `-q, --quiet`: Sets the log level to `error` to suppress progress logs and only show errors.
+
+Example:
+```bash
+node src/cli.js run leetcode --verbose
+```
+
 ---
 
 ## Example Configurations
