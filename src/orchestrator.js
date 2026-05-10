@@ -21,29 +21,32 @@ import { getLogger } from './logger.js';
 const logger = getLogger(['orchestrator']);
 
 /**
- * Retrieves the enforcement step output from the database, parses it, and returns the JSON.
+ * Retrieves all completed enforcement step outputs from the database for the given runId,
+ * parses them, and returns a Map mapping questionId to the parsed JSON.
  * This is crucial during resumption to pull previously generated card data out of the DB,
  * ensuring all completed topics of the run are merged into the final consolidated output files.
  *
  * @param {string} runId
- * @param {string} questionId
- * @returns {Object|null} Conforming JSON object or null.
+ * @returns {Map<string, Object>} Map mapping question ID to conforming JSON object.
  */
-function getCompletedStage3Result(runId, questionId) {
+export function getCompletedStage3Results(runId) {
   const db = getDb();
   const stmt = db.prepare(`
-    SELECT latest_response FROM run_questions
-    WHERE run_id = ? AND question_id = ? AND current_stage = 'enforcement'
+    SELECT question_id, latest_response FROM run_questions
+    WHERE run_id = ? AND current_stage = 'enforcement'
   `);
-  const row = stmt.get(runId, questionId);
-  if (!row || !row.latest_response) return null;
-  try {
-    const cleaned = cleanJsonOutput(row.latest_response);
-    return JSON.parse(cleaned);
-  } catch (err) {
-    logger.error`Failed to parse completed question ${questionId} response from DB: ${err}`;
-    return null;
+  const rows = stmt.all(runId);
+  const results = new Map();
+  for (const row of rows) {
+    if (!row || !row.latest_response) continue;
+    try {
+      const cleaned = cleanJsonOutput(row.latest_response);
+      results.set(row.question_id, JSON.parse(cleaned));
+    } catch (err) {
+      logger.error`Failed to parse completed question ${row.question_id} response from DB: ${err}`;
+    }
   }
+  return results;
 }
 
 /**
@@ -211,6 +214,7 @@ export async function runPipeline({
   try {
     let runId;
     let completedQuestions = new Set();
+    let completedStage3Results = new Map();
     let createdAtIso;
 
     if (resumeRunId) {
@@ -225,6 +229,7 @@ export async function runPipeline({
         updateRunStatus(runId, 'running');
       }
       completedQuestions = getCompletedQuestions(runId);
+      completedStage3Results = getCompletedStage3Results(runId);
     } else {
       runId = crypto.randomUUID();
       createdAtIso = new Date().toISOString();
@@ -283,7 +288,7 @@ export async function runPipeline({
           return { questionId: qId, dryRun: true };
         }
 
-        const completedResult = getCompletedStage3Result(runId, qId);
+        const completedResult = completedStage3Results.get(qId);
         if (completedResult) {
           const metadata = question.metadata || {};
           const postProcessedResult = postProcess(completedResult, {

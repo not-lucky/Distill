@@ -19,6 +19,7 @@ import {
   sanitizeFilename,
   spawnCompiler,
   getCompletedQuestions,
+  getCompletedStage3Results,
   runPipeline,
 } from '../src/orchestrator.js';
 
@@ -320,6 +321,59 @@ describe('Orchestrator Module', () => {
       expect(completed.has('q1')).toBe(true);
       expect(completed.has('q2')).toBe(false);
       expect(completed.size).toBe(1);
+    });
+  });
+
+  describe('getCompletedStage3Results', () => {
+    it('should load and parse completed stage 3 results correctly', () => {
+      const runId = 'run-bulk-comp-test';
+      createRun({
+        runId,
+        subject: 'Algorithms',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash-bulk-comp',
+      });
+
+      // q1 is completed with valid JSON response
+      upsertQuestionEntry({
+        runId,
+        questionId: 'q1',
+        currentStage: 'enforcement',
+        latestResponse: JSON.stringify({ title: 'Mock Q1' }),
+      });
+
+      // q2 has null response
+      upsertQuestionEntry({
+        runId,
+        questionId: 'q2',
+        currentStage: 'enforcement',
+        latestResponse: null,
+      });
+
+      // q3 has invalid JSON response
+      upsertQuestionEntry({
+        runId,
+        questionId: 'q3',
+        currentStage: 'enforcement',
+        latestResponse: 'invalid json',
+      });
+
+      // q4 has no enforcement stage (generation stage)
+      upsertQuestionEntry({
+        runId,
+        questionId: 'q4',
+        currentStage: 'generation',
+        latestResponse: JSON.stringify({ title: 'Mock Q4' }),
+      });
+
+      const results = getCompletedStage3Results(runId);
+      expect(results.size).toBe(1);
+      expect(results.has('q1')).toBe(true);
+      expect(results.get('q1')).toEqual({ title: 'Mock Q1' });
+      expect(results.has('q2')).toBe(false);
+      expect(results.has('q3')).toBe(false);
+      expect(results.has('q4')).toBe(false);
     });
   });
 
