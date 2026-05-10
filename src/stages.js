@@ -341,7 +341,7 @@ export function normalizeJsonObj(jsonObj, questionId, subject = '') {
         delete card.back;
         delete card.options;
         delete card.correct_answer;
-      } else if (card.card_format === 'MCQ') {
+      } else { // MCQ
         delete card.back;
         if (!Array.isArray(card.options)) {
           card.options = ['Option A', 'Option B'];
