@@ -308,13 +308,13 @@ program
       });
 
       logger.debug`Starting cache command with action: ${action}`;
-      const dbPath = path.resolve(process.cwd(), config?.global?.cache_db_path || './llm2deck.db');
+      const dbPath = path.resolve(process.cwd(), config.global.cache_db_path || './llm2deck.db');
       initDatabase(dbPath);
 
       if (action === 'clear') {
         clearCache();
         console.log('Cache cleared successfully.');
-      } else if (action === 'stats') {
+      } else { // stats
         const stats = getCacheStats();
         console.log(`Total cached queries: ${stats.count}`);
       }

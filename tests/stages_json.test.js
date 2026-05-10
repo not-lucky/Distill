@@ -221,6 +221,58 @@ Card 2 Front: What is JSX?
       expect(result.cards[0].tags).toEqual([]);
       expect(result.cards[1].tags).toEqual(['valid-tag']);
     });
+
+    it('should infer card_format if missing or invalid', () => {
+      const input = {
+        cards: [
+          {
+            front: 'MCQ Front',
+            options: ['Option A', 'Option B'],
+            correct_answer: 'A',
+          },
+          {
+            front: 'Cloze {{c1::deletion}} here',
+          },
+          {
+            front: 'Basic front',
+          },
+        ],
+      };
+      const result = normalizeJsonObj(input, 'q');
+      expect(result.cards[0].card_format).toBe('MCQ');
+      expect(result.cards[1].card_format).toBe('Cloze');
+      expect(result.cards[2].card_format).toBe('Basic');
+    });
+
+    it('should default options and correct_answer for MCQ when missing/invalid', () => {
+      const input = {
+        cards: [
+          {
+            card_format: 'MCQ',
+            options: null,
+            correct_answer: 'invalid-choice',
+          },
+        ],
+      };
+      const result = normalizeJsonObj(input, 'q');
+      expect(result.cards[0].options).toEqual(['Option A', 'Option B']);
+      expect(result.cards[0].correct_answer).toBe('A');
+    });
+
+    it('should fallback to Flashcards title if questionId is empty', () => {
+      const input = { cards: [] };
+      const result = normalizeJsonObj(input, '');
+      expect(result.title).toBe('Flashcards');
+    });
+
+    it('should return card as is if it is null or not an object in cards array', () => {
+      const input = {
+        cards: [null, 123],
+      };
+      const result = normalizeJsonObj(input, 'q');
+      expect(result.cards[0]).toBeNull();
+      expect(result.cards[1]).toBe(123);
+    });
   });
 
   describe('runStage3 main function', () => {

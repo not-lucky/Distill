@@ -44,6 +44,16 @@ describe('CLI Commands Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(closeDatabase).mockReset();
+    vi.mocked(getCacheStats).mockReset();
+    vi.mocked(clearCache).mockReset();
+    vi.mocked(initDatabase).mockReset();
+    vi.mocked(runPipeline).mockReset();
+    vi.mocked(spawnCompiler).mockReset();
+    vi.mocked(loadConfig).mockReset();
+    vi.mocked(ingestDirectory).mockReset();
+    vi.mocked(loadPreset).mockReset();
+    vi.mocked(ingestDocumentSources).mockReset();
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -666,6 +676,38 @@ describe('CLI Commands Integration', () => {
       );
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
+
+    it('should set log level to debug when verbose is passed', async () => {
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { global: { output_dir: './output' } },
+        keys: { openai: 'key' },
+        prompts: { subjects: { leetcode: { categories: [{ name: 'A', topics: ['B'] }] } } },
+      });
+      vi.mocked(runPipeline).mockResolvedValue({
+        runId: 'test-run-id',
+        results: [],
+        hasFailures: false,
+      });
+
+      await program.parseAsync(['node', 'src/cli.js', 'run', 'leetcode', '--verbose']);
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('should set log level to error when quiet is passed', async () => {
+      vi.mocked(loadConfig).mockReturnValue({
+        config: { global: { cache_db_path: './llm2deck.db', output_dir: './output' } },
+        keys: { openai: 'key' },
+        prompts: { subjects: { leetcode: { categories: [{ name: 'A', topics: ['B'] }] } } },
+      });
+      vi.mocked(runPipeline).mockResolvedValue({
+        runId: 'test-run-id',
+        results: [],
+        hasFailures: false,
+      });
+
+      await program.parseAsync(['node', 'src/cli.js', 'run', 'leetcode', '--quiet']);
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
   });
 
   describe('compile command', () => {
@@ -741,6 +783,24 @@ describe('CLI Commands Integration', () => {
       );
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
+
+    it('should set log level to debug when verbose is passed', async () => {
+      existsSyncSpy.mockReturnValue(true);
+      vi.mocked(loadConfig).mockReturnValue({ config: { global: { output_dir: './output' } } });
+      vi.mocked(spawnCompiler).mockResolvedValue({ code: 0, stdout: '', stderr: '' });
+
+      await program.parseAsync(['node', 'src/cli.js', 'compile', 'input.json', '--verbose']);
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('should set log level to error when quiet is passed', async () => {
+      existsSyncSpy.mockReturnValue(true);
+      vi.mocked(loadConfig).mockReturnValue({ config: { global: { output_dir: './output' } } });
+      vi.mocked(spawnCompiler).mockResolvedValue({ code: 0, stdout: '', stderr: '' });
+
+      await program.parseAsync(['node', 'src/cli.js', 'compile', 'input.json', '--quiet']);
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
   });
 
   describe('cache command', () => {
@@ -813,6 +873,22 @@ describe('CLI Commands Integration', () => {
         expect.stringContaining('Cache command failed: Stats failed'),
       );
       expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('should set log level to debug when verbose is passed', async () => {
+      vi.mocked(loadConfig).mockReturnValue({ config: { global: {} } });
+      vi.mocked(getCacheStats).mockReturnValue({ count: 42 });
+
+      await program.parseAsync(['node', 'src/cli.js', 'cache', 'stats', '--verbose']);
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('should set log level to error when quiet is passed', async () => {
+      vi.mocked(loadConfig).mockReturnValue({ config: { global: { cache_db_path: './llm2deck.db' } } });
+      vi.mocked(getCacheStats).mockReturnValue({ count: 42 });
+
+      await program.parseAsync(['node', 'src/cli.js', 'cache', 'stats', '--quiet']);
+      expect(exitSpy).toHaveBeenCalledWith(0);
     });
   });
 
