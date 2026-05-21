@@ -1,0 +1,42 @@
+# Pre-commit hooks for LLM2Deck
+# Install with: uv run pre-commit install
+# Run on demand: uv run pre-commit run --all-files
+# Note: ruff/black/mypy-via-ty are run via `uv run` so we don't need extra packages.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff (lint)
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python]
+        files: ^(src|tests)/.*\.py$
+
+      - id: ruff-format
+        name: ruff (format)
+        entry: uv run ruff format
+        language: system
+        types_or: [python]
+        files: ^(src|tests)/.*\.py$
+
+      - id: ty-check
+        name: ty (type check)
+        entry: uv run ty check src
+        language: system
+        types_or: [python]
+        files: ^src/.*\.py$
+        pass_filenames: false
+
+      - id: eslint
+        name: eslint
+        entry: npx eslint --fix
+        language: system
+        types_or: [javascript]
+        files: ^(src|scripts|tests)/.*\.js$
+
+      - id: prettier
+        name: prettier
+        entry: npx prettier --write
+        language: system
+        types_or: [javascript, json, yaml, markdown]
+        files: \.(js|json|ya?ml|md)$

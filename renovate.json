@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":automergeDisabled"],
+  "minimumReleaseAge": "7 days",
+  "stabilityDays": 7,
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 5,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Group patch updates for npm into a single PR",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["patch"],
+      "groupName": "npm patch updates",
+      "groupSlug": "npm-patch"
+    },
+    {
+      "description": "Group minor updates for npm into a single PR",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "npm minor updates",
+      "groupSlug": "npm-minor"
+    },
+    {
+      "description": "Separate major bumps require manual review",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "npm major updates",
+      "labels": ["dependencies", "breaking"]
+    },
+    {
+      "description": "Wait 7 days before any Python dep update (supply-chain safety)",
+      "matchManagers": ["pep621", "pip_requirements"],
+      "minimumReleaseAge": "7 days"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  }
+}

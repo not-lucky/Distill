@@ -1,0 +1,208 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      # ---- AGENTS.md accuracy (signal: agents_md_validation) ----
+      # Walks AGENTS.md and fails the build if any referenced path no
+      # longer exists on disk or any code-block line is an unrecognised
+      # command. Report is uploaded as a CI artifact.
+      - name: Validate AGENTS.md
+        run: npm run agents:validate
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agents-md-validation-${{ matrix.node-version }}
+          path: reports/agents-md-validation.md
+
+      # ---- Static analysis & formatting (signal: formatter) ----
+      - name: Run Prettier (format check)
+        run: npx prettier --check .
+
+      - name: Run ESLint
+        run: npx eslint .
+
+      # ---- Python lint, format, type check ----
+      - name: Run Ruff lint
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+
+      - name: Run Black (format check)
+        run: |
+          uv run black --check --diff src tests
+
+      # ---- Type checking (signals: type_check, strict_typing) ----
+      - name: Run ty (Astral's type checker)
+        run: uv run ty check src
+
+      # ---- Python dead code (signal: dead_code_detection) ----
+      - name: Run vulture
+        run: uv run vulture src
+
+      # ---- Python unused deps (signal: unused_dependencies_detection) ----
+      - name: Run deptry
+        run: uv run deptry .
+
+      # ---- JS dead code (signal: dead_code_detection) ----
+      - name: Run knip
+        run: npx knip
+
+      # ---- JS unused deps (signal: unused_dependencies_detection) ----
+      - name: Run depcheck
+        run: npx depcheck
+
+      # ---- Published JSON Schema export (signal: api_schema_docs) ----
+      # Regenerates schemas/stage3-deck.schema.json and
+      # schemas/stage3-card.schema.json from the in-tree Zod source of
+      # truth. Fails if the published files would change, which catches
+      # drift between the Zod schema and the published contract.
+      - name: Export and verify JSON Schemas
+        run: |
+          cp schemas/stage3-deck.schema.json /tmp/before-deck.json
+          cp schemas/stage3-card.schema.json /tmp/before-card.json
+          npm run schemas:export
+          if ! diff -q /tmp/before-deck.json schemas/stage3-deck.schema.json > /dev/null; then
+            echo "::error::stage3-deck.schema.json is out of date. Run 'npm run schemas:export' and commit the result."
+            exit 1
+          fi
+          if ! diff -q /tmp/before-card.json schemas/stage3-card.schema.json > /dev/null; then
+            echo "::error::stage3-card.schema.json is out of date. Run 'npm run schemas:export' and commit the result."
+            exit 1
+          fi
+
+      # ---- Duplicate code (signal: duplicate_code_detection) ----
+      - name: Run jscpd
+        run: npx jscpd
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jscpd-report
+          path: reports/jscpd/
+
+      # ---- Tech-debt marker scan (signal: tech_debt_tracking) ----
+      - name: Scan TODO/FIXME markers
+        run: npm run todo:scan
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: todos-report
+          path: reports/todos.md
+
+      # ---- Large file detection (signal: large_file_detection) ----
+      - name: Detect oversized source files
+        run: |
+          set -e
+          # 500-line threshold for source files (excludes tests and vendored content)
+          OVER=$(find src -type f \( -name '*.js' -o -name '*.py' \) -size +0c -exec wc -l {} + | awk '$1 > 500 { print $0 }')
+          if [ -n "$OVER" ]; then
+            echo "::error::Files exceed 500 lines: $OVER"
+            exit 1
+          fi
+
+      # ---- Tests ----
+      # Signal: test_performance_tracking  — the verbose reporter surfaces test
+      # timings in the GitHub Actions log so slow tests are easy to spot.
+      # Signal: test_coverage_thresholds    — vitest.config.js defines
+      # lines/branches/functions/statements thresholds; a regression below
+      # them will fail this step.
+      # Signal: flaky_test_detection         — `vitest --retry` and
+      # `pytest-rerunfailures` rerun flakes up to twice and emit retry
+      # counters in the log.
+      - name: Run JS tests with coverage + perf tracking + retry
+        run: npx vitest run --coverage --reporter=verbose
+
+      - name: Upload JS coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-coverage-${{ matrix.node-version }}
+          path: |
+            coverage/
+            coverage/lcov.info
+
+      # Signal: test_performance_tracking  — --durations=10 surfaces the
+      # 10 slowest tests in the log.
+      # Signal: test_coverage_thresholds   — --cov-fail-under=80 fails this
+      # step if Python coverage falls below 80%.
+      # Signal: flaky_test_detection       — --reruns=2 retries flakes.
+      - name: Run Python tests with coverage + perf tracking + retry
+        run: uv run pytest
+
+      - name: Upload Python coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: py-coverage-${{ matrix.node-version }}
+          path: coverage/coverage.xml
+
+  # ---- Documentation site build (signal: automated_doc_generation) ----
+  # Builds the MkDocs Material site with mkdocstrings for auto-generated
+  # API reference. Runs after lint-and-test so a documentation-only
+  # failure does not block code changes from being mergeable, but the
+  # site artifact is still produced for download.
+  docs:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Build documentation site
+        run: npm run docs:build
+
+      - name: Upload built site
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: site/

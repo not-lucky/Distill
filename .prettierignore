@@ -1,0 +1,15 @@
+node_modules/
+coverage/
+output/
+logs/
+.archived/
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.db
+package-lock.json
+uv.lock
+reports/
+tests/temp_out_*/
+schemas/

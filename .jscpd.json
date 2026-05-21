@@ -1,0 +1,20 @@
+{
+  "threshold": 10,
+  "reporters": ["html", "console", "json"],
+  "output": "reports/jscpd",
+  "format": ["javascript", "python"],
+  "ignore": [
+    "node_modules",
+    "coverage",
+    "output",
+    "logs",
+    ".archived",
+    ".venv",
+    "tests",
+    "examples",
+    "reports"
+  ],
+  "absolute": false,
+  "noSymlinks": true,
+  "skipLocal": false
+}
