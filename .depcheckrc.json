@@ -1,0 +1,15 @@
+{
+  "ignores": [
+    "@eslint/js",
+    "@logtape/file",
+    "@logtape/logtape",
+    "@vitest/coverage-v8",
+    "eslint-plugin-import-x",
+    "eslint-plugin-n",
+    "eslint-plugin-boundaries",
+    "globals",
+    "vitest"
+  ],
+  "ignorePatterns": ["tests/**", "scripts/**", ".archived/**", "examples/**"],
+  "ignoreMatches": ["lint-staged", "husky"]
+}
