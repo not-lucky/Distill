@@ -1,11 +1,7 @@
-import {
-  vi, describe, it, expect, beforeEach, beforeAll, afterAll,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import OpenAI from 'openai';
 import { z } from 'zod';
-import {
-  initDatabase, closeDatabase, clearCache, getCacheStats,
-} from '../src/database.js';
+import { initDatabase, closeDatabase, clearCache, getCacheStats } from '../src/database.js';
 import {
   computeCacheKey,
   computePromptHash,
@@ -173,13 +169,15 @@ describe('Providers Module', () => {
 
     it('should ignore cache write if database throws an error', async () => {
       closeDatabase();
-      await expect(writeCache({
-        cacheKey: 'dummy-key',
-        provider: 'openai',
-        model: 'gpt-4',
-        promptHash: 'prompt-hash',
-        response: 'cached output',
-      })).resolves.not.toThrow();
+      await expect(
+        writeCache({
+          cacheKey: 'dummy-key',
+          provider: 'openai',
+          model: 'gpt-4',
+          promptHash: 'prompt-hash',
+          response: 'cached output',
+        }),
+      ).resolves.not.toThrow();
       initDatabase(':memory:');
     });
   });
@@ -285,7 +283,9 @@ describe('Providers Module', () => {
         activeCount++;
         maxActiveCount = Math.max(maxActiveCount, activeCount);
         // Simulate a brief async delay
-        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        });
         activeCount--;
       };
 
@@ -328,8 +328,8 @@ describe('Providers Module', () => {
       config.global.request_delay = -0.5;
       const throttledFetch = createThrottledFetcher(config);
       const start = Date.now();
-      await throttledFetch(async () => { });
-      await throttledFetch(async () => { });
+      await throttledFetch(async () => {});
+      await throttledFetch(async () => {});
       expect(Date.now() - start).toBeLessThan(100);
     });
   });
@@ -460,10 +460,26 @@ describe('Providers Module', () => {
       }
 
       // Check the keys passed in options
-      expect(createSpy).toHaveBeenNthCalledWith(1, expect.any(Object), expect.objectContaining({ apiKey: 'key-op-1' }));
-      expect(createSpy).toHaveBeenNthCalledWith(2, expect.any(Object), expect.objectContaining({ apiKey: 'key-op-2' }));
-      expect(createSpy).toHaveBeenNthCalledWith(3, expect.any(Object), expect.objectContaining({ apiKey: 'key-op-3' }));
-      expect(createSpy).toHaveBeenNthCalledWith(4, expect.any(Object), expect.objectContaining({ apiKey: 'key-op-1' })); // wraps around
+      expect(createSpy).toHaveBeenNthCalledWith(
+        1,
+        expect.any(Object),
+        expect.objectContaining({ apiKey: 'key-op-1' }),
+      );
+      expect(createSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.any(Object),
+        expect.objectContaining({ apiKey: 'key-op-2' }),
+      );
+      expect(createSpy).toHaveBeenNthCalledWith(
+        3,
+        expect.any(Object),
+        expect.objectContaining({ apiKey: 'key-op-3' }),
+      );
+      expect(createSpy).toHaveBeenNthCalledWith(
+        4,
+        expect.any(Object),
+        expect.objectContaining({ apiKey: 'key-op-1' }),
+      ); // wraps around
     });
 
     it('should throw immediately for non-retryable HTTP errors (e.g. 401 Unauthorized)', async () => {
@@ -473,7 +489,9 @@ describe('Providers Module', () => {
       const authError = new Error('Unauthorized');
       authError.status = 401; // Not 429 or 5xx
 
-      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockRejectedValue(authError);
+      const createSpy = vi
+        .spyOn(openaiClient.chat.completions, 'create')
+        .mockRejectedValue(authError);
 
       await expect(
         callLLM({
@@ -500,7 +518,8 @@ describe('Providers Module', () => {
       const rateLimitError = new Error('Too Many Requests');
       rateLimitError.status = 429;
 
-      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create')
+      const createSpy = vi
+        .spyOn(openaiClient.chat.completions, 'create')
         .mockRejectedValueOnce(rateLimitError)
         .mockRejectedValueOnce(rateLimitError)
         .mockResolvedValueOnce({
@@ -540,7 +559,8 @@ describe('Providers Module', () => {
       const messages = [{ role: 'user', content: 'Empty check' }];
       const openaiClient = clients.get('openai');
 
-      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create')
+      const createSpy = vi
+        .spyOn(openaiClient.chat.completions, 'create')
         .mockResolvedValueOnce({ choices: [{ message: { content: '' } }] }) // Empty string
         .mockResolvedValueOnce({ choices: [{ message: { content: 'Not empty' } }] });
 
@@ -570,7 +590,9 @@ describe('Providers Module', () => {
       const serverError = new Error('Server Error');
       serverError.status = 502;
 
-      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockRejectedValue(serverError);
+      const createSpy = vi
+        .spyOn(openaiClient.chat.completions, 'create')
+        .mockRejectedValue(serverError);
 
       const callPromise = callLLM({
         provider: 'openai',

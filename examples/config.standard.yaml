@@ -13,32 +13,31 @@ global:
   # providers.<name>.timeout (see src/providers.js).
   default_timeout: 500.0
   # Where final compiled .apkg and intermediate JSON files land.
-  output_dir: "./output"
+  output_dir: './output'
   # SQLite cache for runs, steps, and LLM response cache.
-  cache_db_path: "./llm2deck.db"
+  cache_db_path: './llm2deck.db'
   # Where API keys live (kept separate from version control).
-  keys_file_path: "./keys.yaml"
+  keys_file_path: './keys.yaml'
   # Custom prompts + subject presets.
-  prompts_file_path: "./prompts.yaml"
+  prompts_file_path: './prompts.yaml'
   # Python compiler subprocess timeout in ms (src/orchestrator.js:405).
   # Omit to fall back to the spawnCompiler default of 60000 ms.
   compiler_timeout: 120000
   # Minimum log level: "debug", "info", "warning", "error", "fatal"
-  log_level: "info"
+  log_level: 'info'
   # Directory for rotating log files (null to disable file logging, e.g., "./logs")
   log_dir: null
 
-
 providers:
   openai:
-    base_url: "https://api.openai.com/v1"
+    base_url: 'https://api.openai.com/v1'
     temperature: 0.3
   cerebras:
-    base_url: "https://api.cerebras.ai/v1"
+    base_url: 'https://api.cerebras.ai/v1'
     temperature: 0.2
   # ollama_local is exempted from API key checks in src/config.js:83.
   ollama_local:
-    base_url: "http://localhost:11434/v1"
+    base_url: 'http://localhost:11434/v1'
     temperature: 0.0
 
 pipeline:
@@ -46,14 +45,14 @@ pipeline:
   # their outputs are merged in Stage 2.
   generation:
     models:
-      - "openai/gpt-3.5-turbo"
-      - "cerebras/llama3.1-70b"
+      - 'openai/gpt-3.5-turbo'
+      - 'cerebras/llama3.1-70b'
   # Stage 2: Frontier model consolidates Stage 1 outputs and deduplicates.
   synthesis:
-    model: "openai/gpt-4o"
+    model: 'openai/gpt-4o'
   # Stage 4: Converts the consolidated text into strict JSON matching
   # CARD_JSON_SCHEMA (src/prompts.js). Includes a recovery retry loop.
   schema_enforcement:
-    model: "openai/gpt-3.5-turbo"
+    model: 'openai/gpt-3.5-turbo'
     # Bypass responses API and force traditional chat completions API (boolean, defaults to false)
     use_completion_api: false

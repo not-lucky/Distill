@@ -7,7 +7,7 @@ subjects:
     # Topic mode is the default when `mode` is omitted. The pipeline walks
     # categories[].topics[] to build the question list.
     categories:
-      - name: "Basics"
+      - name: 'Basics'
         topics:
-          - "Hello World"
-          - "Variables and Types"
+          - 'Hello World'
+          - 'Variables and Types'

@@ -22,7 +22,7 @@ defaults:
     Exhaustiveness & Card Count Requirements:
     - You MUST generate a large, highly detailed deck to achieve exhaustive coverage:
       - Generate a minimum of 20 distinct, high-quality flashcards even for trivial topics.
-      - Generate up to 100 distinct, high-quality flashcards for complex, detailed topics.
+      - Generate up to 50 distinct, high-quality flashcards for complex, detailed topics.
       - Do not settle for a high-level summary or stop generating after a few basic concepts.
     - Systematically walk through the topic's facets. A complete set must test:
       1. Core definition, primary mechanisms, and foundational principles.
@@ -100,19 +100,19 @@ subjects:
       recurrence-relation details for DP problems. Preserve any pseudocode
       blocks verbatim. Do not drop edge-case coverage.
     categories:
-      - name: "Arrays & Hashing"
+      - name: 'Arrays & Hashing'
         topics:
-          - "Two Sum"
+          - 'Two Sum'
       #     - "Group Anagrams"
       #     - "Top K Frequent Elements"
-      # - name: "Two Pointers"
-      #   topics:
-      #     - "Valid Palindrome"
-      #     - "Container With Most Water"
-      # - name: "Dynamic Programming"
-      #   topics:
-      #     - "Climbing Stairs"
-      #     - "Longest Common Subsequence"
+      - name: 'Two Pointers'
+        topics:
+          # - "Valid Palindrome"
+          - 'Container With Most Water'
+      - name: 'Dynamic Programming'
+        topics:
+          # - "Climbing Stairs"
+          - 'Longest Common Subsequence'
 
   # ---- Document mode subject ----
   # Active when: `node src/cli.js run notes`
@@ -127,8 +127,8 @@ subjects:
       Preserve code blocks verbatim. Tag each card with the source file name.
     # Provide an explicit list of files...
     files:
-      - "./scratch/doc1.txt"
-      - "./scratch/doc2.md"
+      - './scratch/doc1.txt'
+      - './scratch/doc2.md'
     # ...OR a folder to recurse into. The folder walker accepts
     # .txt, .md, .markdown, .html, .htm, .rst (src/ingestion.js:126).
     # folder: "./scratch/notes"

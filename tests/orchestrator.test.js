@@ -1,6 +1,4 @@
-import {
-  vi, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -38,10 +36,10 @@ vi.mock('child_process', () => ({
   spawn: vi.fn(),
 }));
 
-vi.mock('../src/stages.js', () => ({
-  runStage1: vi.fn().mockImplementation(async ({ runId, questionId }) => {
+vi.mock('../src/pipeline/stages/index.js', () => ({
+  runStage1: vi.fn().mockImplementation(async (ctx, { questionId }) => {
     addPipelineStep({
-      runId,
+      runId: ctx.runId,
       questionId,
       stage: 'generation',
       provider: 'mock-provider',
@@ -51,9 +49,9 @@ vi.mock('../src/stages.js', () => ({
     });
     return [{ provider: 'mock-provider', model: 'gen-model', output: 'stage1-output' }];
   }),
-  runStage2: vi.fn().mockImplementation(async ({ runId, questionId }) => {
+  runStage2: vi.fn().mockImplementation(async (ctx, { questionId }) => {
     addPipelineStep({
-      runId,
+      runId: ctx.runId,
       questionId,
       stage: 'synthesis',
       provider: 'mock-provider',
@@ -63,9 +61,9 @@ vi.mock('../src/stages.js', () => ({
     });
     return 'stage2-output';
   }),
-  runStage3: vi.fn().mockImplementation(async ({ runId, questionId }) => {
+  runStage3: vi.fn().mockImplementation(async (ctx, { questionId }) => {
     addPipelineStep({
-      runId,
+      runId: ctx.runId,
       questionId,
       stage: 'enforcement',
       provider: 'mock-provider',
@@ -88,7 +86,6 @@ vi.mock('../src/stages.js', () => ({
       ],
     };
   }),
-  cleanJsonOutput: vi.fn().mockImplementation((text) => text),
 }));
 
 describe('Orchestrator Module', () => {
@@ -230,11 +227,7 @@ describe('Orchestrator Module', () => {
 
       const res = await promise;
       expect(res.code).toBe(0);
-      expect(spawn).toHaveBeenCalledWith('uv', [
-        'run',
-        'src/compile.py',
-        'input.json',
-      ]);
+      expect(spawn).toHaveBeenCalledWith('uv', ['run', 'src/compile.py', 'input.json']);
     });
 
     it('should reject and terminate process if execution exceeds timeout limit', async () => {
@@ -429,9 +422,7 @@ describe('Orchestrator Module', () => {
         mockChild.emit('close', 0);
       });
 
-      const questions = [
-        { questionId: 'q-test-flow-1', content: 'content 1' },
-      ];
+      const questions = [{ questionId: 'q-test-flow-1', content: 'content 1' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -565,9 +556,7 @@ describe('Orchestrator Module', () => {
     });
 
     it('should handle dry-run mode correctly', async () => {
-      const questions = [
-        { questionId: 'q-dry-1', content: 'content 1' },
-      ];
+      const questions = [{ questionId: 'q-dry-1', content: 'content 1' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -585,11 +574,11 @@ describe('Orchestrator Module', () => {
     });
 
     it('should tolerate failures in individual questions and mark run failed', async () => {
-      const stages = await import('../src/stages.js');
+      const stages = await import('../src/pipeline/stages/index.js');
       const originalStage1 = stages.runStage1;
 
       // Mock runStage1 to throw on q-fail
-      vi.mocked(originalStage1).mockImplementationOnce(async ({ questionId }) => {
+      vi.mocked(originalStage1).mockImplementationOnce(async (ctx, { questionId }) => {
         if (questionId === 'q-fail') {
           throw new Error('Stage 1 Simulation Failure');
         }
@@ -644,7 +633,9 @@ describe('Orchestrator Module', () => {
 
       expect(res.hasFailures).toBe(false);
       const expectedFilename = `${res.results[0].apkgPath.split('/').pop()}`;
-      expect(expectedFilename).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_[0-9a-fA-F-]+\.apkg$/);
+      expect(expectedFilename).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_[0-9a-fA-F-]+\.apkg$/,
+      );
       expect(res.results[0].apkgPath).toBe(path.join(customDir, expectedFilename));
       expect(fs.existsSync(customDir)).toBe(true);
     });
@@ -690,9 +681,7 @@ describe('Orchestrator Module', () => {
       // Verify that the database is closed (getDb should throw an error)
       expect(() => getDb()).toThrow();
 
-      const questions = [
-        { questionId: 'q-init-db', content: 'content' },
-      ];
+      const questions = [{ questionId: 'q-init-db', content: 'content' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -736,9 +725,7 @@ describe('Orchestrator Module', () => {
       // Intent: Verify that the orchestrator creates the intermediate JSON output directory
       // recursively if it is missing at run time.
       const nestedOutputDir = path.join(tempOutputDir, 'nested_dir_not_exists');
-      const questions = [
-        { questionId: 'q-mkdir-test', content: 'content' },
-      ];
+      const questions = [{ questionId: 'q-mkdir-test', content: 'content' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -759,9 +746,7 @@ describe('Orchestrator Module', () => {
       const existingDir = path.join(tempOutputDir, 'existing_dir');
       fs.mkdirSync(existingDir, { recursive: true });
 
-      const questions = [
-        { questionId: 'q-existing-dir-test', content: 'content' },
-      ];
+      const questions = [{ questionId: 'q-existing-dir-test', content: 'content' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -775,7 +760,9 @@ describe('Orchestrator Module', () => {
 
       expect(res.hasFailures).toBe(false);
       const expectedFilename = `${res.results[0].apkgPath.split('/').pop()}`;
-      expect(expectedFilename).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_[0-9a-fA-F-]+\.apkg$/);
+      expect(expectedFilename).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_[0-9a-fA-F-]+\.apkg$/,
+      );
       expect(res.results[0].apkgPath).toBe(path.join(existingDir, expectedFilename));
     });
 
@@ -783,9 +770,7 @@ describe('Orchestrator Module', () => {
       // Intent: Verify that if the user specifies a specific file path and there is only
       // a single output file, the orchestrator compiles directly to that specific output path.
       const customFilePath = path.join(tempOutputDir, 'custom_file.apkg');
-      const questions = [
-        { questionId: 'q-single-file-test', content: 'content' },
-      ];
+      const questions = [{ questionId: 'q-single-file-test', content: 'content' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -815,9 +800,7 @@ describe('Orchestrator Module', () => {
         return mockChild;
       });
 
-      const questions = [
-        { questionId: 'q-compile-fail-test', content: 'content' },
-      ];
+      const questions = [{ questionId: 'q-compile-fail-test', content: 'content' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -964,9 +947,10 @@ describe('Orchestrator Module', () => {
       ];
 
       // Temporarily mock runStage2 to check database status during execution
-      const stages = await import('../src/stages.js');
+      const stages = await import('../src/pipeline/stages/index.js');
       const originalStage2 = stages.runStage2;
-      vi.mocked(originalStage2).mockImplementationOnce(async ({ runId }) => {
+      vi.mocked(originalStage2).mockImplementationOnce(async (ctx) => {
+        const runId = ctx.runId;
         const run = getRun(runId);
         expect(run.status).toBe('running');
         return 'stage2-out';
@@ -1034,9 +1018,7 @@ describe('Orchestrator Module', () => {
         configHash: 'hash-resume-dry',
       });
 
-      const questions = [
-        { questionId: 'q-resume-dry-1', content: 'content' },
-      ];
+      const questions = [{ questionId: 'q-resume-dry-1', content: 'content' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -1070,9 +1052,7 @@ describe('Orchestrator Module', () => {
         currentStage: 'enforcement',
       });
 
-      const questions = [
-        { questionId: 'q-resume-dry-comp-1', content: 'content' },
-      ];
+      const questions = [{ questionId: 'q-resume-dry-comp-1', content: 'content' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -1107,9 +1087,7 @@ describe('Orchestrator Module', () => {
         latestResponse: '{invalid_json',
       });
 
-      const questions = [
-        { questionId: 'q-parse-err-1', content: 'content' },
-      ];
+      const questions = [{ questionId: 'q-parse-err-1', content: 'content' }];
 
       const res = await runPipeline({
         config: mockConfig,
@@ -1128,7 +1106,7 @@ describe('Orchestrator Module', () => {
     });
 
     it('should respect topic_concurrency limit when processing questions', async () => {
-      const stages = await import('../src/stages.js');
+      const stages = await import('../src/pipeline/stages/index.js');
       const originalStage1 = stages.runStage1;
       const originalStage2 = stages.runStage2;
       const originalStage3 = stages.runStage3;
@@ -1139,7 +1117,9 @@ describe('Orchestrator Module', () => {
       vi.mocked(originalStage1).mockImplementation(async () => {
         activeTopics++;
         maxActiveTopics = Math.max(maxActiveTopics, activeTopics);
-        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        });
         return [{ provider: 'mock', model: 'model', output: 'ok' }];
       });
 

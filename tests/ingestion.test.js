@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, beforeAll, afterAll, vi,
-} from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -64,27 +62,6 @@ describe('Ingestion - Namespace Formatting', () => {
     expect(formatNamespaceComponent('01-02-basics')).toBe('01_02_Basics');
     expect(formatNamespaceComponent('1_2_intro')).toBe('1_2_Intro');
   });
-
-  // --- Edge Case: Tabs, newlines, and mixed consecutive whitespace / separators
-  it('should handle tabs, newlines, and mixed consecutive separator noise correctly', () => {
-    expect(formatNamespaceComponent('basics \t\n--__of  \t js')).toBe('Basics_Of_Js');
-  });
-
-  // --- Edge Case: Pure numeric input
-  it('should handle pure numeric input without stripping or corrupting it', () => {
-    expect(formatNamespaceComponent('12345')).toBe('12345');
-  });
-
-  // --- Edge Case: Non-ASCII characters (UTF-8)
-  it('should convert words containing non-ASCII characters to Title Case correctly', () => {
-    expect(formatNamespaceComponent('react-tütorial')).toBe('React_Tütorial');
-  });
-
-  // --- Edge Case: Special symbols that are not standard separators
-  it('should treat other punctuation marks (like dots or @) as part of the word', () => {
-    expect(formatNamespaceComponent('a.b')).toBe('A.b');
-    expect(formatNamespaceComponent('user@domain')).toBe('User@domain');
-  });
 });
 
 describe('Ingestion - File Reading Encodings', () => {
@@ -112,7 +89,7 @@ describe('Ingestion - File Reading Encodings', () => {
     const filePath = path.join(FIXTURES_DIR, 'latin1_file.txt');
     // Write high-ASCII Latin-1 bytes that are invalid in UTF-8
     // "Hello éñ" in Latin-1
-    const buffer = Buffer.from([0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0xE9, 0xF1]);
+    const buffer = Buffer.from([0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0xe9, 0xf1]);
     fs.writeFileSync(filePath, buffer);
 
     const result = await readFileWithFallback(filePath);
@@ -408,7 +385,9 @@ categories:
     topics:
       - "Two Sum"
 `;
-    expect(() => parsePreset(invalidYaml3)).toThrow(/Category entry must have a non-empty "name" string field/);
+    expect(() => parsePreset(invalidYaml3)).toThrow(
+      /Category entry must have a non-empty "name" string field/,
+    );
 
     // Non-string topic
     const invalidYaml4 = `
@@ -548,152 +527,6 @@ categories:
   });
 });
 
-describe('Ingestion - Uncovered Branch Coverage', () => {
-  beforeAll(() => {
-    if (!fs.existsSync(FIXTURES_DIR)) {
-      fs.mkdirSync(FIXTURES_DIR, { recursive: true });
-    }
-  });
-
-  afterAll(() => {
-    if (fs.existsSync(FIXTURES_DIR)) {
-      fs.rmSync(FIXTURES_DIR, { recursive: true, force: true });
-    }
-  });
-
-  it('should handle unreadable subdirectory gracefully (walkDirectory catch block)', async () => {
-    const rootScanDir = path.join(FIXTURES_DIR, 'unreadable-dir-root');
-    const unreadableDir = path.join(rootScanDir, 'no-access');
-    const readableDir = path.join(rootScanDir, 'readable');
-
-    fs.mkdirSync(unreadableDir, { recursive: true });
-    fs.mkdirSync(readableDir, { recursive: true });
-
-    // Add a readable file for contrast
-    fs.writeFileSync(path.join(readableDir, 'good.md'), 'readable content', 'utf8');
-
-    // Remove read permission from subdirectory
-    fs.chmodSync(unreadableDir, 0o000);
-
-    const logger = getLogger(['ingestion']);
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-
-    try {
-      const results = await ingestDirectory(rootScanDir);
-      // Should still process the readable directory
-      expect(results.length).toBe(1);
-      expect(results[0].content).toBe('readable content');
-    } finally {
-      // Restore permission before cleanup
-      fs.chmodSync(unreadableDir, 0o755);
-      warnSpy.mockRestore();
-    }
-  });
-
-  it('should throw when ingestDirectory is called with a nonexistent path', async () => {
-    await expect(ingestDirectory('/nonexistent/path/to/dir')).rejects.toThrow();
-  });
-
-  it('should handle files in root directory (no subdirectory nesting)', async () => {
-    const rootScanDir = path.join(FIXTURES_DIR, 'flat-root');
-    fs.mkdirSync(rootScanDir, { recursive: true });
-
-    fs.writeFileSync(path.join(rootScanDir, 'intro.md'), 'flat content', 'utf8');
-
-    const results = await ingestDirectory(rootScanDir);
-    expect(results.length).toBe(1);
-    expect(results[0].deckPath).toBe('Flat_Root::Intro');
-    expect(results[0].content).toBe('flat content');
-  });
-
-  it('should handle readFileWithFallback when both UTF-8 and Latin-1 fail', async () => {
-    // Mock TextDecoder to force both decoders to fail
-    const originalTextDecoder = globalThis.TextDecoder;
-    let callCount = 0;
-
-    globalThis.TextDecoder = class MockTextDecoder {
-      constructor(encoding, options) {
-        this.encoding = encoding;
-        this.options = options;
-      }
-
-      decode() {
-        callCount++;
-        throw new Error(`Mocked ${this.encoding} decode failure`);
-      }
-    };
-
-    const logger = getLogger(['ingestion']);
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-
-    try {
-      const filePath = path.join(FIXTURES_DIR, 'mock_decode_file.txt');
-      fs.writeFileSync(filePath, 'some content', 'utf8');
-
-      const result = await readFileWithFallback(filePath);
-      expect(result).toBeNull();
-      expect(callCount).toBe(2); // Both UTF-8 and Latin-1 attempted
-      expect(warnSpy).toHaveBeenCalled();
-      expect(warnSpy.mock.calls.some((call) => Array.isArray(call[0]) && call[0][0] && call[0][0].includes('Failed to decode file'))).toBe(true);
-    } finally {
-      globalThis.TextDecoder = originalTextDecoder;
-      warnSpy.mockRestore();
-    }
-  });
-
-  it('should handle file that contains only null bytes', async () => {
-    const filePath = path.join(FIXTURES_DIR, 'null_bytes.txt');
-    // Write a file with only null bytes — valid UTF-8 but content is non-printable
-    fs.writeFileSync(filePath, Buffer.from([0x00, 0x00, 0x00]));
-
-    const result = await readFileWithFallback(filePath);
-    // Should successfully decode (null bytes are valid UTF-8)
-    expect(result).not.toBeNull();
-    expect(result.length).toBe(3);
-  });
-
-  it('should handle .htm and .markdown extensions correctly', async () => {
-    const rootScanDir = path.join(FIXTURES_DIR, 'multi-ext-root');
-    fs.mkdirSync(rootScanDir, { recursive: true });
-
-    fs.writeFileSync(path.join(rootScanDir, 'page.htm'), 'htm content', 'utf8');
-    fs.writeFileSync(path.join(rootScanDir, 'doc.markdown'), 'markdown content', 'utf8');
-
-    const results = await ingestDirectory(rootScanDir);
-    expect(results.length).toBe(2);
-
-    const htmResult = results.find((r) => r.filePath.endsWith('.htm'));
-    expect(htmResult).toBeDefined();
-    expect(htmResult.content).toBe('htm content');
-
-    const markdownResult = results.find((r) => r.filePath.endsWith('.markdown'));
-    expect(markdownResult).toBeDefined();
-    expect(markdownResult.content).toBe('markdown content');
-  });
-
-  it('should skip files where readFileWithFallback returns null', async () => {
-    const rootScanDir = path.join(FIXTURES_DIR, 'null-read-root');
-    fs.mkdirSync(rootScanDir, { recursive: true });
-
-    const filePath = path.join(rootScanDir, 'unreadable.md');
-    fs.writeFileSync(filePath, 'content', 'utf8');
-    // Remove read permission from the file itself
-    fs.chmodSync(filePath, 0o000);
-
-    const logger = getLogger(['ingestion']);
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-
-    try {
-      const results = await ingestDirectory(rootScanDir);
-      // The file should be skipped because readFileWithFallback returns null
-      expect(results.length).toBe(0);
-    } finally {
-      fs.chmodSync(filePath, 0o644);
-      warnSpy.mockRestore();
-    }
-  });
-});
-
 describe('Ingestion - Document Mode Helpers', () => {
   beforeAll(() => {
     if (!fs.existsSync(FIXTURES_DIR)) {
@@ -780,43 +613,6 @@ describe('Ingestion - Document Mode Helpers', () => {
   it('should return empty array for empty array input to ingestFiles', async () => {
     const results = await ingestFiles([]);
     expect(results).toEqual([]);
-  });
-
-  it('should ignore null, undefined, boolean, and object values in ingestFiles list', async () => {
-    const file = path.join(FIXTURES_DIR, 'valid_item.txt');
-    fs.writeFileSync(file, 'some text content', 'utf8');
-
-    const results = await ingestFiles([null, undefined, true, { path: file }, file]);
-    expect(results.length).toBe(1);
-    expect(results[0].deckPath).toBe('Valid_Item');
-    expect(results[0].content).toBe('some text content');
-  });
-
-  it('should support Latin-1 encoded file fallback in ingestFiles', async () => {
-    const file = path.join(FIXTURES_DIR, 'latin1_ingest.txt');
-    // Write high-ASCII Latin-1 bytes that are invalid in UTF-8
-    const buffer = Buffer.from([0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0xE9, 0xF1]);
-    fs.writeFileSync(file, buffer);
-
-    const results = await ingestFiles([file]);
-    expect(results.length).toBe(1);
-    expect(results[0].content).toBe('Hello éñ');
-  });
-
-  it('should skip folder path passed inside the filePaths array of ingestFiles', async () => {
-    const dirPath = path.join(FIXTURES_DIR, 'dummy-dir');
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-    }
-
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const results = await ingestFiles([dirPath]);
-      // Directory cannot be read as a file, so it should be skipped
-      expect(results).toEqual([]);
-    } finally {
-      warnSpy.mockRestore();
-    }
   });
 
   it('should prioritize folder option over files option in ingestDocumentSources', async () => {

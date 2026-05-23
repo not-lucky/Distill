@@ -1,31 +1,35 @@
 # Global defaults and concurrency controls
 global:
-  model_concurrency: 3          # Maximum generation models running simultaneously per topic (0 = unlimited)
-  topic_concurrency: 5          # Maximum topics/documents processed through pipeline simultaneously (1 = sequential)
-  request_delay: 1.0            # Delay in seconds between starting requests
-  default_timeout: 500.0        # Default network request timeout in seconds
-  output_dir: "./output"        # Where final compiled .apkg files land
-  cache_db_path: "./llm2deck.db" # SQLite database path for runs, steps, and caching
-  keys_file_path: "./keys.yaml" # Path to keys file where all providers' keys are stored
-  log_level: "info"             # Minimum log level: "debug", "info", "warning", "error", "fatal"
-  log_dir: "./logs"                 # Directory for rotating log files (e.g., "./logs")
+  model_concurrency: 3 # Maximum generation models running simultaneously per topic (0 = unlimited)
+  topic_concurrency: 5 # Maximum topics/documents processed through pipeline simultaneously (1 = sequential)
+  request_delay: 1.0 # Delay in seconds between starting requests
+  default_timeout: 1000.0 # Default network request timeout in seconds
+  output_dir: './output' # Where final compiled .apkg files land
+  cache_db_path: './llm2deck.db' # SQLite database path for runs, steps, and caching
+  keys_file_path: './keys.yaml' # Path to keys file where all providers' keys are stored
+  log_level: 'info' # Minimum log level: "debug", "info", "warning", "error", "fatal"
+  log_dir: './logs' # Directory for rotating log files (e.g., "./logs")
 
 # Definition of available LLM providers (excluding raw keys)
 providers:
   openai:
-    base_url: "https://api.openai.com/v1"
+    base_url: 'https://api.openai.com/v1'
     temperature: 0.3
   cerebras:
-    base_url: "https://api.cerebras.ai/v1"
+    base_url: 'https://api.cerebras.ai/v1'
     temperature: 0.2
   ollama_local:
-    base_url: "http://localhost:11434/v1"
+    base_url: 'http://localhost:11434/v1'
     temperature: 0.0
   gemini:
-    base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    base_url: 'https://generativelanguage.googleapis.com/v1beta/openai/'
   omniroute:
-    base_url: "https://omniroute.notlucky.dedyn.io/v1"
-
+    base_url: 'https://omniroute.notlucky.dedyn.io/v1'
+    timeout: 1200.0
+  waypoint:
+    base_url: 'http://localhost:20128/openai'
+  freetheai:
+    base_url: 'https://api.freetheai.xyz/v1'
 
 # Assignment of models to pipeline stages using the "provider/model" convention.
 # Format: <provider_name>/<model_name_path>
@@ -33,14 +37,14 @@ pipeline:
   # Stage 1: Parallel Initial Generation (raw text extraction)
   generation:
     models:
-      - "gemini/gemini-flash-lite-latest"
-  
+      - 'waypoint/gemini/flash-lite-high'
+      - 'waypoint/openrouter/north-mini-code'
+
   # Stage 2: Synthesis (frontier model merges and deduplicates)
   synthesis:
-    model: "gemini/gemini-flash-lite-latest"
-  
+    model: 'waypoint/tokenrouter/MiniMax-M3'
 
   # Stage 3: Strict JSON Schema Enforcement
   schema_enforcement:
-    model: "gemini/gemini-flash-lite-latest"
-    use_completion_api: true   # Set to true to bypass Responses API and force Chat Completions API
+    model: 'waypoint/gemini/flash-lite-high'
+    use_completion_api: true # Set to true to bypass Responses API and force Chat Completions API

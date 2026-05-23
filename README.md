@@ -1,14 +1,14 @@
 # LLM2Deck: Orchestrated Parallel Flashcard Generation
 
-> [!WARNING]
-> **WORK IN PROGRESS**: This repository is currently a Work In Progress (WIP) and is not fully functional in its master branch.
-> If you require a fully functional and stable version urgently, please use the old version located in the [archived/](file:///home/lucky/stuff/to-del/LLM2Deck/archived) directory.
+[![CI](https://github.com/not-lucky/LLM2Deck/actions/workflows/ci.yml/badge.svg)](https://github.com/not-lucky/LLM2Deck/actions/workflows/ci.yml)
+
+> A legacy v1 implementation is preserved in the `.archived/` directory for reference.
 
 ---
 
 ## General Overview
 
-**LLM2Deck** is an orchestrated system designed to convert complex technical study materials (codebases, Textbook chapters, LeetCode algorithms, language specifications) into high-quality, pedagogically optimized Anki flashcards (`.apkg`). 
+**LLM2Deck** is an orchestrated system designed to convert complex technical study materials (codebases, Textbook chapters, LeetCode algorithms, language specifications) into high-quality, pedagogically optimized Anki flashcards (`.apkg`).
 
 Rather than relying on a single, expensive LLM prompt that suffers from low detail density and high syntax failures, LLM2Deck uses a **four-stage parallel execution and synthesis pipeline** built in Node.js (ESM), utilizing an SQLite database cache and spawning a Python script for final deck compilation.
 
@@ -17,7 +17,7 @@ Rather than relying on a single, expensive LLM prompt that suffers from low deta
 ## How It Works: The Four-Stage Pipeline
 
 ```
-[Source Material] 
+[Source Material]
        │
        ├─► [Stage 1: Parallel Generation] (Multi-LLM Raw Text Extraction)
        │
@@ -46,16 +46,20 @@ Rather than relying on a single, expensive LLM prompt that suffers from low deta
 
 ## Installation & Setup
 
-Ensure you have Node.js (v18+) and Python 3 installed.
+Ensure you have Node.js (v20+) and Python 3.12+ installed.
 
 ### 1. Install Node.js Dependencies
+
 Using `npm` to install packages:
+
 ```bash
 npm install
 ```
 
 ### 2. Set Up Python Virtual Environment
+
 Use `uv` to sync python dependencies:
+
 ```bash
 uv sync
 ```
@@ -67,58 +71,62 @@ uv sync
 Everything is configured via external configuration files. Below are structural schemas and examples.
 
 ### 1. Main Configuration (`config.yaml`)
+
 Points to API endpoints, concurrency parameters, and custom prompts/keys file paths.
 
 ```yaml
 # Global defaults and concurrency controls
 global:
-  concurrency_limit: 8          # Max parallel API requests
-  request_delay: 1.0            # Delay (seconds) between starting requests
-  default_timeout: 500.0        # Default API request timeout (seconds)
-  output_dir: "./output"        # Compiled Anki decks target directory
-  cache_db_path: "./llm2deck.db" # Database cache path
-  keys_file_path: "./keys.yaml" # Path to API keys configuration
-  prompts_file_path: "./prompts.yaml" # Custom prompts configuration path
+  concurrency_limit: 8 # Max parallel API requests
+  request_delay: 1.0 # Delay (seconds) between starting requests
+  default_timeout: 500.0 # Default API request timeout (seconds)
+  output_dir: './output' # Compiled Anki decks target directory
+  cache_db_path: './llm2deck.db' # Database cache path
+  keys_file_path: './keys.yaml' # Path to API keys configuration
+  prompts_file_path: './prompts.yaml' # Custom prompts configuration path
 
 # Configured LLM providers
 providers:
   openai:
-    base_url: "https://api.openai.com/v1"
+    base_url: 'https://api.openai.com/v1'
     temperature: 0.3
   cerebras:
-    base_url: "https://api.cerebras.ai/v1"
+    base_url: 'https://api.cerebras.ai/v1'
     temperature: 0.2
   ollama_local:
-    base_url: "http://localhost:11434/v1"
+    base_url: 'http://localhost:11434/v1'
     temperature: 0.0
 
 # Assignment of models to pipeline stages (provider/model format)
 pipeline:
   generation:
     models:
-      - "openai/gpt-3.5-turbo"
-      - "cerebras/llama3.1-70b"
+      - 'openai/gpt-3.5-turbo'
+      - 'cerebras/llama3.1-70b'
   synthesis:
-    model: "openai/gpt-4o"
+    model: 'openai/gpt-4o'
   schema_enforcement:
-    model: "openai/gpt-3.5-turbo"
+    model: 'openai/gpt-3.5-turbo'
 ```
 
 ### 2. Credentials Storage (`keys.yaml`)
+
 Keeps API keys isolated from primary configurations and version control.
 
 ```yaml
 openai:
-  - "sk-proj-..."
-  - "sk-proj-rotate-key-..."
+  - 'sk-proj-...'
+  - 'sk-proj-rotate-key-...'
 cerebras:
-  - "cber-..."
+  - 'cber-...'
 ```
 
 ### 3. Prompt Overrides & Subjects Mapping (`prompts.yaml`)
+
 Overwrites default prompts for any stage and sets up study subjects with nested topic paths, generation instructions, and additional stage 2 combiner prompts.
 
 Supports two generation modes:
+
 - **Topic Mode** (default): Generates cards systematically from topic names.
 - **Document Mode**: Ingests files or directories, digesting their contents directly.
 
@@ -134,7 +142,7 @@ defaults:
   synthesis: |
     You are a senior technical editor. Consolidate and merge...
 
-# Subject presets mapping. 
+# Subject presets mapping.
 # Match directly via CLI argument (e.g. `node src/cli.js run leetcode`).
 subjects:
   # 1. Example Topic Mode subject
@@ -146,13 +154,13 @@ subjects:
     synthesis: |
       Consolidate algorithmic insights. Retain complexity trade-offs.
     categories:
-      - name: "Arrays & Hashing"
+      - name: 'Arrays & Hashing'
         topics:
-          - "Two Sum"
-          - "Group Anagrams"
-      - name: "Two Pointers"
+          - 'Two Sum'
+          - 'Group Anagrams'
+      - name: 'Two Pointers'
         topics:
-          - "Valid Palindrome"
+          - 'Valid Palindrome'
 
   # 2. Example Document Mode subject
   document_notes:
@@ -160,8 +168,8 @@ subjects:
     generation: |
       Focus on extracting clear terminology definitions and syntax details.
     files:
-      - "./scratch/doc1.txt"
-      - "./scratch/doc2.md"
+      - './scratch/doc1.txt'
+      - './scratch/doc2.md'
     # OR configure folder instead:
     # folder: "./scratch/notes"
 ```
@@ -174,16 +182,19 @@ You can customize logging in the `global` section of `config.yaml`:
 
 ```yaml
 global:
-  log_level: "info"       # Minimum log level: "debug", "info", "warning", "error", "fatal"
-  log_dir: null           # Directory for rotating log files (null to disable file logging, e.g., "./logs")
+  log_level: 'info' # Minimum log level: "debug", "info", "warning", "error", "fatal"
+  log_dir: null # Directory for rotating log files (null to disable file logging, e.g., "./logs")
 ```
 
 #### CLI Log Overrides
+
 You can override the log level on the fly for any command (`run`, `compile`, or `cache`):
-* `-v, --verbose`: Sets the log level to `debug` for detailed step-by-step trace logging.
-* `-q, --quiet`: Sets the log level to `error` to suppress progress logs and only show errors.
+
+- `-v, --verbose`: Sets the log level to `debug` for detailed step-by-step trace logging.
+- `-q, --quiet`: Sets the log level to `error` to suppress progress logs and only show errors.
 
 Example:
+
 ```bash
 node src/cli.js run leetcode --verbose
 ```
@@ -194,27 +205,51 @@ node src/cli.js run leetcode --verbose
 
 Ready-to-use example files live in the [`examples/`](examples/) directory at three levels of detail:
 
-| File | Purpose |
-|------|---------|
-| `examples/config.minimal.yaml`   | One provider, one model per stage, low concurrency. |
-| `examples/config.standard.yaml`  | Three providers (OpenAI + Cerebras + local Ollama) with two parallel generation models. |
-| `examples/config.full.yaml`      | Every documented option: all 8 `global` keys, per-provider `timeout`/`temperature`, multiple stage-1 models, every pipeline stage commented. |
-| `examples/keys.minimal.yaml`     | Single OpenAI key. |
-| `examples/keys.standard.yaml`    | OpenAI (two-key rotation) + Cerebras + Ollama placeholder. |
-| `examples/keys.full.yaml`        | One entry per provider declared in `config.full.yaml`, mix of single-string and array-of-strings formats. |
-| `examples/prompts.minimal.yaml`  | One topic-mode subject, no defaults. |
-| `examples/prompts.standard.yaml` | All four `defaults` keys (short) + `leetcode` (topic) and `notes` (document) subjects. |
+| File                             | Purpose                                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `examples/config.minimal.yaml`   | One provider, one model per stage, low concurrency.                                                                                                     |
+| `examples/config.standard.yaml`  | Three providers (OpenAI + Cerebras + local Ollama) with two parallel generation models.                                                                 |
+| `examples/config.full.yaml`      | Every documented option: all 8 `global` keys, per-provider `timeout`/`temperature`, multiple stage-1 models, every pipeline stage commented.            |
+| `examples/keys.minimal.yaml`     | Single OpenAI key.                                                                                                                                      |
+| `examples/keys.standard.yaml`    | OpenAI (two-key rotation) + Cerebras + Ollama placeholder.                                                                                              |
+| `examples/keys.full.yaml`        | One entry per provider declared in `config.full.yaml`, mix of single-string and array-of-strings formats.                                               |
+| `examples/prompts.minimal.yaml`  | One topic-mode subject, no defaults.                                                                                                                    |
+| `examples/prompts.standard.yaml` | All four `defaults` keys (short) + `leetcode` (topic) and `notes` (document) subjects.                                                                  |
 | `examples/prompts.full.yaml`     | All four `defaults` keys populated with the **verbatim** hard-coded prompts shipped in `src/prompts.js` + fully worked `leetcode` and `notes` subjects. |
 
 The `full` prompts file matches the in-source defaults byte-for-byte, so it is a safe drop-in replacement if you want every option in one place.
 
 To use an example, copy it over the corresponding real file:
+
 ```bash
 cp examples/config.full.yaml    config.yaml
 cp examples/keys.full.yaml      keys.yaml
 cp examples/prompts.full.yaml   prompts.yaml
 ```
+
 Then edit the placeholders (API keys, file paths, subjects) to match your setup.
+
+---
+
+## Project Structure
+
+```
+src/
+  cli.js              — CLI entry point
+  config.js           — YAML config loading and validation
+  context.js          — PipelineContext (shared state for stages)
+  database.js         — SQLite schema and queries
+  ingestion.js        — File/directory ingestion
+  prompts.js          — Prompt templates and resolution
+  postProcess.js      — Card deduplication and normalization
+  compile.py          — Python Anki compilation (genanki)
+
+  commands/           — CLI command handlers (run, compile, cache)
+  pipeline/           — Orchestration, stages, schemas, validation
+  llm/                — LLM calling, caching, throttling, key rotation
+```
+
+See [AGENTS.md](AGENTS.md) for the detailed architecture map and coding conventions.
 
 ---
 
@@ -223,7 +258,9 @@ Then edit the placeholders (API keys, file paths, subjects) to match your setup.
 LLM2Deck exposes a command-line interface:
 
 ### Run Pipeline Generation
+
 Generate flashcards for a configured subject preset or local folder:
+
 ```bash
 # Run a preset topic-based subject defined in prompts.yaml
 node src/cli.js run leetcode --card-type standard
@@ -236,19 +273,25 @@ node src/cli.js run ./study_material --card-type mcq
 ```
 
 ### Resume a Run
+
 If a pipeline is interrupted, resume it using its unique Run ID:
+
 ```bash
 node src/cli.js run leetcode --resume "run-12345"
 ```
 
 ### Compile JSON Manually
+
 Compile a pre-generated structured JSON schema file directly to `.apkg`:
+
 ```bash
 node src/cli.js compile ./output/LeetCode.json -o ./output/custom_deck.apkg
 ```
 
 ### Cache Management
+
 Clear cache tables or review cache stats:
+
 ```bash
 # Get stats
 node src/cli.js cache stats
@@ -258,7 +301,9 @@ node src/cli.js cache clear
 ```
 
 ### Running Tests
+
 Execute unit tests for JavaScript (Vitest) and Python (Pytest):
+
 ```bash
 # Run all tests (JavaScript + Python)
 npm test
@@ -274,7 +319,9 @@ npm run coverage
 ```
 
 ### Linting & Formatting
+
 Verify code health and styling consistency across JavaScript and Python files:
+
 ```bash
 # Run all linters (ESLint + Ruff check & format validation)
 npm run lint
@@ -282,3 +329,5 @@ npm run lint
 # Auto-fix and format all files in place
 npm run lint:fix
 ```
+
+JavaScript is linted with [ESLint 10](https://eslint.org/) using [flat config](https://eslint.org/docs/latest/use/configure/configuration-files) (`eslint.config.js`) with `@eslint/js` recommended rules, `eslint-plugin-import-x` for ESM import validation, and `eslint-plugin-n` for Node.js-specific rules. Python is linted and formatted with [Ruff](https://docs.astral.sh/ruff/).

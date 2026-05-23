@@ -58,7 +58,8 @@ Rules:
 
 // The enforcement engine is provided a plain text/markdown list from the synthesis stage (Stage 2)
 // and converts it into a compliant JSON structure matching CARD_JSON_SCHEMA.
-export const DEFAULT_ENFORCEMENT = 'You are a schema compliance engine. You will be provided a plain text/markdown list of consolidated flashcards and a target JSON Schema. Your job is to parse and convert this list into a JSON object that strictly conforms to the schema, correcting any field names, types, array lengths, or formats to meet the schema requirements. Ensure no educational, contextual, or explanation details are modified or deleted.';
+export const DEFAULT_ENFORCEMENT =
+  'You are a schema compliance engine. You will be provided a plain text/markdown list of consolidated flashcards and a target JSON Schema. Your job is to parse and convert this list into a JSON object that strictly conforms to the schema, correcting any field names, types, array lengths, or formats to meet the schema requirements. Ensure no educational, contextual, or explanation details are modified or deleted.';
 
 export const FORMAT_STANDARD = `Format Instruction:
 You must output the cards in a clean, plain text/markdown format. Do not use JSON.
@@ -78,7 +79,7 @@ Front: [An active recall statement containing one or more cloze deletions using 
 Back: [The short, punchy answer. If using cloze deletion, you can omit the back or make it a brief summary of the deleted word/phrase]
 Explanation: [Detailed background explanation, code examples, trade-offs, why the answer is correct, and common pitfalls]`;
 
-export const FORMAT_MCQ = `Format Instruction:
+const FORMAT_MCQ = `Format Instruction:
 You must output the cards in a clean, plain text/markdown format. Do not use JSON.
 For each card, output using the following format:
 ---
@@ -92,206 +93,90 @@ Correct: [The correct option letter: A, B, C, or D]
 Explanation: [Detailed background explanation, why the correct option is right, and why the other options are incorrect]`;
 
 /**
+ * Returns the case-preserved subject key whose lowercased name matches
+ * the supplied query, or null if no entry matches. Coerces non-string
+ * subject inputs to an empty string before the comparison to keep
+ * the function safe for arbitrary CLI input.
+ */
+function findSubjectKey(subjects, subject) {
+  if (!subjects) return null;
+  const subjectLower = typeof subject === 'string' ? subject.toLowerCase() : '';
+  return Object.keys(subjects).find((k) => k.toLowerCase() === subjectLower) || null;
+}
+
+/**
+ * Picks the active generation mode. Priority: explicit argument,
+ * then the matched subject's `mode` field, then 'topic' as the default.
+ */
+function resolveGenerationMode(explicitMode, matchedKey, subjectsMap) {
+  if (explicitMode) return explicitMode;
+  if (matchedKey) {
+    const subConf = subjectsMap[matchedKey];
+    if (subConf && subConf.mode === 'document') return 'document';
+  }
+  return 'topic';
+}
+
+/**
+ * Resolves the generation system prompt by cascading through:
+ * document mode -> standard mode -> hardcoded defaults. Subject-level
+ * generation overrides are returned separately so the caller can
+ * splice them into the final composed prompt.
+ */
+function pickGenerationBase(defaults, mode) {
+  if (mode === 'document') {
+    return defaults.generation_document || defaults.generation || DEFAULT_GENERATION_DOCUMENT;
+  }
+  return defaults.generation || DEFAULT_GENERATION;
+}
+
+/**
+ * Concatenates multiple prompt fragments with double newlines, dropping
+ * any null/empty pieces. Used to compose the final stage-1 and stage-2
+ * system prompts from base + subject + format blocks.
+ */
+function joinPromptFragments(...fragments) {
+  return fragments.filter(Boolean).join('\n\n');
+}
+
+/**
  * Resolves prompts for all stages by merging YAML-loaded overrides and hardcoded fallbacks.
  *
  * @param {Object} promptsConfig Loaded prompts configuration from yaml file.
  * @param {string} subject Subject name passed to the pipeline.
  * @param {string} cardType Layout format ('standard' or 'mcq').
+ * @param {string|null} mode Optional explicit mode override ('document' | 'topic').
  * @returns {Object} Resolved stage-specific prompts.
  */
-export function resolvePrompts(promptsConfig, subject = '', cardType = 'standard', mode = null) {
-  const defaults = promptsConfig?.defaults || {};
-
-  // Resolve subject-specific modifications. Subject parameter is checked case-insensitively.
-  // We ensure it is a string before converting to lowercase to prevent runtime exceptions.
-  const subjectLower = typeof subject === 'string' ? subject.toLowerCase() : '';
-  const subjectsMap = promptsConfig?.subjects || {};
-
-  // Check if subject is explicitly configured in YAML.
-  // We iterate over the subject keys to perform a case-insensitive match on the CLI subject name.
-  let matchedSubjectKey = null;
-  for (const key of Object.keys(subjectsMap)) {
-    if (key.toLowerCase() === subjectLower) {
-      matchedSubjectKey = key;
-      break;
-    }
-  }
-
-  // Determine active generation mode ('topic' or 'document') to select the appropriate
-  // default system prompt.
-  // 1. Prioritize explicit option passed to the function parameter
-  // 2. Query subject configuration in YAML prompts config
-  // 3. Fallback to 'topic' as the default mode
-  let resolvedMode = mode;
-  if (!resolvedMode && matchedSubjectKey) {
-    const subConf = subjectsMap[matchedSubjectKey];
-    if (subConf && subConf.mode === 'document') {
-      resolvedMode = 'document';
-    }
-  }
-  if (!resolvedMode) {
-    resolvedMode = 'topic';
-  }
-
-  // Resolve base stage prompts (defaults/overrides)
-  // For document mode, we look for generation_document override first, then standard
-  // generation override, then fallback to DEFAULT_GENERATION_DOCUMENT.
-  // For other modes, we look for standard generation override, then fallback to DEFAULT_GENERATION.
-  let genBase;
-  if (resolvedMode === 'document') {
-    genBase = defaults.generation_document || defaults.generation || DEFAULT_GENERATION_DOCUMENT;
-  } else {
-    genBase = defaults.generation || DEFAULT_GENERATION;
-  }
-  const synthBase = defaults.synthesis || DEFAULT_SYNTHESIS;
-
-  const enforcement = defaults.schema_enforcement || DEFAULT_ENFORCEMENT;
-
-  let subjectGenPrompt = '';
-  let subjectSynthPrompt = '';
-
-  // If a matching subject configuration exists, extract any generation or synthesis overrides.
-  if (matchedSubjectKey) {
-    const subConf = subjectsMap[matchedSubjectKey];
-    if (subConf.generation) {
-      subjectGenPrompt = subConf.generation;
-    }
-    if (subConf.synthesis) {
-      subjectSynthPrompt = subConf.synthesis;
-    }
-  }
-
-  // Format rules selection
-  const formatPrompt = cardType === 'mcq' ? FORMAT_MCQ : FORMAT_STANDARD;
-
-  // For Stage 1 generation prompt, we join:
-  // Base Generation + Subject-specific guidelines + Format rules
-  const generation = [genBase, subjectGenPrompt, formatPrompt].filter(Boolean).join('\n\n');
-
-  // For Stage 2 synthesis prompt, we join the base synthesis prompt, subject-specific combiner,
-  // and the target formatting rules (Basic/Cloze or MCQ) to ensure output format is preserved.
-  const synthesis = [synthBase, subjectSynthPrompt, formatPrompt].filter(Boolean).join('\n\n');
-
-  return {
-    generation,
-    synthesis,
-    enforcement,
-  };
+function resolveSubjectOverrides(subjectsMap, matchedKey) {
+  if (!matchedKey) return { generation: '', synthesis: '' };
+  const subConf = subjectsMap[matchedKey] || {};
+  return { generation: subConf.generation || '', synthesis: subConf.synthesis || '' };
 }
 
-export const CARD_JSON_SCHEMA = {
-  $schema: 'http://json-schema.org/draft-07/schema#',
-  type: 'object',
-  properties: {
-    title: { type: 'string', description: 'Title of the concept, problem, or document section.' },
-    topic: { type: 'string', description: 'Main category hierarchy or path.' },
-    difficulty: {
-      type: 'string',
-      enum: ['Basic', 'Intermediate', 'Advanced'],
-      description: 'Standardized difficulty level for database sorting.',
-    },
-    cards: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          card_format: {
-            type: 'string',
-            enum: ['Basic', 'Cloze', 'MCQ'],
-            description: 'The structural layout of the card in Anki.',
-          },
-          card_type: {
-            type: 'string',
-            enum: ['Concept', 'Code', 'Procedure', 'Syntax', 'Behavior', 'Constraint', 'ErrorHandling', 'TradeOff'],
-            description: 'Pedagogical tag for sorting and styled headers.',
-          },
-          tags: {
-            type: 'array',
-            items: { type: 'string', pattern: '^[A-Za-z0-9-_/]+$' },
-            description: 'Alphanumeric, hyphen, underscore, and slash tags (no spaces allowed).',
-          },
-          front: { type: 'string', description: 'Front/question side of the card, or statement with {{c1::hidden text}} syntax for Cloze.' },
-          back: { type: 'string', description: 'Short, punchy answer. Required for Basic card format; prohibited in MCQ or Cloze.' },
-          options: {
-            type: 'array',
-            items: { type: 'string' },
-            minItems: 2,
-            maxItems: 4,
-            description: '2 to 4 choices. Required only for MCQ.',
-          },
-          correct_answer: {
-            type: 'string',
-            enum: ['A', 'B', 'C', 'D'],
-            description: 'Correct choice letter index. Required only for MCQ.',
-          },
-          explanation: {
-            type: 'string',
-            description: 'Detailed background explanation, code examples, or trade-offs shown on the back side of all card formats.',
-          },
-        },
-        required: ['card_format', 'card_type', 'tags', 'explanation'],
-        additionalProperties: false,
-        oneOf: [
-          {
-            properties: {
-              card_format: { const: 'Basic' },
-              options: { not: {} },
-              correct_answer: { not: {} },
-            },
-            required: ['front', 'back'],
-          },
-          {
-            properties: {
-              card_format: { const: 'Cloze' },
-              front: { pattern: '\\{\\{c[0-9]+::' },
-              back: { not: {} },
-              options: { not: {} },
-              correct_answer: { not: {} },
-            },
-            required: ['front'],
-            description: 'front must contain at least one cloze deletion using {{c1::word}} syntax.',
-          },
-          {
-            properties: {
-              card_format: { const: 'MCQ' },
-              back: { not: {} },
-            },
-            required: ['front', 'options', 'correct_answer'],
-          },
-        ],
-        allOf: [
-          {
-            if: {
-              properties: {
-                card_format: { const: 'MCQ' },
-                correct_answer: { const: 'C' },
-              },
-              required: ['card_format', 'correct_answer'],
-            },
-            then: {
-              properties: {
-                options: { minItems: 3 },
-              },
-            },
-          },
-          {
-            if: {
-              properties: {
-                card_format: { const: 'MCQ' },
-                correct_answer: { const: 'D' },
-              },
-              required: ['card_format', 'correct_answer'],
-            },
-            then: {
-              properties: {
-                options: { minItems: 4 },
-              },
-            },
-          },
-        ],
-      },
-    },
-  },
-  required: ['title', 'topic', 'difficulty', 'cards'],
-  additionalProperties: false,
-};
+function buildStagePrompts({ base, subjectOverride, formatPrompt }) {
+  return joinPromptFragments(base, subjectOverride, formatPrompt);
+}
+
+export function resolvePrompts(promptsConfig, subject = '', cardType = 'standard', mode = null) {
+  const defaults = promptsConfig?.defaults || {};
+  const subjectsMap = promptsConfig?.subjects || {};
+  const matchedKey = findSubjectKey(subjectsMap, subject);
+  const resolvedMode = resolveGenerationMode(mode, matchedKey, subjectsMap);
+  const subjectOverrides = resolveSubjectOverrides(subjectsMap, matchedKey);
+  const formatPrompt = cardType === 'mcq' ? FORMAT_MCQ : FORMAT_STANDARD;
+
+  return {
+    generation: buildStagePrompts({
+      base: pickGenerationBase(defaults, resolvedMode),
+      subjectOverride: subjectOverrides.generation,
+      formatPrompt,
+    }),
+    synthesis: buildStagePrompts({
+      base: defaults.synthesis || DEFAULT_SYNTHESIS,
+      subjectOverride: subjectOverrides.synthesis,
+      formatPrompt,
+    }),
+    enforcement: defaults.schema_enforcement || DEFAULT_ENFORCEMENT,
+  };
+}

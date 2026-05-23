@@ -12,14 +12,14 @@
 #   - An empty / missing key produces a console warning at startup.
 
 openai:
-  - "sk-replace-with-primary-openai-key"
-  - "sk-replace-with-secondary-openai-key"
+  - 'sk-replace-with-primary-openai-key'
+  - 'sk-replace-with-secondary-openai-key'
 cerebras:
-  - "csk-replace-with-your-cerebras-key"
+  - 'csk-replace-with-your-cerebras-key'
 # Local Ollama daemon. Exempted from key validation in src/config.js:83.
 ollama_local:
-  - "ollama"
+  - 'ollama'
 gemini:
-  - "AIza-replace-with-your-gemini-key"
+  - 'AIza-replace-with-your-gemini-key'
 omniroute:
-  - "sk-replace-with-your-omniroute-key"
+  - 'sk-replace-with-your-omniroute-key'

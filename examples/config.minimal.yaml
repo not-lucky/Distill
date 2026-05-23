@@ -7,25 +7,24 @@ global:
   topic_concurrency: 1
   request_delay: 0.0
   default_timeout: 120.0
-  output_dir: "./output"
-  cache_db_path: "./llm2deck.db"
-  keys_file_path: "./keys.yaml"
-  prompts_file_path: "./prompts.yaml"
-  log_level: "info"
+  output_dir: './output'
+  cache_db_path: './llm2deck.db'
+  keys_file_path: './keys.yaml'
+  prompts_file_path: './prompts.yaml'
+  log_level: 'info'
   log_dir: null
-
 
 providers:
   openai:
-    base_url: "https://api.openai.com/v1"
+    base_url: 'https://api.openai.com/v1'
     temperature: 0.3
 
 pipeline:
   generation:
     models:
-      - "openai/gpt-3.5-turbo"
+      - 'openai/gpt-3.5-turbo'
   synthesis:
-    model: "openai/gpt-3.5-turbo"
+    model: 'openai/gpt-3.5-turbo'
   schema_enforcement:
-    model: "openai/gpt-3.5-turbo"
+    model: 'openai/gpt-3.5-turbo'
     # use_completion_api: false

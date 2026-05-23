@@ -10,15 +10,69 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "black==25.12.0",
+    "deptry==0.23.1",
+    "jsonschema>=4.23.0,<5",
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5,<10",
+    "mkdocstrings>=0.27,<2",
+    "mkdocstrings-python>=1.10,<3",
+    "pymdown-extensions>=10.10,<11",
     "pytest>=9.0.3",
+    "pytest-cov>=7.0.0",
+    "pytest-rerunfailures>=16.0.0",
     "ruff>=0.15.15",
+    "ty==0.0.1a25",
+    "vulture==2.14",
 ]
 
+# ---- pytest configuration (signals: test_performance_tracking, test_coverage_thresholds, flaky_test_detection) ----
+# - --durations=10         : surface the 10 slowest tests in CI logs
+# - --cov=src             : measure coverage for the Python source tree
+# - --cov-fail-under=80   : gate CI on a minimum 80% line coverage threshold
+# - --reruns=2            : re-run flaky tests up to twice
+# - --reruns-delay=1      : small delay between retries to absorb transient I/O
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v"
+addopts = "-v --durations=10 --cov=src --cov-report=term-missing --cov-report=xml:coverage/coverage.xml --cov-fail-under=80 --reruns=2 --reruns-delay=1"
 
 [tool.ruff.format]
 preview = true
 
+# ---- Black (signal: formatter) ----
+# Black is used as a secondary formatter that complements ruff format.
+# `uv run black --check src tests` is wired into the lint script and CI.
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+# ---- ty (signal: type_check + strict_typing) ----
+# ty is Astral's fast type checker, used here in strict mode for src/.
+# `uv run ty check src` is wired into the lint script and CI.
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.rules]
+# Allow missing type stubs for third-party libs without bundled types
+unsupported-base = "warn"
+
+# ---- deptry (signal: unused_dependencies_detection) ----
+# Detects unused or missing Python dependencies.
+# `uv run deptry .` is wired into CI.
+[tool.deptry]
+known_first_party = ["llm2deck"]
+
+[tool.deptry.per_rule_ignores]
+DEP001 = ["compile"]
+exclude = [".venv", "build", "dist", ".archived", "reports", "scratch"]
+
+# ---- vulture (signal: dead_code_detection) ----
+[tool.vulture]
+min_confidence = 80
+paths = ["src"]
+sort_by_size = true
+verbose = false

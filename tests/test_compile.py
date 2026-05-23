@@ -6,8 +6,8 @@ import zipfile
 import hashlib
 import subprocess
 
-# Ensure the project root is in the python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
+import jsonschema
+import pytest
 
 from src.compile import (
     generate_id,
@@ -18,6 +18,11 @@ from src.compile import (
     build_tags,
     compile_deck,
 )
+
+
+def jsonschema_validate(payload, schema):
+    """Thin wrapper around jsonschema.validate for test readability."""
+    jsonschema.validate(payload, schema)
 
 
 def test_generate_id_deterministic():
@@ -651,3 +656,179 @@ def test_compile_topic_list_custom_deck_name():
 
         assert os.path.exists(apkg_path)
         assert os.path.getsize(apkg_path) > 0
+
+
+# ----------------------------------------------------------------------
+# Published JSON Schema tests (signal: api_schema_docs)
+#
+# These tests load the machine-readable contract under schemas/ and
+# validate a matrix of valid and invalid payloads against it. They fail
+# if the published schema drifts from the per-topic card-json.js
+# source of truth.
+# ----------------------------------------------------------------------
+
+
+SCHEMA_ROOT = os.path.join(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+    "schemas",
+)
+
+
+def _load_schema(name):
+    path = os.path.join(SCHEMA_ROOT, name)
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _basic_card():
+    return {
+        "card_format": "Basic",
+        "card_type": "Concept",
+        "tags": ["algorithms/sorting"],
+        "front": "What is the worst case of quicksort?",
+        "back": "O(n^2).",
+        "explanation": "Occurs when the pivot is always the smallest or largest element.",
+    }
+
+
+def _cloze_card():
+    return {
+        "card_format": "Cloze",
+        "card_type": "Concept",
+        "tags": ["algorithms/sorting"],
+        "front": "Quicksort average complexity is {{c1::O(n log n)}}.",
+        "explanation": "On average the partition is balanced.",
+    }
+
+
+def _mcq_card():
+    return {
+        "card_format": "MCQ",
+        "card_type": "Concept",
+        "tags": ["algorithms/sorting"],
+        "front": "Which is a stable sort?",
+        "options": ["Quicksort", "Merge sort", "Heapsort", "Selection sort"],
+        "correct_answer": "B",
+        "explanation": "Merge sort preserves the relative order of equal elements.",
+    }
+
+
+def test_published_deck_schema_accepts_single_topic_basic():
+    """A single topic with a Basic card must validate against the deck schema."""
+    schema = _load_schema("stage3-deck.schema.json")
+    payload = {
+        "title": "Quicksort",
+        "topic": "CS/Algorithms/Sorting",
+        "difficulty": "Basic",
+        "cards": [_basic_card()],
+    }
+    jsonschema_validate(payload, schema)
+
+
+def test_published_deck_schema_accepts_single_topic_cloze():
+    """A single topic with a Cloze card must validate against the deck schema."""
+    schema = _load_schema("stage3-deck.schema.json")
+    payload = {
+        "title": "Quicksort complexity",
+        "topic": "CS/Algorithms/Sorting",
+        "difficulty": "Intermediate",
+        "cards": [_cloze_card()],
+    }
+    jsonschema_validate(payload, schema)
+
+
+def test_published_deck_schema_accepts_single_topic_mcq():
+    """A single topic with an MCQ card must validate against the deck schema."""
+    schema = _load_schema("stage3-deck.schema.json")
+    payload = {
+        "title": "Stable sorts",
+        "topic": "CS/Algorithms/Sorting",
+        "difficulty": "Advanced",
+        "cards": [_mcq_card()],
+    }
+    jsonschema_validate(payload, schema)
+
+
+def test_published_deck_schema_accepts_array_of_topics():
+    """An array of topics (merged-runs shape) must validate against the deck schema."""
+    schema = _load_schema("stage3-deck.schema.json")
+    payload = [
+        {
+            "title": "Topic A",
+            "topic": "A",
+            "difficulty": "Basic",
+            "cards": [_basic_card()],
+        },
+        {
+            "title": "Topic B",
+            "topic": "B",
+            "difficulty": "Intermediate",
+            "cards": [_cloze_card(), _mcq_card()],
+        },
+    ]
+    jsonschema_validate(payload, schema)
+
+
+def test_published_deck_schema_rejects_cloze_without_marker():
+    """A Cloze card whose `front` is missing the {{c1::…}} marker must be rejected."""
+    schema = _load_schema("stage3-deck.schema.json")
+    payload = {
+        "title": "Bad",
+        "topic": "Bad",
+        "difficulty": "Basic",
+        "cards": [
+            {
+                "card_format": "Cloze",
+                "card_type": "Concept",
+                "tags": ["x"],
+                "front": "No marker here.",
+                "explanation": "Missing cloze syntax.",
+            }
+        ],
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema_validate(payload, schema)
+
+
+def test_published_deck_schema_rejects_mcq_with_short_options():
+    """An MCQ whose `correct_answer` is D but only 3 options must be rejected."""
+    schema = _load_schema("stage3-deck.schema.json")
+    payload = {
+        "title": "Bad",
+        "topic": "Bad",
+        "difficulty": "Basic",
+        "cards": [
+            {
+                "card_format": "MCQ",
+                "card_type": "Concept",
+                "tags": ["x"],
+                "front": "Pick one.",
+                "options": ["a", "b", "c"],
+                "correct_answer": "D",
+                "explanation": "D requires 4 options.",
+            }
+        ],
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema_validate(payload, schema)
+
+
+def test_published_card_schema_rejects_unknown_field():
+    """The card schema is strict; unknown fields are rejected."""
+    schema = _load_schema("stage3-card.schema.json")
+    payload = {
+        "title": "T",
+        "topic": "P",
+        "difficulty": "Basic",
+        "cards": [{**_basic_card(), "extra_field": "boom"}],
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema_validate(payload, schema)
+
+
+def test_published_schema_has_draft07_meta():
+    """The published schema advertises draft-07 so the $schema URL is valid."""
+    for name in ("stage3-deck.schema.json", "stage3-card.schema.json"):
+        schema = _load_schema(name)
+        assert schema.get("$schema") == "http://json-schema.org/draft-07/schema#", name
+        assert schema.get("$id"), name

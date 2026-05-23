@@ -40,7 +40,7 @@ export function initDatabase(dbPath) {
   if (dbConn) {
     try {
       dbConn.close();
-    } catch (error) {
+    } catch (_error) {
       // Ignore errors during cleanup of stale connection
     }
     dbConn = null;
@@ -142,9 +142,7 @@ export function closeDatabase() {
  * @param {string} params.configHash Hash representing current system configuration.
  * @returns {Database.RunResult} Result of the insertion operation.
  */
-export function createRun({
-  runId, subject, cardType, status, configHash, createdAt,
-}) {
+export function createRun({ runId, subject, cardType, status, configHash, createdAt }) {
   logger.debug`Creating run record in DB: ${runId} (subject: ${subject}, cardType: ${cardType})`;
   const db = getDb();
   const dateVal = createdAt || new Date().toISOString();
@@ -218,7 +216,15 @@ export function deleteRun(runId) {
  * @returns {Database.RunResult}
  */
 export function addPipelineStep({
-  runId, questionId, stage, provider, model, inputData, outputData, status = 'success', errors = null,
+  runId,
+  questionId,
+  stage,
+  provider,
+  model,
+  inputData,
+  outputData,
+  status = 'success',
+  errors = null,
 }) {
   logger.debug`Adding pipeline step in DB: run=${runId}, question=${questionId}, stage=${stage}, status=${status}`;
   const db = getDb();
@@ -336,9 +342,7 @@ export function getCache(cacheKey) {
  * @param {string} params.response
  * @returns {Database.RunResult}
  */
-export function setCache({
-  cacheKey, provider, model, promptHash, response,
-}) {
+export function setCache({ cacheKey, provider, model, promptHash, response }) {
   const db = getDb();
   const stmt = db.prepare(`
     INSERT INTO llm_cache (cache_key, provider, model, prompt_hash, response)

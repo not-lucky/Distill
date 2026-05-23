@@ -1,12 +1,12 @@
+import { vi, describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import {
-  vi, describe, it, expect, beforeEach, beforeAll, afterAll,
-} from 'vitest';
-import {
-  initDatabase, closeDatabase, getPipelineStepsForRun, createRun, clearCache,
+  initDatabase,
+  closeDatabase,
+  getPipelineStepsForRun,
+  createRun,
+  clearCache,
 } from '../src/database.js';
-import {
-  createProviderClients, createThrottledFetcher,
-} from '../src/providers.js';
+import { createProviderClients, createThrottledFetcher } from '../src/providers.js';
 import {
   cleanJsonOutput,
   parseStage2Questions,
@@ -34,7 +34,7 @@ vi.mock('openai', () => {
   };
 });
 
-describe('Stage 3 - AJV Schema Enforcement', () => {
+describe('Stage 3 - Zod Schema Enforcement', () => {
   let config;
   let keys;
   let clients;
@@ -79,6 +79,20 @@ describe('Stage 3 - AJV Schema Enforcement', () => {
     clients = createProviderClients(config, keys);
     throttledFetch = createThrottledFetcher(config);
   });
+
+  function buildContext(overrides = {}) {
+    return {
+      config: overrides.config || config,
+      keys: overrides.keys || keys,
+      clients: overrides.clients || clients,
+      throttledFetch: overrides.throttledFetch || throttledFetch,
+      prompts: overrides.prompts || {},
+      subject: overrides.subject || '',
+      cardType: overrides.cardType || 'standard',
+      runId: overrides.runId || 'run-default',
+      maxEnforcementRetries: overrides.maxEnforcementRetries ?? 5,
+    };
+  }
 
   describe('cleanJsonOutput helper', () => {
     it('should strip markdown code block fences correctly', () => {
@@ -132,9 +146,7 @@ Card 2 Front: What is JSX?
       ];
       expect(verifyContentLoss(stage2, stage3Valid)).toEqual([]);
 
-      const stage3Missing = [
-        { front: 'what is react?' },
-      ];
+      const stage3Missing = [{ front: 'what is react?' }];
       expect(verifyContentLoss(stage2, stage3Missing)).toEqual(['How does useEffect work?']);
     });
   });
@@ -278,29 +290,16 @@ Card 2 Front: What is JSX?
   describe('runStage3 main function', () => {
     it('should throw error if synthesisResult is missing or empty', async () => {
       await expect(
-        runStage3({
-          runId: 'run-3-1',
-          questionId: 'q-3-1',
-          synthesisResult: '',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-        }),
+        runStage3(buildContext(), { questionId: 'q-3-1', synthesisResult: '' }),
       ).rejects.toThrow('Stage 2 synthesis result is missing or empty');
     });
 
     it('should throw error if model configuration is missing', async () => {
       const badConfig = { pipeline: {} };
       await expect(
-        runStage3({
-          runId: 'run-3-2',
+        runStage3(buildContext({ config: badConfig }), {
           questionId: 'q-3-2',
           synthesisResult: 'Front: Test Q',
-          config: badConfig,
-          keys,
-          clients,
-          throttledFetch,
         }),
       ).rejects.toThrow('No schema enforcement model configured');
     });
@@ -336,14 +335,9 @@ Card 2 Front: What is JSX?
         configHash: 'hash-basic',
       });
 
-      const result = await runStage3({
-        runId,
+      const result = await runStage3(buildContext({ runId, subject: 'ReactPreset' }), {
         questionId: 'q-basic',
         synthesisResult: 'Front: What is React?\nBack: A library',
-        config,
-        keys,
-        clients,
-        throttledFetch,
       });
 
       expect(result).toEqual(mockResultObj);
@@ -384,14 +378,9 @@ Card 2 Front: What is JSX?
         configHash: 'hash-cloze',
       });
 
-      const result = await runStage3({
-        runId,
+      const result = await runStage3(buildContext({ runId, subject: 'ReactPreset' }), {
         questionId: 'q-cloze',
         synthesisResult: 'Front: Use the {{c1::useState}} hook to manage functional state.',
-        config,
-        keys,
-        clients,
-        throttledFetch,
       });
 
       expect(result).toEqual(mockResultObj);
@@ -429,15 +418,13 @@ Card 2 Front: What is JSX?
         configHash: 'hash-mcq',
       });
 
-      const result = await runStage3({
-        runId,
-        questionId: 'q-mcq',
-        synthesisResult: 'Front: Which of the following is NOT a primitive type in JavaScript?',
-        config,
-        keys,
-        clients,
-        throttledFetch,
-      });
+      const result = await runStage3(
+        buildContext({ runId, subject: 'JSPreset', cardType: 'mcq' }),
+        {
+          questionId: 'q-mcq',
+          synthesisResult: 'Front: Which of the following is NOT a primitive type in JavaScript?',
+        },
+      );
 
       expect(result).toEqual(mockResultObj);
     });
@@ -476,16 +463,15 @@ Card 2 Front: What is JSX?
       });
 
       await expect(
-        runStage3({
-          runId: 'run-mcq-invalid-c',
-          questionId: 'q-mcq-c',
-          synthesisResult: 'Front: Question',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-          maxEnforcementRetries: 1,
-        }),
+        runStage3(
+          buildContext({
+            runId: 'run-mcq-invalid-c',
+            subject: 'JSPreset',
+            cardType: 'mcq',
+            maxEnforcementRetries: 1,
+          }),
+          { questionId: 'q-mcq-c', synthesisResult: 'Front: Question' },
+        ),
       ).rejects.toThrow('must NOT have fewer than 3 items');
     });
 
@@ -523,16 +509,15 @@ Card 2 Front: What is JSX?
       });
 
       await expect(
-        runStage3({
-          runId: 'run-mcq-invalid-d',
-          questionId: 'q-mcq-d',
-          synthesisResult: 'Front: Question',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-          maxEnforcementRetries: 1,
-        }),
+        runStage3(
+          buildContext({
+            runId: 'run-mcq-invalid-d',
+            subject: 'JSPreset',
+            cardType: 'mcq',
+            maxEnforcementRetries: 1,
+          }),
+          { questionId: 'q-mcq-d', synthesisResult: 'Front: Question' },
+        ),
       ).rejects.toThrow('options must NOT have fewer than 4 items');
     });
 
@@ -574,16 +559,10 @@ Card 2 Front: What is JSX?
         configHash: 'hash-rec-json',
       });
 
-      const result = await runStage3({
-        runId,
-        questionId: 'q-recovery-json',
-        synthesisResult: 'Front: What is React?',
-        config,
-        keys,
-        clients,
-        throttledFetch,
-        maxEnforcementRetries: 3,
-      });
+      const result = await runStage3(
+        buildContext({ runId, subject: 'ReactPreset', maxEnforcementRetries: 3 }),
+        { questionId: 'q-recovery-json', synthesisResult: 'Front: What is React?' },
+      );
 
       expect(result).toEqual(mockResultObj);
       expect(mockCompletions).toHaveBeenCalledTimes(2);
@@ -596,7 +575,7 @@ Card 2 Front: What is JSX?
       expect(secondCallParams.messages[3].content).toContain('JSON Parsing Error');
     });
 
-    it('should trigger recovery loop on AJV validation error and succeed on retry', async () => {
+    it('should trigger recovery loop on Zod validation error and succeed on retry', async () => {
       const openaiClient = clients.get('openai');
       const mockCompletions = vi.spyOn(openaiClient.chat.completions, 'create');
 
@@ -651,22 +630,18 @@ Card 2 Front: What is JSX?
         configHash: 'hash-rec-schema',
       });
 
-      const result = await runStage3({
-        runId,
-        questionId: 'q-recovery-schema',
-        synthesisResult: 'Front: What is React?',
-        config,
-        keys,
-        clients,
-        throttledFetch,
-        maxEnforcementRetries: 3,
-      });
+      const result = await runStage3(
+        buildContext({ runId, subject: 'ReactPreset', maxEnforcementRetries: 3 }),
+        { questionId: 'q-recovery-schema', synthesisResult: 'Front: What is React?' },
+      );
 
       expect(result).toEqual(mockResultObj);
       expect(mockCompletions).toHaveBeenCalledTimes(2);
 
       const secondCallParams = mockCompletions.mock.calls[1][0];
-      expect(secondCallParams.messages[3].content).toContain('Invalid input: expected string, received undefined');
+      expect(secondCallParams.messages[3].content).toContain(
+        'Invalid input: expected string, received undefined',
+      );
     });
 
     it('should trigger recovery loop on Content Loss Audit failure and succeed on retry', async () => {
@@ -731,16 +706,13 @@ Card 2 Front: What is JSX?
         configHash: 'hash-rec-audit',
       });
 
-      const result = await runStage3({
-        runId,
-        questionId: 'q-recovery-audit',
-        synthesisResult: 'Front: What is React?\nFront: Explain Virtual DOM',
-        config,
-        keys,
-        clients,
-        throttledFetch,
-        maxEnforcementRetries: 3,
-      });
+      const result = await runStage3(
+        buildContext({ runId, subject: 'ReactPreset', maxEnforcementRetries: 3 }),
+        {
+          questionId: 'q-recovery-audit',
+          synthesisResult: 'Front: What is React?\nFront: Explain Virtual DOM',
+        },
+      );
 
       expect(result).toEqual(mockResultObj);
       expect(mockCompletions).toHaveBeenCalledTimes(2);
@@ -769,16 +741,14 @@ Card 2 Front: What is JSX?
       });
 
       await expect(
-        runStage3({
-          runId: 'run-recovery-fail',
-          questionId: 'q-recovery-fail',
-          synthesisResult: 'Front: What is React?',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-          maxEnforcementRetries: 2,
-        }),
+        runStage3(
+          buildContext({
+            runId: 'run-recovery-fail',
+            subject: 'ReactPreset',
+            maxEnforcementRetries: 2,
+          }),
+          { questionId: 'q-recovery-fail', synthesisResult: 'Front: What is React?' },
+        ),
       ).rejects.toThrow('Stage 3 Schema Enforcement failed after 2 attempts');
     });
 
@@ -820,16 +790,10 @@ Card 2 Front: What is JSX?
         configHash: 'hash-failed-save',
       });
 
-      const result = await runStage3({
-        runId,
-        questionId: 'q-failed-save',
-        synthesisResult: 'Front: What is React?',
-        config,
-        keys,
-        clients,
-        throttledFetch,
-        maxEnforcementRetries: 3,
-      });
+      const result = await runStage3(
+        buildContext({ runId, subject: 'ReactPreset', maxEnforcementRetries: 3 }),
+        { questionId: 'q-failed-save', synthesisResult: 'Front: What is React?' },
+      );
 
       expect(result).toEqual(mockResultObj);
       expect(mockCompletions).toHaveBeenCalledTimes(2);
@@ -856,31 +820,23 @@ Card 2 Front: What is JSX?
       expect(verifyContentLoss(stage2, {})).toEqual(stage2);
     });
 
-    it('verifyContentLoss edge cases: stage2 has empty/non-alphanumeric questions', () => {
-      const stage2 = ['?', '   ', '!!!'];
-      // Should skip them without checking or flagging as missing
-      expect(verifyContentLoss(stage2, [])).toEqual([]);
-    });
-
-    it('verifyContentLoss edge cases: card is null or front is not a string', () => {
-      const stage2 = ['What is React?'];
-      const cards = [null, { front: 123 }, { front: 'What is React?' }];
-      expect(verifyContentLoss(stage2, cards)).toEqual([]);
-    });
-
-    it('cleanJsonOutput edge cases: non-string or no match', () => {
+    it('verifyContentLoss/cleanJsonOutput/parseStage2Questions defensive inputs', () => {
+      // verifyContentLoss: empty/punctuation-only stage2 questions are skipped
+      expect(verifyContentLoss(['?', '   ', '!!!'], [])).toEqual([]);
+      // verifyContentLoss: null/typed fronts are tolerated
+      expect(
+        verifyContentLoss(['What is React?'], [null, { front: 123 }, { front: 'What is React?' }]),
+      ).toEqual([]);
+      // cleanJsonOutput: non-string and code-block-with-surrounding-text
       expect(cleanJsonOutput(1234)).toBe('');
-      // If codeBlockMatch matches but we have text outside
       expect(cleanJsonOutput('some text ```json\n{"a": 1}\n``` other text')).toBe('{"a": 1}');
-    });
-
-    it('parseStage2Questions edge cases: non-string input or empty matching line', () => {
+      // parseStage2Questions: non-string input and empty matches
       expect(parseStage2Questions(123)).toEqual([]);
       expect(parseStage2Questions(null)).toEqual([]);
       expect(parseStage2Questions('Front:\nFront:   ')).toEqual([]);
     });
 
-    it('runStage3 edge cases: prompts.schema_enforcement override empty and root level AJV validation error', async () => {
+    it('runStage3 edge cases: prompts.schema_enforcement override empty and root level Zod validation error', async () => {
       // Missing 'cards' root property, prompting a root-level error '/'
       const mockResultObj = {
         title: 'React Basics',
@@ -904,17 +860,15 @@ Card 2 Front: What is JSX?
 
       // Pass empty schema_enforcement to test DEFAULT_ENFORCEMENT fallback
       await expect(
-        runStage3({
-          runId,
-          questionId: 'q-root-error',
-          synthesisResult: 'Front: What is React?',
-          prompts: { defaults: { schema_enforcement: '' } },
-          config,
-          keys,
-          clients,
-          throttledFetch,
-          maxEnforcementRetries: 1,
-        }),
+        runStage3(
+          buildContext({
+            runId,
+            subject: 'ReactPreset',
+            prompts: { defaults: { schema_enforcement: '' } },
+            maxEnforcementRetries: 1,
+          }),
+          { questionId: 'q-root-error', synthesisResult: 'Front: What is React?' },
+        ),
       ).rejects.toThrow('/cards: Invalid input: expected array, received undefined');
     });
 
@@ -941,15 +895,9 @@ Card 2 Front: What is JSX?
       });
 
       await expect(
-        runStage3({
-          runId,
+        runStage3(buildContext({ runId, subject: 'ReactPreset', maxEnforcementRetries: 1 }), {
           questionId: 'q-missing-cards',
           synthesisResult: 'Front: What is React?',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-          maxEnforcementRetries: 1,
         }),
       ).rejects.toThrow('/cards: Invalid input: expected array, received undefined');
     });
@@ -972,16 +920,14 @@ Card 2 Front: What is JSX?
       });
 
       await expect(
-        runStage3({
-          runId: 'run-root-val-error',
-          questionId: 'q-root-val-error',
-          synthesisResult: 'Front: What is React?',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-          maxEnforcementRetries: 1,
-        }),
+        runStage3(
+          buildContext({
+            runId: 'run-root-val-error',
+            subject: 'ReactPreset',
+            maxEnforcementRetries: 1,
+          }),
+          { questionId: 'q-root-val-error', synthesisResult: 'Front: What is React?' },
+        ),
       ).rejects.toThrow('/: Invalid input: expected object, received string');
     });
 
@@ -1030,15 +976,14 @@ Card 2 Front: What is JSX?
         configHash: 'hash-completion-api',
       });
 
-      const result = await runStage3({
-        runId,
-        questionId: 'q-completion-api',
-        synthesisResult: 'Front: What is React?',
-        config: configWithCompletion,
-        keys,
-        clients,
-        throttledFetch,
-      });
+      const result = await runStage3(
+        buildContext({
+          runId,
+          subject: 'ReactPreset',
+          config: configWithCompletion,
+        }),
+        { questionId: 'q-completion-api', synthesisResult: 'Front: What is React?' },
+      );
 
       expect(result).toEqual(mockResultObj);
       expect(createSpy).toHaveBeenCalledTimes(1);
