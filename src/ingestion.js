@@ -50,7 +50,7 @@ export async function readFileWithFallback(filePath) {
     try {
       const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
       return utf8Decoder.decode(buffer);
-    } catch (utf8Error) {
+    } catch (_utf8Error) {
       // 2. Fall back to Latin-1 (ISO-8859-1 / windows-1252)
       // windows-1252 maps all possible 8-bit byte values (0x00 - 0xFF) to characters,
       // which acts as a reliable fallback for single-byte legacy encodings.
@@ -93,7 +93,8 @@ async function walkDirectory(dirPath, allowedExtensions) {
       const fullPath = path.join(dirPath, entry.name);
       if (entry.isDirectory()) {
         return walkDirectory(fullPath, allowedExtensions);
-      } if (entry.isFile()) {
+      }
+      if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
         if (allowedExtensions.includes(ext)) {
           return [fullPath];
@@ -173,6 +174,29 @@ export async function ingestDirectory(rootPath) {
   return results;
 }
 
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function validateCategory(category) {
+  if (!category || typeof category !== 'object') {
+    throw new Error('Category entry must be an object.');
+  }
+  if (!isNonEmptyString(category.name)) {
+    throw new Error('Category entry must have a non-empty "name" string field.');
+  }
+  if (!Array.isArray(category.topics)) {
+    throw new Error('Category entry must have a "topics" array.');
+  }
+  for (const topic of category.topics) validateTopic(topic);
+}
+
+function validateTopic(topic) {
+  if (!isNonEmptyString(topic)) {
+    throw new Error('Topic must be a non-empty string.');
+  }
+}
+
 /**
  * Validates and parses topic presets in YAML format.
  *
@@ -192,26 +216,10 @@ export function parsePreset(fileContent) {
       throw new Error('Preset must have a "categories" array.');
     }
 
-    for (const category of doc.categories) {
-      if (!category || typeof category !== 'object') {
-        throw new Error('Category entry must be an object.');
-      }
-      if (typeof category.name !== 'string' || category.name.trim().length === 0) {
-        throw new Error('Category entry must have a non-empty "name" string field.');
-      }
-      if (!Array.isArray(category.topics)) {
-        throw new Error('Category entry must have a "topics" array.');
-      }
-      for (const topic of category.topics) {
-        if (typeof topic !== 'string' || topic.trim().length === 0) {
-          throw new Error('Topic must be a non-empty string.');
-        }
-      }
-    }
-
+    for (const category of doc.categories) validateCategory(category);
     return doc;
   } catch (error) {
-    throw new Error(`Failed to parse preset: ${error.message}`);
+    throw new Error(`Failed to parse preset: ${error.message}`, { cause: error });
   }
 }
 

@@ -39,13 +39,13 @@ subjects:
     synthesis: |
       Consolidate algorithmic insights. Retain complexity trade-offs.
     categories:
-      - name: "Arrays & Hashing"
+      - name: 'Arrays & Hashing'
         topics:
-          - "Two Sum"
-          - "Group Anagrams"
-      - name: "Two Pointers"
+          - 'Two Sum'
+          - 'Group Anagrams'
+      - name: 'Two Pointers'
         topics:
-          - "Valid Palindrome"
+          - 'Valid Palindrome'
 
   # ---- Document mode subject ----
   # Active when: `node src/cli.js run notes`
@@ -58,6 +58,6 @@ subjects:
     generation: |
       Focus on extracting clear terminology definitions and syntax details.
     files:
-      - "./scratch/doc1.txt"
-      - "./scratch/doc2.md"
+      - './scratch/doc1.txt'
+      - './scratch/doc2.md'
     # folder: "./scratch/notes"

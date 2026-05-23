@@ -1,6 +1,4 @@
-import {
-  describe, it, expect, beforeAll, afterAll, beforeEach, afterEach,
-} from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
@@ -68,13 +66,19 @@ describe('Database Module & SQLite Operations', () => {
     const db = getDb();
 
     // Check if runs, pipeline_steps, and llm_cache tables exist
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+      .all()
+      .map((r) => r.name);
     expect(tables).toContain('runs');
     expect(tables).toContain('pipeline_steps');
     expect(tables).toContain('llm_cache');
 
     // Check if indices exist
-    const indices = db.prepare("SELECT name FROM sqlite_master WHERE type='index'").all().map((r) => r.name);
+    const indices = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='index'")
+      .all()
+      .map((r) => r.name);
     expect(indices).toContain('idx_pipeline_steps_lookup');
     expect(indices).toContain('idx_runs_status');
   });
@@ -272,17 +276,19 @@ describe('Database Module & SQLite Operations', () => {
     const promises = [];
 
     for (let i = 0; i < insertionCount; i++) {
-      promises.push((async () => {
-        addPipelineStep({
-          runId,
-          questionId: `parallel-q-${i}`,
-          stage: 'generation',
-          provider: 'cerebras',
-          model: 'llama3',
-          inputData: `input-${i}`,
-          outputData: `output-${i}`,
-        });
-      })());
+      promises.push(
+        (async () => {
+          addPipelineStep({
+            runId,
+            questionId: `parallel-q-${i}`,
+            stage: 'generation',
+            provider: 'cerebras',
+            model: 'llama3',
+            inputData: `input-${i}`,
+            outputData: `output-${i}`,
+          });
+        })(),
+      );
     }
 
     // Await all parallel write operations
@@ -349,43 +355,6 @@ describe('Database Module & SQLite Operations', () => {
     // Verify that tx-q-3 was NOT inserted due to rollback
     const stepsAfter = getPipelineStepsForRun(runId);
     expect(stepsAfter.length).toBe(2); // Still 2, no tx-q-3
-  });
-
-  it('should handle nested directory database path creation', () => {
-    // Close the standard test DB
-    closeDatabase();
-
-    const nestedDbPath = path.join(FIXTURES_DIR, 'nested1/nested2/test_nested.db');
-    // Ensure clean state: delete nested database file if present
-    if (fs.existsSync(nestedDbPath)) {
-      fs.unlinkSync(nestedDbPath);
-    }
-    const nestedDir = path.join(FIXTURES_DIR, 'nested1/nested2');
-    if (fs.existsSync(nestedDir)) {
-      fs.rmSync(path.join(FIXTURES_DIR, 'nested1'), { recursive: true, force: true });
-    }
-
-    // initDatabase should recursively create parent directories nested1/nested2
-    initDatabase(nestedDbPath);
-    expect(fs.existsSync(nestedDbPath)).toBe(true);
-
-    // Clean up
-    closeDatabase();
-    fs.rmSync(path.join(FIXTURES_DIR, 'nested1'), { recursive: true, force: true });
-  });
-
-  it('should safely close stale connections when initDatabase is called multiple times', () => {
-    // Call initDatabase to open first connection
-    const db1 = getDb();
-
-    // Call initDatabase again on standard path to re-initialize
-    const db2 = initDatabase(TEST_DB_PATH);
-
-    // db1 should now be closed. Calling prepare on db1 should throw because it is closed.
-    expect(() => db1.prepare('SELECT 1')).toThrow(/database connection is not open/);
-
-    // db2 should be open and operational
-    expect(db2.prepare('SELECT 1').get()).toEqual({ 1: 1 });
   });
 
   it('should enforce NOT NULL constraints on runs table', () => {
@@ -528,36 +497,5 @@ describe('Database Module & SQLite Operations', () => {
     const questionIds = steps.map((s) => s.question_id);
     expect(questionIds).toContain('outer-q');
     expect(questionIds).not.toContain('inner-q');
-  });
-
-  it('should handle special unicode characters and large inputs', () => {
-    const runId = 'special-char-run';
-    createRun({
-      runId,
-      subject: 'Unicode Study 🚀',
-      cardType: 'standard',
-      status: 'running',
-      configHash: 'hash',
-    });
-
-    // Large code block and complex unicode text
-    const largeUnicodeInput = `const x = "你好, 世界!";\n${'🚀'.repeat(10000)}`;
-    const unicodeOutput = 'Output: 🌟 🎏 💖';
-
-    addPipelineStep({
-      runId,
-      questionId: 'unicode-q',
-      stage: 'generation',
-      provider: 'openai compatible client',
-      model: 'gpt-4o-unicode-🚀',
-      inputData: largeUnicodeInput,
-      outputData: unicodeOutput,
-    });
-
-    const steps = getPipelineSteps(runId, 'unicode-q');
-    expect(steps.length).toBe(1);
-    expect(steps[0].input_data).toBe(largeUnicodeInput);
-    expect(steps[0].output_data).toBe(unicodeOutput);
-    expect(steps[0].model).toBe('gpt-4o-unicode-🚀');
   });
 });

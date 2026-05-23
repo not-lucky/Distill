@@ -25,3 +25,14 @@ coverage/
 output/
 scratch/
 logs/
+
+# Test output artifacts
+output-test
+tests/temp_out_concurrency/
+tests/temp_out_concurrency_error/
+tests/temp_out_concurrency_skip/
+
+# Python tool caches
+.ruff_cache/
+# Static analysis reports
+reports/

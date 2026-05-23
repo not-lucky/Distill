@@ -10,11 +10,11 @@
 
 # Multiple keys enable automatic round-robin rotation to spread rate limits.
 openai:
-  - "sk-replace-with-primary-openai-key"
-  - "sk-replace-with-rotation-openai-key"
+  - 'sk-replace-with-primary-openai-key'
+  - 'sk-replace-with-rotation-openai-key'
 cerebras:
-  - "csk-replace-with-your-cerebras-key"
+  - 'csk-replace-with-your-cerebras-key'
 # Ollama runs locally; the literal string "ollama" is hard-coded in
 # src/providers.js:108 as a default placeholder.
 ollama_local:
-  - "ollama"
+  - 'ollama'

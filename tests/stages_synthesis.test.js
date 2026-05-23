@@ -1,19 +1,20 @@
+import { vi, describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import {
-  vi, describe, it, expect, beforeEach, beforeAll, afterAll,
-} from 'vitest';
-import {
-  initDatabase, closeDatabase, getPipelineStepsForRun, createRun, clearCache,
+  initDatabase,
+  closeDatabase,
+  getPipelineStepsForRun,
+  createRun,
+  clearCache,
 } from '../src/database.js';
 import {
-  createProviderClients, createThrottledFetcher, computeCacheKey, computePromptHash, writeCache,
+  createProviderClients,
+  createThrottledFetcher,
+  computeCacheKey,
+  computePromptHash,
+  writeCache,
 } from '../src/providers.js';
-import {
-  DEFAULT_SYNTHESIS,
-  FORMAT_STANDARD,
-} from '../src/prompts.js';
-import {
-  runStage2,
-} from '../src/stages.js';
+import { DEFAULT_SYNTHESIS, FORMAT_STANDARD } from '../src/prompts.js';
+import { runStage2 } from '../src/stages.js';
 
 vi.mock('openai', () => {
   const MockOpenAI = vi.fn().mockImplementation(function mockOpenAIConstructor(options) {
@@ -78,6 +79,21 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
     throttledFetch = createThrottledFetcher(config);
   });
 
+  function buildContext(overrides = {}) {
+    return {
+      config: overrides.config !== undefined ? overrides.config : config,
+      keys: overrides.keys !== undefined ? overrides.keys : keys,
+      clients: overrides.clients !== undefined ? overrides.clients : clients,
+      throttledFetch:
+        overrides.throttledFetch !== undefined ? overrides.throttledFetch : throttledFetch,
+      prompts: overrides.prompts || {},
+      subject: overrides.subject || '',
+      cardType: overrides.cardType || 'standard',
+      runId: overrides.runId || 'run-default',
+      maxEnforcementRetries: overrides.maxEnforcementRetries ?? 3,
+    };
+  }
+
   it('should throw an error if synthesis model is not configured', async () => {
     const invalidConfig = {
       pipeline: {
@@ -86,41 +102,20 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
     };
 
     await expect(
-      runStage2({
-        runId: 'run-synthesis-1',
+      runStage2(buildContext({ config: invalidConfig }), {
         questionId: 'q-test-1',
         stage1Results: [{ provider: 'openai', model: 'gpt-3.5-turbo', output: 'some output' }],
-        config: invalidConfig,
-        keys,
-        clients,
-        throttledFetch,
       }),
     ).rejects.toThrow('No synthesis model configured in config.pipeline.synthesis.model');
   });
 
   it('should throw an error if Stage 1 results are missing or empty', async () => {
     await expect(
-      runStage2({
-        runId: 'run-synthesis-2',
-        questionId: 'q-test-2',
-        stage1Results: [],
-        config,
-        keys,
-        clients,
-        throttledFetch,
-      }),
+      runStage2(buildContext(), { questionId: 'q-test-2', stage1Results: [] }),
     ).rejects.toThrow('No Stage 1 results provided');
 
     await expect(
-      runStage2({
-        runId: 'run-synthesis-2',
-        questionId: 'q-test-2',
-        stage1Results: null,
-        config,
-        keys,
-        clients,
-        throttledFetch,
-      }),
+      runStage2(buildContext(), { questionId: 'q-test-2', stage1Results: null }),
     ).rejects.toThrow('No Stage 1 results provided');
   });
 
@@ -144,17 +139,9 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
       { provider: 'cerebras', model: 'llama3.1-70b', output: 'Card 2 from Cerebras' },
     ];
 
-    const result = await runStage2({
-      runId,
+    const result = await runStage2(buildContext({ runId, subject: 'LeetCode' }), {
       questionId: 'q-synthesis-1',
       stage1Results,
-      cardType: 'standard',
-      subject: 'LeetCode',
-      prompts: {},
-      config,
-      keys,
-      clients,
-      throttledFetch,
     });
 
     expect(result).toBe('Synthesized flashcard list output');
@@ -167,9 +154,13 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
     expect(calledWithParams.messages[0].role).toBe('system');
     expect(calledWithParams.messages[0].content).toContain(DEFAULT_SYNTHESIS);
     expect(calledWithParams.messages[1].role).toBe('user');
-    expect(calledWithParams.messages[1].content).toContain('--- Provider: openai, Model: gpt-3.5-turbo ---');
+    expect(calledWithParams.messages[1].content).toContain(
+      '--- Provider: openai, Model: gpt-3.5-turbo ---',
+    );
     expect(calledWithParams.messages[1].content).toContain('Card 1 from OpenAI');
-    expect(calledWithParams.messages[1].content).toContain('--- Provider: cerebras, Model: llama3.1-70b ---');
+    expect(calledWithParams.messages[1].content).toContain(
+      '--- Provider: cerebras, Model: llama3.1-70b ---',
+    );
     expect(calledWithParams.messages[1].content).toContain('Card 2 from Cerebras');
 
     // Verify DB pipeline step logging
@@ -211,23 +202,17 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
       { provider: 'openai', model: 'gpt-3.5-turbo', output: 'Raw cards content' },
     ];
 
-    const result = await runStage2({
-      runId,
-      questionId: 'q-synthesis-yaml',
-      stage1Results,
-      cardType: 'standard',
-      subject: 'CustomLC',
-      prompts: promptsConfig,
-      config,
-      keys,
-      clients,
-      throttledFetch,
-    });
+    const result = await runStage2(
+      buildContext({ runId, subject: 'CustomLC', prompts: promptsConfig }),
+      { questionId: 'q-synthesis-yaml', stage1Results },
+    );
 
     expect(result).toBe('Custom synthesis output');
     const calledWithParams = mockCreate.mock.calls[0][0];
     expect(calledWithParams.messages[0].content).toContain('YAML Default Synthesis Guidelines');
-    expect(calledWithParams.messages[0].content).toContain('YAML Custom Subject Combiner Guidelines');
+    expect(calledWithParams.messages[0].content).toContain(
+      'YAML Custom Subject Combiner Guidelines',
+    );
   });
 
   it('should propagate API errors correctly', async () => {
@@ -245,29 +230,18 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
       configHash: 'hash123',
     });
 
-    const stage1Results = [
-      { provider: 'openai', model: 'gpt-3.5-turbo', output: 'Card 1' },
-    ];
+    const stage1Results = [{ provider: 'openai', model: 'gpt-3.5-turbo', output: 'Card 1' }];
 
     await expect(
-      runStage2({
-        runId,
-        questionId: 'q-err-1',
-        stage1Results,
-        cardType: 'standard',
-        config,
-        keys,
-        clients,
-        throttledFetch,
-      }),
+      runStage2(buildContext({ runId }), { questionId: 'q-err-1', stage1Results }),
     ).rejects.toThrow('API Rate Limit Exceeded');
   });
 
   it('should integrate with llm_cache and return cached results without API call', async () => {
     const openaiClient = clients.get('openai');
-    const mockCreate = vi.spyOn(openaiClient.chat.completions, 'create').mockRejectedValue(
-      new Error('Should not make API call on cache hit'),
-    );
+    const mockCreate = vi
+      .spyOn(openaiClient.chat.completions, 'create')
+      .mockRejectedValue(new Error('Should not make API call on cache hit'));
 
     const runId = 'run-synthesis-cache-1';
     createRun({
@@ -278,9 +252,7 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
       configHash: 'hash123',
     });
 
-    const stage1Results = [
-      { provider: 'openai', model: 'gpt-3.5-turbo', output: 'Card 1' },
-    ];
+    const stage1Results = [{ provider: 'openai', model: 'gpt-3.5-turbo', output: 'Card 1' }];
 
     const combinedContent = '--- Provider: openai, Model: gpt-3.5-turbo ---\nCard 1';
     const messages = [
@@ -305,17 +277,9 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
       response: 'Cached consolidated flashcard list',
     });
 
-    const result = await runStage2({
-      runId,
+    const result = await runStage2(buildContext({ runId, subject: 'LeetCode' }), {
       questionId: 'q-cache-1',
       stage1Results,
-      cardType: 'standard',
-      subject: 'LeetCode',
-      prompts: {},
-      config,
-      keys,
-      clients,
-      throttledFetch,
     });
 
     expect(result).toBe('Cached consolidated flashcard list');
@@ -335,14 +299,9 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
       // Intent: Verify function resilience when the main config object is
       // completely missing or null.
       await expect(
-        runStage2({
-          runId: 'run-edge-1',
+        runStage2(buildContext({ config: null }), {
           questionId: 'q-edge-1',
           stage1Results: [{ provider: 'openai', model: 'gpt-3.5-turbo', output: 'content' }],
-          config: null,
-          keys,
-          clients,
-          throttledFetch,
         }),
       ).rejects.toThrow();
     });
@@ -351,14 +310,9 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
       // Intent: Verify handling when config is present but the pipeline stage
       // mappings block is missing.
       await expect(
-        runStage2({
-          runId: 'run-edge-2',
+        runStage2(buildContext({ config: { global: {} } }), {
           questionId: 'q-edge-2',
           stage1Results: [{ provider: 'openai', model: 'gpt-3.5-turbo', output: 'content' }],
-          config: { global: {} },
-          keys,
-          clients,
-          throttledFetch,
         }),
       ).rejects.toThrow('No synthesis model configured');
     });
@@ -374,14 +328,9 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
 
       for (const badConfig of invalidConfigs) {
         await expect(
-          runStage2({
-            runId: 'run-edge-3',
+          runStage2(buildContext({ config: badConfig }), {
             questionId: 'q-edge-3',
             stage1Results: [{ provider: 'openai', model: 'gpt-3.5-turbo', output: 'content' }],
-            config: badConfig,
-            keys,
-            clients,
-            throttledFetch,
           }),
         ).rejects.toThrow('Invalid model format');
       }
@@ -399,15 +348,7 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
 
       for (const results of badStage1Results) {
         await expect(
-          runStage2({
-            runId: 'run-edge-4',
-            questionId: 'q-edge-4',
-            stage1Results: results,
-            config,
-            keys,
-            clients,
-            throttledFetch,
-          }),
+          runStage2(buildContext(), { questionId: 'q-edge-4', stage1Results: results }),
         ).rejects.toThrow('Stage 1 result item is missing a valid string output');
       }
     });
@@ -434,14 +375,9 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
         { provider: '', model: null, output: 'Card B' }, // empty/null provider and model
       ];
 
-      await runStage2({
-        runId,
+      await runStage2(buildContext({ runId, subject: 'LeetCode' }), {
         questionId: 'q-edge-5',
         stage1Results: results,
-        config,
-        keys,
-        clients,
-        throttledFetch,
       });
 
       const calledWithParams = mockCreate.mock.calls[0][0];
@@ -474,18 +410,13 @@ describe('Stage 2 Pipeline - Frontier Synthesis', () => {
         },
       };
 
-      await runStage2({
-        runId,
-        questionId: 'q-edge-6',
-        stage1Results: [{ provider: 'openai', model: 'gpt-3.5-turbo', output: 'content' }],
-        cardType: 'mcq',
-        subject: 'LeetCode',
-        prompts: promptsConfig,
-        config,
-        keys,
-        clients,
-        throttledFetch,
-      });
+      await runStage2(
+        buildContext({ runId, subject: 'LeetCode', cardType: 'mcq', prompts: promptsConfig }),
+        {
+          questionId: 'q-edge-6',
+          stage1Results: [{ provider: 'openai', model: 'gpt-3.5-turbo', output: 'content' }],
+        },
+      );
 
       const calledWithParams = mockCreate.mock.calls[0][0];
       expect(calledWithParams.messages[0].content).toContain('MCQ Specific Combiner Rule');

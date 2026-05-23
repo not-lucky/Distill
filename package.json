@@ -2,14 +2,38 @@
   "name": "llm2deck",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/cli.js",
   "scripts": {
     "test": "vitest run && uv run pytest",
     "test:js": "vitest run",
+    "test:js:no-cov": "vitest run --coverage=false",
     "test:py": "uv run pytest",
+    "test:e2e": "vitest run tests/integration",
     "coverage": "vitest run --coverage",
-    "lint": "eslint . && uv run ruff check src tests && uv run ruff format --check src tests",
-    "lint:fix": "eslint . --fix && uv run ruff check --fix src tests && uv run ruff format src tests"
+    "lint": "eslint . && prettier --check . && uv run ruff check src tests && uv run ruff format --check src tests && npm run schemas:export",
+    "lint:fix": "eslint . --fix && prettier --write . && uv run ruff check --fix src tests && uv run ruff format src tests",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "uv run ty check src",
+    "deadcode": "knip",
+    "deps:check": "depcheck",
+    "duplication": "jscpd",
+    "todo:scan": "node scripts/scan-todos.js",
+    "prepare": "husky",
+    "schemas:export": "node scripts/export-schemas.js",
+    "agents:validate": "node scripts/validate-agents-md.js",
+    "docs:build": "uv run mkdocs build --strict",
+    "docs:serve": "uv run mkdocs serve",
+    "verify": "npm run schemas:export && npm run agents:validate && npm run docs:build"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --fix --max-warnings=0",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "repository": {
     "type": "git",
@@ -24,20 +48,33 @@
   },
   "homepage": "https://github.com/not-lucky/LLM2Deck#readme",
   "dependencies": {
-    "@logtape/file": "^2.1.1",
-    "@logtape/logtape": "^2.1.1",
-    "better-sqlite3": "^12.10.0",
-    "commander": "^15.0.0",
-    "js-yaml": "^4.1.1",
-    "openai": "^6.39.1",
-    "p-limit": "^7.3.0",
-    "zod": "^4.4.3"
+    "@logtape/file": "2.1.5",
+    "@logtape/logtape": "2.1.5",
+    "better-sqlite3": "12.11.1",
+    "commander": "15.0.0",
+    "js-yaml": "4.2.0",
+    "openai": "6.44.0",
+    "p-limit": "7.3.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.7",
-    "eslint": "^8.57.1",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.32.0",
-    "vitest": "^4.1.7"
+    "@eslint/js": "10.0.1",
+    "@vitest/coverage-v8": "4.1.9",
+    "depcheck": "1.4.7",
+    "eslint": "10.5.0",
+    "eslint-plugin-boundaries": "6.0.2",
+    "eslint-plugin-import-x": "4.16.2",
+    "eslint-plugin-n": "18.1.0",
+    "globals": "17.6.0",
+    "husky": "9.1.7",
+    "jscpd": "5.0.10",
+    "knip": "6.17.1",
+    "lint-staged": "17.0.7",
+    "prettier": "3.8.4",
+    "vitest": "4.1.9"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "unrs-resolver@1.12.2": true
   }
 }

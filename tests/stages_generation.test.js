@@ -1,13 +1,13 @@
-import {
-  vi, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
 import {
-  initDatabase, closeDatabase, getPipelineStepsForRun, createRun, clearCache,
+  initDatabase,
+  closeDatabase,
+  getPipelineStepsForRun,
+  createRun,
+  clearCache,
 } from '../src/database.js';
-import {
-  createProviderClients, createThrottledFetcher,
-} from '../src/providers.js';
+import { createProviderClients, createThrottledFetcher } from '../src/providers.js';
 import {
   resolvePrompts,
   DEFAULT_GENERATION,
@@ -15,9 +15,7 @@ import {
   DEFAULT_ENFORCEMENT,
   DEFAULT_GENERATION_DOCUMENT,
 } from '../src/prompts.js';
-import {
-  runStage1,
-} from '../src/stages.js';
+import { runStage1 } from '../src/stages.js';
 import { loadConfig } from '../src/config.js';
 
 vi.mock('openai', () => {
@@ -73,10 +71,7 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
       },
       pipeline: {
         generation: {
-          models: [
-            'openai/gpt-3.5-turbo',
-            'cerebras/llama3.1-70b',
-          ],
+          models: ['openai/gpt-3.5-turbo', 'cerebras/llama3.1-70b'],
         },
       },
     };
@@ -89,6 +84,20 @@ describe('Stage 1 Pipeline - Parallel Card Generation & Dynamic Prompts', () => 
     clients = createProviderClients(config, keys);
     throttledFetch = createThrottledFetcher(config);
   });
+
+  function buildContext(overrides = {}) {
+    return {
+      config: overrides.config || config,
+      keys: overrides.keys || keys,
+      clients: overrides.clients || clients,
+      throttledFetch: overrides.throttledFetch || throttledFetch,
+      prompts: overrides.prompts || {},
+      subject: overrides.subject || '',
+      cardType: overrides.cardType || 'standard',
+      runId: overrides.runId || 'run-default',
+      maxEnforcementRetries: overrides.maxEnforcementRetries ?? 3,
+    };
+  }
 
   describe('resolvePrompts with Hardcoded Fallbacks', () => {
     it('should resolve standard stage prompts by default', () => {
@@ -293,7 +302,11 @@ global:
 
       const { prompts, warnings } = loadConfig(tempConfigPath, '/dev/null');
       expect(prompts).toEqual({});
-      expect(warnings.some((w) => w.includes('Error reading prompts file') || w.includes('empty or invalid'))).toBe(true);
+      expect(
+        warnings.some(
+          (w) => w.includes('Error reading prompts file') || w.includes('empty or invalid'),
+        ),
+      ).toBe(true);
     });
 
     it('should record warning if prompts file is empty string', () => {
@@ -334,64 +347,36 @@ global:
       };
 
       await expect(
-        runStage1({
-          runId: 'run-test-1',
+        runStage1(buildContext({ config: invalidConfig }), {
           questionId: 'q-test-1',
           content: 'Some test content',
-          deckPath: 'General::Test',
-          cardType: 'standard',
-          config: invalidConfig,
-          keys,
-          clients,
-          throttledFetch,
         }),
       ).rejects.toThrow('No generation models configured');
     });
 
     it('should throw an error if pipeline is missing', async () => {
       await expect(
-        runStage1({
-          runId: 'run-test-2',
+        runStage1(buildContext({ config: {} }), {
           questionId: 'q-test-2',
           content: 'Some test content',
-          deckPath: 'General::Test',
-          cardType: 'standard',
-          config: {},
-          keys,
-          clients,
-          throttledFetch,
         }),
       ).rejects.toThrow('No generation models configured');
     });
 
     it('should throw an error if generation block is missing', async () => {
       await expect(
-        runStage1({
-          runId: 'run-test-3',
+        runStage1(buildContext({ config: { pipeline: {} } }), {
           questionId: 'q-test-3',
           content: 'Some test content',
-          deckPath: 'General::Test',
-          cardType: 'standard',
-          config: { pipeline: {} },
-          keys,
-          clients,
-          throttledFetch,
         }),
       ).rejects.toThrow('No generation models configured');
     });
 
     it('should throw an error if models block is missing', async () => {
       await expect(
-        runStage1({
-          runId: 'run-test-4',
+        runStage1(buildContext({ config: { pipeline: { generation: {} } } }), {
           questionId: 'q-test-4',
           content: 'Some test content',
-          deckPath: 'General::Test',
-          cardType: 'standard',
-          config: { pipeline: { generation: {} } },
-          keys,
-          clients,
-          throttledFetch,
         }),
       ).rejects.toThrow('No generation models configured');
     });
@@ -403,9 +388,11 @@ global:
       const mockOpenaiCreate = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
         choices: [{ message: { content: 'OpenAI output' } }],
       });
-      const mockCerebrasCreate = vi.spyOn(cerebrasClient.chat.completions, 'create').mockResolvedValue({
-        choices: [{ message: { content: 'Cerebras output' } }],
-      });
+      const mockCerebrasCreate = vi
+        .spyOn(cerebrasClient.chat.completions, 'create')
+        .mockResolvedValue({
+          choices: [{ message: { content: 'Cerebras output' } }],
+        });
 
       const runId = 'run-parallel-yaml-1';
       createRun({
@@ -424,19 +411,14 @@ global:
         },
       };
 
-      const result = await runStage1({
-        runId,
-        questionId: 'q-1',
-        content: 'Topic content',
-        deckPath: 'Deck::Path',
-        cardType: 'standard',
-        subject: 'MyDynamicSubject',
-        prompts: promptsConfig,
-        config,
-        keys,
-        clients,
-        throttledFetch,
-      });
+      const result = await runStage1(
+        buildContext({
+          runId,
+          subject: 'MyDynamicSubject',
+          prompts: promptsConfig,
+        }),
+        { questionId: 'q-1', content: 'Topic content' },
+      );
 
       expect(result).toHaveLength(2);
       expect(mockOpenaiCreate).toHaveBeenCalledTimes(1);
@@ -471,19 +453,13 @@ global:
       });
 
       await expect(
-        runStage1({
-          runId,
-          questionId: 'q-err',
-          content: 'Some content',
-          deckPath: 'Deck::Error',
-          cardType: 'standard',
-          subject: 'ErrorSubject',
-          prompts: {},
-          config,
-          keys,
-          clients,
-          throttledFetch,
-        }),
+        runStage1(
+          buildContext({
+            runId,
+            subject: 'ErrorSubject',
+          }),
+          { questionId: 'q-err', content: 'Some content' },
+        ),
       ).rejects.toThrow('Cerebras API Error');
     });
 
@@ -507,56 +483,44 @@ global:
         configHash: 'hash123',
       });
 
-      await runStage1({
-        runId,
+      await runStage1(buildContext({ runId, subject: 'General' }), {
         questionId: 'some_topic_name',
         content: '',
         topicName: 'Custom Topic Name',
-        deckPath: 'Deck::Path',
-        cardType: 'standard',
-        subject: 'General',
-        prompts: {},
-        config,
-        keys,
-        clients,
-        throttledFetch,
       });
 
       // Verify prompt uses topicName
-      expect(mockOpenaiCreate.mock.calls[0][0]).toEqual(expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({
-            role: 'user',
-            content: 'Please generate comprehensive flashcards for the following topic: Custom Topic Name',
-          }),
-        ]),
-      }));
+      expect(mockOpenaiCreate.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              content:
+                'Please generate comprehensive flashcards for the following topic: Custom Topic Name',
+            }),
+          ]),
+        }),
+      );
 
       // Test fallback to questionId if topicName is also missing
-      await runStage1({
-        runId,
+      await runStage1(buildContext({ runId, subject: 'General' }), {
         questionId: 'fallback_question_id',
         content: '',
         topicName: '',
-        deckPath: 'Deck::Path',
-        cardType: 'standard',
-        subject: 'General',
-        prompts: {},
-        config,
-        keys,
-        clients,
-        throttledFetch,
       });
 
       // Verify prompt uses normalized questionId
-      expect(mockOpenaiCreate.mock.calls[1][0]).toEqual(expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({
-            role: 'user',
-            content: 'Please generate comprehensive flashcards for the following topic: fallback question id',
-          }),
-        ]),
-      }));
+      expect(mockOpenaiCreate.mock.calls[1][0]).toEqual(
+        expect.objectContaining({
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              content:
+                'Please generate comprehensive flashcards for the following topic: fallback question id',
+            }),
+          ]),
+        }),
+      );
     });
   });
 
@@ -570,10 +534,7 @@ global:
         configHash: 'hash123',
       });
       config.global.model_concurrency = 1; // Only 1 model at a time
-      config.pipeline.generation.models = [
-        'openai/gpt-3.5-turbo',
-        'cerebras/llama3.1-70b',
-      ];
+      config.pipeline.generation.models = ['openai/gpt-3.5-turbo', 'cerebras/llama3.1-70b'];
 
       const openaiClient = clients.get('openai');
       const cerebrasClient = clients.get('cerebras');
@@ -584,7 +545,9 @@ global:
       const mockCall = async () => {
         activeCalls++;
         maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
-        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        });
         activeCalls--;
         return { choices: [{ message: { content: 'mock output' } }] };
       };
@@ -592,18 +555,9 @@ global:
       vi.spyOn(openaiClient.chat.completions, 'create').mockImplementation(mockCall);
       vi.spyOn(cerebrasClient.chat.completions, 'create').mockImplementation(mockCall);
 
-      await runStage1({
-        runId: 'run-limit-models',
+      await runStage1(buildContext({ runId: 'run-limit-models', subject: 'General' }), {
         questionId: 'q-limit-models',
         content: 'content',
-        deckPath: 'Deck',
-        cardType: 'standard',
-        subject: 'General',
-        prompts: {},
-        config,
-        keys,
-        clients,
-        throttledFetch,
       });
 
       expect(maxActiveCalls).toBe(1);

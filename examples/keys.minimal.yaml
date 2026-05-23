@@ -3,4 +3,4 @@
 # running. Keep this file out of version control (see .gitignore).
 
 openai:
-  - "sk-replace-with-your-openai-key"
+  - 'sk-replace-with-your-openai-key'

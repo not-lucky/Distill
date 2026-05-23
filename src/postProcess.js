@@ -55,15 +55,12 @@ export function deduplicateCards(cards) {
     const card = cards[i];
     if (!card) continue;
     const norm = normalizeQuestion(card.front);
-    const explanationLength = typeof card.explanation === 'string'
-      ? card.explanation.length
-      : 0;
+    const explanationLength = typeof card.explanation === 'string' ? card.explanation.length : 0;
 
     if (seen.has(norm)) {
       const existing = seen.get(norm);
-      const existingLength = typeof existing.card.explanation === 'string'
-        ? existing.card.explanation.length
-        : 0;
+      const existingLength =
+        typeof existing.card.explanation === 'string' ? existing.card.explanation.length : 0;
       // Discard shorter explanation. If new is longer, overwrite but preserve index.
       if (explanationLength > existingLength) {
         seen.set(norm, { card, index: existing.index });

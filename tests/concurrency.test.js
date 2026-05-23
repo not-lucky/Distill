@@ -1,6 +1,4 @@
-import {
-  vi, describe, it, expect, beforeEach, beforeAll, afterAll,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
 import fs from 'fs';
@@ -12,7 +10,7 @@ import {
   upsertQuestionEntry,
 } from '../src/database.js';
 import { createThrottledFetcher, createProviderClients } from '../src/providers.js';
-import { runStage1 } from '../src/stages.js';
+import { runStage1 } from '../src/pipeline/stages/index.js';
 import { runPipeline } from '../src/orchestrator.js';
 
 // Mock child_process spawn to simulate python compiler calls
@@ -22,13 +20,15 @@ vi.mock('child_process', () => ({
 
 // Mock stages modules to control execution flow in orchestrator tests.
 // Default mocked stages return canned responses, avoiding heavy LLM/schema checks.
-vi.mock('../src/stages.js', async (importOriginal) => {
+vi.mock('../src/pipeline/stages/index.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    runStage1: vi.fn().mockImplementation(async () => [
-      { provider: 'mock', model: 'model-a', output: 'stage 1 output' },
-    ]),
+    runStage1: vi
+      .fn()
+      .mockImplementation(async () => [
+        { provider: 'mock', model: 'model-a', output: 'stage 1 output' },
+      ]),
     runStage2: vi.fn().mockImplementation(async () => 'stage 2 output'),
     runStage3: vi.fn().mockImplementation(async () => ({
       title: 'Title',
@@ -185,54 +185,65 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       // Use only one model to avoid unmocked cerebras call
       config.pipeline.generation.models = ['openai/gpt-4'];
 
-      const { runStage1: originalRunStage1 } = await vi.importActual('../src/stages.js');
+      const { runStage1: originalRunStage1 } = await vi.importActual(
+        '../src/pipeline/stages/index.js',
+      );
 
       // Test negative concurrency
       config.global.model_concurrency = -3;
       await expect(
-        originalRunStage1({
-          runId,
-          questionId: 'q-def-model-1',
-          content: 'content',
-          deckPath: 'Deck',
-          cardType: 'standard',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-        }),
+        originalRunStage1(
+          {
+            config,
+            keys,
+            clients,
+            throttledFetch,
+            prompts: {},
+            subject: '',
+            cardType: 'standard',
+            runId,
+            maxEnforcementRetries: 3,
+          },
+          { questionId: 'q-def-model-1', content: 'content' },
+        ),
       ).resolves.toBeDefined();
 
       // Test non-numeric concurrency
       config.global.model_concurrency = 'invalid-string';
       await expect(
-        originalRunStage1({
-          runId,
-          questionId: 'q-def-model-2',
-          content: 'content',
-          deckPath: 'Deck',
-          cardType: 'standard',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-        }),
+        originalRunStage1(
+          {
+            config,
+            keys,
+            clients,
+            throttledFetch,
+            prompts: {},
+            subject: '',
+            cardType: 'standard',
+            runId,
+            maxEnforcementRetries: 3,
+          },
+          { questionId: 'q-def-model-2', content: 'content' },
+        ),
       ).resolves.toBeDefined();
 
       // Test NaN concurrency
       config.global.model_concurrency = NaN;
       await expect(
-        originalRunStage1({
-          runId,
-          questionId: 'q-def-model-3',
-          content: 'content',
-          deckPath: 'Deck',
-          cardType: 'standard',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-        }),
+        originalRunStage1(
+          {
+            config,
+            keys,
+            clients,
+            throttledFetch,
+            prompts: {},
+            subject: '',
+            cardType: 'standard',
+            runId,
+            maxEnforcementRetries: 3,
+          },
+          { questionId: 'q-def-model-3', content: 'content' },
+        ),
       ).resolves.toBeDefined();
 
       expect(mockOpenai).toHaveBeenCalled();
@@ -304,10 +315,7 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       });
 
       config.global.model_concurrency = 0;
-      config.pipeline.generation.models = [
-        'openai/gpt-4',
-        'cerebras/llama-3.1',
-      ];
+      config.pipeline.generation.models = ['openai/gpt-4', 'cerebras/llama-3.1'];
 
       const openaiClient = clients.get('openai');
       const cerebrasClient = clients.get('cerebras');
@@ -328,19 +336,24 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       vi.spyOn(openaiClient.chat.completions, 'create').mockImplementation(mockCall);
       vi.spyOn(cerebrasClient.chat.completions, 'create').mockImplementation(mockCall);
 
-      const { runStage1: originalRunStage1 } = await vi.importActual('../src/stages.js');
+      const { runStage1: originalRunStage1 } = await vi.importActual(
+        '../src/pipeline/stages/index.js',
+      );
 
-      await originalRunStage1({
-        runId,
-        questionId: 'q-unlimited',
-        content: 'content',
-        deckPath: 'Deck',
-        cardType: 'standard',
-        config,
-        keys,
-        clients,
-        throttledFetch,
-      });
+      await originalRunStage1(
+        {
+          config,
+          keys,
+          clients,
+          throttledFetch,
+          prompts: {},
+          subject: '',
+          cardType: 'standard',
+          runId,
+          maxEnforcementRetries: 3,
+        },
+        { questionId: 'q-unlimited', content: 'content' },
+      );
 
       // Both models should have executed concurrently
       expect(maxActiveCalls).toBe(2);
@@ -383,19 +396,24 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       vi.spyOn(openaiClient.chat.completions, 'create').mockImplementation(mockCall);
       vi.spyOn(cerebrasClient.chat.completions, 'create').mockImplementation(mockCall);
 
-      const { runStage1: originalRunStage1 } = await vi.importActual('../src/stages.js');
+      const { runStage1: originalRunStage1 } = await vi.importActual(
+        '../src/pipeline/stages/index.js',
+      );
 
-      await originalRunStage1({
-        runId,
-        questionId: 'q-limited',
-        content: 'content',
-        deckPath: 'Deck',
-        cardType: 'standard',
-        config,
-        keys,
-        clients,
-        throttledFetch,
-      });
+      await originalRunStage1(
+        {
+          config,
+          keys,
+          clients,
+          throttledFetch,
+          prompts: {},
+          subject: '',
+          cardType: 'standard',
+          runId,
+          maxEnforcementRetries: 3,
+        },
+        { questionId: 'q-limited', content: 'content' },
+      );
 
       // Max active calls must never exceed 2
       expect(maxActiveCalls).toBeLessThanOrEqual(2);
@@ -413,10 +431,7 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       });
 
       config.global.model_concurrency = 1; // Sequential execution
-      config.pipeline.generation.models = [
-        'openai/gpt-4',
-        'cerebras/llama-3.1',
-      ];
+      config.pipeline.generation.models = ['openai/gpt-4', 'cerebras/llama-3.1'];
 
       const openaiClient = clients.get('openai');
       const cerebrasClient = clients.get('cerebras');
@@ -431,21 +446,26 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
         choices: [{ message: { content: 'Success output' } }],
       });
 
-      const { runStage1: originalRunStage1 } = await vi.importActual('../src/stages.js');
+      const { runStage1: originalRunStage1 } = await vi.importActual(
+        '../src/pipeline/stages/index.js',
+      );
 
       // Stage 1 throws the propagated error from the first failing model
       await expect(
-        originalRunStage1({
-          runId,
-          questionId: 'q-fail-model',
-          content: 'content',
-          deckPath: 'Deck',
-          cardType: 'standard',
-          config,
-          keys,
-          clients,
-          throttledFetch,
-        }),
+        originalRunStage1(
+          {
+            config,
+            keys,
+            clients,
+            throttledFetch,
+            prompts: {},
+            subject: '',
+            cardType: 'standard',
+            runId,
+            maxEnforcementRetries: 3,
+          },
+          { questionId: 'q-fail-model', content: 'content' },
+        ),
       ).rejects.toThrow('API failure');
 
       // Verify that the second model was still invoked (failure did not block the loop)
@@ -458,11 +478,11 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       // Mock runStage1 to resolve dynamically with artificial delay:
       // Topic 1 takes 100ms, Topic 2 takes 10ms, Topic 3 takes 50ms.
       // Therefore, they finish in the order: Topic 2 -> Topic 3 -> Topic 1.
-      const stages = await import('../src/stages.js');
+      const stages = await import('../src/pipeline/stages/index.js');
       const originalStage1 = stages.runStage1;
       const originalStage3 = stages.runStage3;
 
-      vi.mocked(originalStage1).mockImplementation(async ({ questionId }) => {
+      vi.mocked(originalStage1).mockImplementation(async (_ctx, { questionId }) => {
         let delay = 10;
         if (questionId === 'topic-1') delay = 100;
         if (questionId === 'topic-3') delay = 50;
@@ -473,7 +493,7 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
         return [{ provider: 'mock', model: 'model', output: 'ok' }];
       });
 
-      vi.mocked(originalStage3).mockImplementation(async ({ questionId }) => ({
+      vi.mocked(originalStage3).mockImplementation(async (_ctx, { questionId }) => ({
         title: `Title ${questionId}`,
         topic: `Topic ${questionId}`,
         difficulty: 'Basic',
@@ -512,7 +532,7 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
     });
 
     it('should correctly release the topic slot and continue processing subsequent tasks if a topic pipeline execution throws an error', async () => {
-      const stages = await import('../src/stages.js');
+      const stages = await import('../src/pipeline/stages/index.js');
       const originalStage1 = stages.runStage1;
 
       // Topic 1 throws an error
@@ -575,12 +595,12 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
         }),
       });
 
-      const stages = await import('../src/stages.js');
+      const stages = await import('../src/pipeline/stages/index.js');
       const originalStage1 = stages.runStage1;
 
-      const stage1Spy = vi.mocked(originalStage1).mockImplementation(async () => [
-        { provider: 'mock', model: 'model', output: 'ok' },
-      ]);
+      const stage1Spy = vi
+        .mocked(originalStage1)
+        .mockImplementation(async () => [{ provider: 'mock', model: 'model', output: 'ok' }]);
 
       config.global.topic_concurrency = 1;
 

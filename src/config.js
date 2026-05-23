@@ -22,6 +22,147 @@ const DEFAULTS = {
 };
 
 /**
+ * Reads a YAML file from disk and returns the parsed object.
+ * Pushes a single warning to `warnings` and returns `{}` on any error.
+ * Used for the config, keys, and prompts files which all share the
+ * same "missing / invalid / unreadable" handling.
+ */
+function readYamlObject(filePath, warnings, errorContext) {
+  if (!fs.existsSync(filePath)) {
+    warnings.push(`${errorContext} not found at ${filePath}.`);
+    return {};
+  }
+  let parsed;
+  try {
+    parsed = yaml.load(fs.readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    warnings.push(`Error reading ${errorContext.toLowerCase()} at ${filePath}: ${error.message}.`);
+    return {};
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    warnings.push(`${errorContext} at ${filePath} is empty or invalid.`);
+    return {};
+  }
+  return parsed;
+}
+
+/**
+ * Loads the main config.yaml, applying the supplied default. Pushes a
+ * warning and returns DEFAULTS-shaped object on any failure.
+ */
+function readConfigFile(configPath, warnings) {
+  if (!fs.existsSync(configPath)) {
+    warnings.push(`Config file not found at ${configPath}. Using default values.`);
+    return {};
+  }
+  let parsed;
+  try {
+    parsed = yaml.load(fs.readFileSync(configPath, 'utf8'));
+  } catch (error) {
+    warnings.push(`Error reading config file at ${configPath}: ${error.message}. Using defaults.`);
+    return {};
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    warnings.push(`Config file at ${configPath} is empty or invalid. Using defaults.`);
+    return {};
+  }
+  return parsed;
+}
+
+/**
+ * Returns true when the supplied provider-key field carries at least
+ * one non-empty API key. Accepts both the array form (rotated keys)
+ * and the legacy single-string form.
+ */
+function providerHasKey(providerKeys) {
+  if (Array.isArray(providerKeys)) {
+    return providerKeys.some((k) => typeof k === 'string' && k.trim().length > 0);
+  }
+  if (typeof providerKeys === 'string') {
+    return providerKeys.trim().length > 0;
+  }
+  return false;
+}
+
+/**
+ * Emits a "missing API key" warning for every active provider that
+ * has no usable key. The 'ollama_local' provider is exempt because
+ * it talks to a local server with no credentials.
+ */
+function checkProviderKeys(activeProviders, keys, warnings) {
+  for (const provider of activeProviders) {
+    if (provider === 'ollama_local') continue;
+    if (!providerHasKey(keys[provider])) {
+      warnings.push(`Missing API key for active provider: ${provider}`);
+    }
+  }
+}
+
+/**
+ * Returns true when the supplied value is a non-empty trimmed string.
+ * Used to gate "model is configured" warnings.
+ */
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Emits warnings for any missing or empty model declarations in the
+ * pipeline's required stages. Generation expects an array; synthesis
+ * and schema_enforcement expect a single string.
+ */
+function checkPipelineModels(pipeline, warnings) {
+  const generation = pipeline?.generation;
+  if (!generation || !Array.isArray(generation.models) || generation.models.length === 0) {
+    warnings.push('Missing configuration: Pipeline stage "generation" has no models configured.');
+  } else if (generation.models.some((m) => !isNonEmptyString(m))) {
+    warnings.push(
+      'Missing configuration: Pipeline stage "generation" contains empty or invalid model strings.',
+    );
+  }
+
+  if (!pipeline?.synthesis || !isNonEmptyString(pipeline.synthesis.model)) {
+    warnings.push('Missing configuration: Pipeline stage "synthesis" has no model configured.');
+  }
+  if (!pipeline?.schema_enforcement || !isNonEmptyString(pipeline.schema_enforcement.model)) {
+    warnings.push(
+      'Missing configuration: Pipeline stage "schema_enforcement" has no model configured.',
+    );
+  }
+}
+
+/**
+ * Logs every accumulated warning in one pass, unless the process is
+ * running in a test environment (so vitest stays quiet).
+ */
+function flushWarnings(warnings) {
+  if (warnings.length === 0) return;
+  if (process.env.NODE_ENV === 'test') return;
+  for (const w of warnings) logger.warn`${w}`;
+}
+
+/**
+ * Loads the prompts.yaml file if it exists. Unlike the config and
+ * keys files, a missing prompts file is not a warning: prompts are
+ * optional and the pipeline falls back to hardcoded defaults.
+ */
+function loadPromptsFile(promptsPath, warnings) {
+  if (!fs.existsSync(promptsPath)) return {};
+  let parsed;
+  try {
+    parsed = yaml.load(fs.readFileSync(promptsPath, 'utf8'));
+  } catch (error) {
+    warnings.push(`Error reading prompts file at ${promptsPath}: ${error.message}.`);
+    return {};
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    warnings.push(`Prompts file at ${promptsPath} is empty or invalid.`);
+    return {};
+  }
+  return parsed;
+}
+
+/**
  * Loads config.yaml and keys.yaml, merges with default values,
  * and validates that active pipeline providers have configured API keys.
  *
@@ -31,126 +172,68 @@ const DEFAULTS = {
  */
 export function loadConfig(configPath = './config.yaml', keysPath = null) {
   const warnings = [];
-  let parsedConfig = null;
-
-  // 1. Load and parse the config file
-  try {
-    if (fs.existsSync(configPath)) {
-      const fileContent = fs.readFileSync(configPath, 'utf8');
-      parsedConfig = yaml.load(fileContent);
-      if (!parsedConfig || typeof parsedConfig !== 'object') {
-        warnings.push(`Config file at ${configPath} is empty or invalid. Using defaults.`);
-        parsedConfig = {};
-      }
-    } else {
-      warnings.push(`Config file not found at ${configPath}. Using default values.`);
-      parsedConfig = {};
-    }
-  } catch (error) {
-    warnings.push(`Error reading config file at ${configPath}: ${error.message}. Using defaults.`);
-    parsedConfig = {};
-  }
-
-  // 2. Merge defaults recursively
+  const parsedConfig = readConfigFile(configPath, warnings);
   /* v8 ignore next */
   const config = deepMerge(DEFAULTS, parsedConfig || {});
-
-  // 3. Resolve the keys file path (argument overrides config setting)
   /* v8 ignore next */
   const resolvedKeysPath = keysPath || config.global.keys_file_path || './keys.yaml';
+  const keys = readYamlObject(resolvedKeysPath, warnings, 'Keys file');
 
-  // 4. Load and parse the keys file
-  let keys = {};
-  try {
-    if (fs.existsSync(resolvedKeysPath)) {
-      const fileContent = fs.readFileSync(resolvedKeysPath, 'utf8');
-      const parsedKeys = yaml.load(fileContent);
-      if (parsedKeys && typeof parsedKeys === 'object') {
-        keys = parsedKeys;
-      } else {
-        warnings.push(`Keys file at ${resolvedKeysPath} is empty or invalid.`);
-      }
-    } else {
-      warnings.push(`Keys file not found at ${resolvedKeysPath}.`);
-    }
-  } catch (error) {
-    warnings.push(`Error reading keys file at ${resolvedKeysPath}: ${error.message}.`);
-  }
-
-  // 5. Dynamically extract all active providers referenced in the pipeline and validate them
   /* v8 ignore next */
   const activeProviders = extractActiveProviders(
     config.pipeline,
     Object.keys(config.providers || {}),
   );
+  checkProviderKeys(activeProviders, keys, warnings);
+  checkPipelineModels(config.pipeline, warnings);
 
-  // 6. Validate that active providers have at least one non-empty API key
-  for (const provider of activeProviders) {
-    if (provider === 'ollama_local') {
-      continue; // Local Ollama server does not require an API key
-    }
-    const providerKeys = keys[provider];
-    let hasKey = false;
-    if (Array.isArray(providerKeys)) {
-      hasKey = providerKeys.some((k) => typeof k === 'string' && k.trim().length > 0);
-    } else if (typeof providerKeys === 'string') {
-      hasKey = providerKeys.trim().length > 0;
-    }
+  const prompts = loadPromptsFile(config.global.prompts_file_path, warnings);
+  flushWarnings(warnings);
 
-    if (!hasKey) {
-      warnings.push(`Missing API key for active provider: ${provider}`);
-    }
+  return { config, keys, prompts, warnings };
+}
+
+/**
+ * Parses a single "provider/model" string, validating the slash is
+ * neither at the start nor at the end. Throws on any malformed input
+ * or undeclared provider prefix.
+ */
+function parseModelString(modelString, declaredProviders) {
+  const firstSlashIdx = modelString.indexOf('/');
+  if (firstSlashIdx <= 0 || firstSlashIdx === modelString.length - 1) {
+    throw new Error(`Invalid model format: "${modelString}". Must be in "provider/model" format.`);
   }
-
-  // Validate that all required pipeline stages have configured models.
-  // This notifies the user beforehand if any models are missing.
-  const { pipeline } = config;
-  const genModels = pipeline.generation?.models;
-  if (!pipeline.generation || !Array.isArray(genModels) || genModels.length === 0) {
-    warnings.push('Missing configuration: Pipeline stage "generation" has no models configured.');
-  } else {
-    const hasEmptyGenModel = pipeline.generation.models.some((m) => typeof m !== 'string' || !m.trim());
-    if (hasEmptyGenModel) {
-      warnings.push('Missing configuration: Pipeline stage "generation" contains empty or invalid model strings.');
-    }
+  const provider = modelString.substring(0, firstSlashIdx);
+  const model = modelString.substring(firstSlashIdx + 1);
+  if (!provider || !model) {
+    throw new Error(`Invalid model format: "${modelString}". Must be in "provider/model" format.`);
   }
-
-  if (!pipeline.synthesis || typeof pipeline.synthesis.model !== 'string' || !pipeline.synthesis.model.trim()) {
-    warnings.push('Missing configuration: Pipeline stage "synthesis" has no model configured.');
+  if (!declaredProviders.includes(provider)) {
+    throw new Error(
+      `Undeclared provider: "${provider}" referenced in model "${modelString}". Must be declared in the "providers" section.`,
+    );
   }
+  return provider;
+}
 
-  if (!pipeline.schema_enforcement || typeof pipeline.schema_enforcement.model !== 'string' || !pipeline.schema_enforcement.model.trim()) {
-    warnings.push('Missing configuration: Pipeline stage "schema_enforcement" has no model configured.');
+/**
+ * Walks a value (object / array / string) and records every provider
+ * referenced under a `model` / `models` key. Throws on bad model
+ * strings via parseModelString.
+ */
+function visitValue(value, parentKey, declaredProviders, providers) {
+  if (Array.isArray(value)) {
+    for (const item of value) visitValue(item, parentKey, declaredProviders, providers);
+    return;
   }
-
-  // 7. Load and parse the prompts YAML file
-  let prompts = {};
-  const resolvedPromptsPath = config.global.prompts_file_path;
-  try {
-    if (fs.existsSync(resolvedPromptsPath)) {
-      const fileContent = fs.readFileSync(resolvedPromptsPath, 'utf8');
-      const parsedPrompts = yaml.load(fileContent);
-      if (parsedPrompts && typeof parsedPrompts === 'object') {
-        prompts = parsedPrompts;
-      } else {
-        warnings.push(`Prompts file at ${resolvedPromptsPath} is empty or invalid.`);
-      }
-    }
-  } catch (error) {
-    warnings.push(`Error reading prompts file at ${resolvedPromptsPath}: ${error.message}.`);
+  if (value && typeof value === 'object') {
+    for (const key of Object.keys(value)) visitValue(value[key], key, declaredProviders, providers);
+    return;
   }
-
-  // Log warnings if not running inside a test environment
-  if (warnings.length > 0 && process.env.NODE_ENV !== 'test') {
-    warnings.forEach((w) => logger.warn`${w}`);
-  }
-
-  return {
-    config,
-    keys,
-    prompts,
-    warnings,
-  };
+  if (typeof value !== 'string') return;
+  if (parentKey !== 'model' && parentKey !== 'models' && parentKey) return;
+  if (!value.trim()) return;
+  providers.add(parseModelString(value, declaredProviders));
 }
 
 /**
@@ -165,42 +248,18 @@ function extractActiveProviders(pipeline, declaredProviders = []) {
   const providers = new Set();
   /* v8 ignore next */
   if (!pipeline || typeof pipeline !== 'object') return providers;
-
-  function traverse(value, parentKey) {
-    if (typeof value === 'string') {
-      if (parentKey === 'model' || parentKey === 'models' || !parentKey) {
-        if (!value.trim()) {
-          return;
-        }
-        const firstSlashIdx = value.indexOf('/');
-        if (firstSlashIdx <= 0 || firstSlashIdx === value.length - 1) {
-          throw new Error(`Invalid model format: "${value}". Must be in "provider/model" format.`);
-        }
-        const provider = value.substring(0, firstSlashIdx);
-        const model = value.substring(firstSlashIdx + 1);
-        /* v8 ignore next 3 -- Defensive guard: logically unreachable
-           after the slash-index bounds check above */
-        if (!provider || !model) {
-          throw new Error(`Invalid model format: "${value}". Must be in "provider/model" format.`);
-        }
-        if (!declaredProviders.includes(provider)) {
-          throw new Error(`Undeclared provider: "${provider}" referenced in model "${value}". Must be declared in the "providers" section.`);
-        }
-        providers.add(provider);
-      }
-    } else if (Array.isArray(value)) {
-      for (const item of value) {
-        traverse(item, parentKey);
-      }
-    } else if (value && typeof value === 'object') {
-      for (const key of Object.keys(value)) {
-        traverse(value[key], key);
-      }
-    }
-  }
-
-  traverse(pipeline, null);
+  visitValue(pipeline, null, declaredProviders, providers);
   return providers;
+}
+
+const UNSAFE_MERGE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Returns true when both sides are plain objects, in which case
+ * deepMerge should recurse rather than overwrite.
+ */
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
@@ -212,26 +271,18 @@ function extractActiveProviders(pipeline, declaredProviders = []) {
  * @returns {Object}
  */
 export function deepMerge(target, source) {
-  if (!target || typeof target !== 'object') return source;
-  if (!source || typeof source !== 'object') return target;
+  if (!isPlainObject(target)) return source;
+  if (!isPlainObject(source)) return target;
 
   const result = { ...target };
   for (const key of Object.keys(source)) {
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
-      continue;
-    }
-
-    const targetVal = target[key];
+    if (UNSAFE_MERGE_KEYS.has(key)) continue;
     const sourceVal = source[key];
-
-    if (sourceVal === null || sourceVal === undefined) {
-      continue;
-    }
-
+    if (sourceVal === null || sourceVal === undefined) continue;
     if (Array.isArray(sourceVal)) {
       result[key] = sourceVal;
-    } else if (sourceVal && typeof sourceVal === 'object' && targetVal && typeof targetVal === 'object') {
-      result[key] = deepMerge(targetVal, sourceVal);
+    } else if (isPlainObject(sourceVal) && isPlainObject(target[key])) {
+      result[key] = deepMerge(target[key], sourceVal);
     } else {
       result[key] = sourceVal;
     }
