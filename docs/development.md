@@ -10,7 +10,7 @@ npm test              # Run all tests (JS + Python)
 npm run test:js       # Run JS tests only
 npm run test:py       # Run Python tests only
 npm run test:e2e      # JS integration tests only
-npm run lint          # ESLint + Prettier + Ruff check + Black check
+npm run lint          # ESLint + Prettier + Ruff check + Ruff format check
 npm run lint:fix      # Auto-fix lint and formatting issues
 npm run format        # Prettier write
 npm run format:check  # Prettier check
@@ -25,7 +25,6 @@ npm run coverage      # JS coverage report
 uv run pytest
 uv run ruff check
 uv run ruff format
-uv run black --check
 uv run ty check src
 uv run vulture src
 uv run deptry .

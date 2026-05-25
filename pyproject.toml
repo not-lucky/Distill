@@ -10,7 +10,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "black==25.12.0",
     "deptry==0.23.1",
     "jsonschema>=4.23.0,<5",
     "mkdocs>=1.6,<2",
@@ -39,13 +38,6 @@ addopts = "-v --durations=10 --cov=src --cov-report=term-missing --cov-report=xm
 
 [tool.ruff.format]
 preview = true
-
-# ---- Black (signal: formatter) ----
-# Black is used as a secondary formatter that complements ruff format.
-# `uv run black --check src tests` is wired into the lint script and CI.
-[tool.black]
-line-length = 100
-target-version = ["py312"]
 
 # ---- ty (signal: type_check + strict_typing) ----
 # ty is Astral's fast type checker, used here in strict mode for src/.

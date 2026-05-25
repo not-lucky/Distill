@@ -19,7 +19,8 @@ global:
   request_delay: 1.0
   # Default per-request network timeout in seconds. Providers can override
   # this via their own `timeout` field below.
-  default_timeout: 500.0
+  # Set to null (or omit) to disable the client-side timeout entirely.
+  default_timeout: null
   # Where final compiled .apkg and intermediate JSON files land.
   output_dir: './output'
   # SQLite cache for runs, steps, and LLM response cache.

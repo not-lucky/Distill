@@ -46,7 +46,6 @@ const UV_SCRIPTS = new Set([
   'pytest',
   'ruff check',
   'ruff format',
-  'black --check',
   'ty check src',
   'vulture src',
   'deptry .',

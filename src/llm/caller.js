@@ -1,5 +1,7 @@
 import { zodTextFormat, zodResponseFormat } from 'openai/helpers/zod';
 import { getLogger } from '../logger.js';
+import { isValidTimeout } from '../config.js';
+import { resolveClientTimeoutSec } from './client.js';
 import { computeCacheKey, computePromptHash } from './cache.js';
 import { checkCache, writeCache } from './cache-io.js';
 import { getNextKey } from './keys.js';
@@ -60,14 +62,20 @@ function buildChatCompletionsParams({ model, temperature, messages, schema }) {
 /**
  * Resolves the per-call client options: rotated API key (if any) and
  * a millisecond timeout derived from the provider/global config.
+ *
+ * A resolved timeout of `null` (no timeout configured) results in the
+ * `timeout` key being omitted from the per-request options so the OpenAI
+ * SDK falls back to its own no-timeout default.
  */
 function buildRequestOptions({ provider, providerKeys, providerConfig, globalConfig }) {
   const options = {};
   const rotatedKey = getNextKey(provider, providerKeys);
   if (rotatedKey !== undefined) options.apiKey = rotatedKey;
 
-  const timeoutSec = providerConfig.timeout || globalConfig.default_timeout;
-  if (timeoutSec) options.timeout = timeoutSec * 1000;
+  const resolvedSec = resolveClientTimeoutSec(providerConfig, globalConfig);
+  if (isValidTimeout(resolvedSec)) {
+    options.timeout = resolvedSec * 1000;
+  }
 
   return options;
 }
