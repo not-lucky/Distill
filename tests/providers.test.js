@@ -10,6 +10,7 @@ import {
   createProviderClients,
   createThrottledFetcher,
   resolveProviderModel,
+  resolveClientTimeoutSec,
   callLLM,
   _resetKeyCounters,
 } from '../src/providers.js';
@@ -268,6 +269,96 @@ describe('Providers Module', () => {
           timeout: undefined,
         }),
       );
+    });
+
+    it('should leave timeout undefined when global default_timeout is null', () => {
+      const configNullTimeout = {
+        global: { default_timeout: null },
+        providers: {
+          openai: {
+            base_url: 'https://api.openai.com/v1',
+          },
+        },
+      };
+      createProviderClients(configNullTimeout, keys);
+      expect(OpenAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeout: undefined,
+        }),
+      );
+    });
+
+    it('should leave timeout undefined when global default_timeout is 0', () => {
+      const configZeroTimeout = {
+        global: { default_timeout: 0 },
+        providers: {
+          openai: {
+            base_url: 'https://api.openai.com/v1',
+          },
+        },
+      };
+      createProviderClients(configZeroTimeout, keys);
+      expect(OpenAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeout: undefined,
+        }),
+      );
+    });
+
+    it('should leave timeout undefined when provider timeout is 0, overriding a positive global default_timeout', () => {
+      const configProviderZero = {
+        global: { default_timeout: 60.0 },
+        providers: {
+          openai: {
+            base_url: 'https://api.openai.com/v1',
+            timeout: 0,
+          },
+        },
+      };
+      createProviderClients(configProviderZero, keys);
+      expect(OpenAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeout: undefined,
+        }),
+      );
+    });
+  });
+
+  describe('resolveClientTimeoutSec', () => {
+    it('returns the provider timeout when set to a positive number', () => {
+      expect(resolveClientTimeoutSec({ timeout: 12.5 }, { default_timeout: 999 })).toBe(12.5);
+    });
+
+    it('falls back to the global default_timeout when provider timeout is missing', () => {
+      expect(resolveClientTimeoutSec({}, { default_timeout: 30 })).toBe(30);
+    });
+
+    it('returns null when neither provider nor global timeout is set', () => {
+      expect(resolveClientTimeoutSec({}, {})).toBeNull();
+    });
+
+    it('returns null when global default_timeout is null and provider has no timeout', () => {
+      expect(resolveClientTimeoutSec({}, { default_timeout: null })).toBeNull();
+    });
+
+    it('returns null when global default_timeout is 0 and provider has no timeout', () => {
+      expect(resolveClientTimeoutSec({}, { default_timeout: 0 })).toBeNull();
+    });
+
+    it('treats provider timeout of 0 as no timeout, overriding a positive global default_timeout', () => {
+      expect(resolveClientTimeoutSec({ timeout: 0 }, { default_timeout: 30 })).toBeNull();
+    });
+
+    it('treats negative, NaN, and non-numeric provider timeouts as no timeout', () => {
+      expect(resolveClientTimeoutSec({ timeout: -1 }, { default_timeout: 30 })).toBe(30);
+      expect(resolveClientTimeoutSec({ timeout: Number.NaN }, { default_timeout: 30 })).toBe(30);
+      expect(resolveClientTimeoutSec({ timeout: '30' }, { default_timeout: 30 })).toBe(30);
+    });
+
+    it('tolerates missing providerConfig and globalConfig arguments', () => {
+      expect(resolveClientTimeoutSec(undefined, undefined)).toBeNull();
+      expect(resolveClientTimeoutSec({}, undefined)).toBeNull();
+      expect(resolveClientTimeoutSec(undefined, { default_timeout: 5 })).toBe(5);
     });
   });
 
@@ -910,6 +1001,94 @@ describe('Providers Module', () => {
       expect(openaiClient.responses.create).not.toHaveBeenCalled();
 
       delete openaiClient.responses;
+    });
+
+    it('should set per-request options.timeout from provider timeout', async () => {
+      const messages = [{ role: 'user', content: 'Provider timeout check' }];
+      const openaiClient = clients.get('openai');
+      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: 'Done' } }],
+      });
+
+      await callLLM({
+        provider: 'openai',
+        model: 'gpt-3.5-turbo',
+        messages,
+        config,
+        keys,
+        clients,
+        throttledFetch,
+      });
+
+      // openai provider in the test fixture has timeout: 10.0 -> 10000ms
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ timeout: 10000 }),
+      );
+    });
+
+    it('should omit per-request options.timeout when no timeout is configured anywhere', async () => {
+      const messages = [{ role: 'user', content: 'No timeout check' }];
+      const noTimeoutConfig = {
+        global: { default_timeout: null, request_delay: 0.1 },
+        providers: {
+          openai: {
+            base_url: 'https://api.openai.com/v1',
+          },
+        },
+      };
+      const localClients = createProviderClients(noTimeoutConfig, keys);
+      const openaiClient = localClients.get('openai');
+      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: 'Done' } }],
+      });
+
+      await callLLM({
+        provider: 'openai',
+        model: 'gpt-3.5-turbo',
+        messages,
+        config: noTimeoutConfig,
+        keys,
+        clients: localClients,
+        throttledFetch,
+      });
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.not.objectContaining({ timeout: expect.anything() }),
+      );
+    });
+
+    it('should omit per-request options.timeout when global default_timeout is 0', async () => {
+      const messages = [{ role: 'user', content: 'Zero timeout check' }];
+      const zeroTimeoutConfig = {
+        global: { default_timeout: 0, request_delay: 0.1 },
+        providers: {
+          openai: {
+            base_url: 'https://api.openai.com/v1',
+          },
+        },
+      };
+      const localClients = createProviderClients(zeroTimeoutConfig, keys);
+      const openaiClient = localClients.get('openai');
+      const createSpy = vi.spyOn(openaiClient.chat.completions, 'create').mockResolvedValue({
+        choices: [{ message: { content: 'Done' } }],
+      });
+
+      await callLLM({
+        provider: 'openai',
+        model: 'gpt-3.5-turbo',
+        messages,
+        config: zeroTimeoutConfig,
+        keys,
+        clients: localClients,
+        throttledFetch,
+      });
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.not.objectContaining({ timeout: expect.anything() }),
+      );
     });
   });
 });

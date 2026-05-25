@@ -12,17 +12,17 @@ provider catalogue, and the model assignment for each pipeline stage.
 
 ### `global` keys
 
-| Key                 | Type       | Default          | Description                                                     |
-| ------------------- | ---------- | ---------------- | --------------------------------------------------------------- |
-| `concurrency_limit` | integer    | `8`              | Max parallel API requests at any moment.                        |
-| `request_delay`     | float      | `1.0`            | Seconds to stagger the start of each new request.               |
-| `default_timeout`   | float      | `500.0`          | Default API request timeout in seconds.                         |
-| `output_dir`        | path       | `./output`       | Compiled Anki deck target directory.                            |
-| `cache_db_path`     | path       | `./llm2deck.db`  | SQLite database path for the request cache and run state.       |
-| `keys_file_path`    | path       | `./keys.yaml`    | Path to the API keys YAML.                                      |
-| `prompts_file_path` | path       | `./prompts.yaml` | Path to the prompts YAML.                                       |
-| `log_level`         | string     | `info`           | Min log level: `debug`, `info`, `warning`, `error`, `fatal`.    |
-| `log_dir`           | path\|null | `null`           | Directory for rotating log files. `null` disables file logging. |
+| Key                 | Type        | Default          | Description                                                                               |
+| ------------------- | ----------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| `concurrency_limit` | integer     | `8`              | Max parallel API requests at any moment.                                                  |
+| `request_delay`     | float       | `1.0`            | Seconds to stagger the start of each new request.                                         |
+| `default_timeout`   | float\|null | `null`           | Default API request timeout in seconds. `null` (or `0`) disables the client-side timeout. |
+| `output_dir`        | path        | `./output`       | Compiled Anki deck target directory.                                                      |
+| `cache_db_path`     | path        | `./llm2deck.db`  | SQLite database path for the request cache and run state.                                 |
+| `keys_file_path`    | path        | `./keys.yaml`    | Path to the API keys YAML.                                                                |
+| `prompts_file_path` | path        | `./prompts.yaml` | Path to the prompts YAML.                                                                 |
+| `log_level`         | string      | `info`           | Min log level: `debug`, `info`, `warning`, `error`, `fatal`.                              |
+| `log_dir`           | path\|null  | `null`           | Directory for rotating log files. `null` disables file logging.                           |
 
 ### `providers` catalogue
 
@@ -31,7 +31,10 @@ Each provider entry is keyed by an arbitrary name (e.g. `openai`,
 
 - `base_url` (string) — the OpenAI-compatible API base URL
 - `temperature` (float) — default sampling temperature
-- `timeout` (float, optional) — per-provider request timeout override
+- `timeout` (float, optional) — per-provider request timeout override.
+  A positive number is interpreted as seconds. `0` or `null` explicitly
+  disables the timeout for that provider (overriding the global default).
+  When omitted, the provider inherits `global.default_timeout`.
 
 The `openai` SDK is used for every provider; any OpenAI-compatible endpoint
 (Ollama, vLLM, llama.cpp server, Groq, Together, etc.) works as long as

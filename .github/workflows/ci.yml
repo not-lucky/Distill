@@ -65,10 +65,6 @@ jobs:
           uv run ruff check src tests
           uv run ruff format --check src tests
 
-      - name: Run Black (format check)
-        run: |
-          uv run black --check --diff src tests
-
       # ---- Type checking (signals: type_check, strict_typing) ----
       - name: Run ty (Astral's type checker)
         run: uv run ty check src

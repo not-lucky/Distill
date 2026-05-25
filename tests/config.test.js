@@ -31,7 +31,7 @@ describe('Configuration Loader - Edge Cases & Robustness', () => {
     expect(config.global.model_concurrency).toBe(0);
     expect(config.global.topic_concurrency).toBe(1);
     expect(config.global.request_delay).toBe(1.0);
-    expect(config.global.default_timeout).toBe(500.0);
+    expect(config.global.default_timeout).toBeNull();
     expect(config.global.output_dir).toBe('./output');
     expect(config.global.cache_db_path).toBe('./llm2deck.db');
 

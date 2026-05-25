@@ -1,7 +1,7 @@
 # Pre-commit hooks for LLM2Deck
 # Install with: uv run pre-commit install
 # Run on demand: uv run pre-commit run --all-files
-# Note: ruff/black/mypy-via-ty are run via `uv run` so we don't need extra packages.
+# Note: ruff/ty are run via `uv run` so we don't need extra packages.
 repos:
   - repo: local
     hooks:

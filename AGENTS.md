@@ -14,7 +14,6 @@ LLM2Deck is a hybrid Node.js (ESM) + Python flashcard generation pipeline. It co
 - **JS Linting**: ESLint 10 with flat config (`eslint.config.js`) — `@eslint/js` recommended + `eslint-plugin-import-x` + `eslint-plugin-n` + `eslint-plugin-boundaries`
 - **JS Formatting**: Prettier 3 (`.prettierrc.json`)
 - **Python Linting**: Ruff (`uv run ruff check` + `uv run ruff format`)
-- **Python Formatting**: Black 25 (line-length 100)
 - **Python Type Checking**: ty (Astral's fast type checker, `uv run ty check src`)
 - **Python Dead Code**: Vulture (`uv run vulture src`)
 - **Python Unused Deps**: deptry (`uv run deptry .`)
@@ -52,7 +51,6 @@ npm run verify         # Run schemas:export, agents:validate, and docs:build as 
 uv run pytest         # Run Python tests
 uv run ruff check     # Python lint
 uv run ruff format    # Python format
-uv run black --check  # Black format check
 uv run ty check src   # Python type check
 uv run vulture src    # Python dead code
 uv run deptry .       # Python unused deps

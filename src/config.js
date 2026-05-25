@@ -9,7 +9,7 @@ const DEFAULTS = {
     model_concurrency: 0,
     topic_concurrency: 1,
     request_delay: 1.0,
-    default_timeout: 500.0,
+    default_timeout: null,
     output_dir: './output',
     cache_db_path: './llm2deck.db',
     keys_file_path: './keys.yaml',
@@ -20,6 +20,15 @@ const DEFAULTS = {
   providers: {},
   pipeline: {},
 };
+
+/**
+ * Returns true when the supplied value is a positive, finite number of
+ * seconds usable as a request timeout. `null`, `undefined`, `0`, and any
+ * non-numeric or negative value are considered "not a valid timeout".
+ */
+function isValidTimeout(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
 
 /**
  * Reads a YAML file from disk and returns the parsed object.
@@ -289,3 +298,5 @@ export function deepMerge(target, source) {
   }
   return result;
 }
+
+export { isValidTimeout };

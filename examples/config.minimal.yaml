@@ -6,7 +6,10 @@ global:
   model_concurrency: 1
   topic_concurrency: 1
   request_delay: 0.0
-  default_timeout: 120.0
+  # Default per-request network timeout in seconds. Set to null (or omit)
+  # to disable the client-side timeout entirely. Providers can also set
+  # their own `timeout` field to override the global value.
+  default_timeout: null
   output_dir: './output'
   cache_db_path: './llm2deck.db'
   keys_file_path: './keys.yaml'
