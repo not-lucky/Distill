@@ -1,5 +1,5 @@
 """
-Catppuccin Mocha CSS theme for LLM2Deck Anki cards.
+Catppuccin Mocha CSS theme for Distill Anki cards.
 
 Centralizing the stylesheet here keeps compile.py focused on Python logic and
 lets us swap themes (e.g., for a light variant) without touching card generation.

@@ -26,7 +26,7 @@ vi.mock('../src/database.js', async (importOriginal) => {
   return {
     ...actual,
     initDatabase: vi.fn().mockImplementation((dbPath) => {
-      const targetPath = dbPath === './llm2deck.db' ? './llm2deck_test_fallback.db' : dbPath;
+      const targetPath = dbPath === './distill.db' ? './distill_test_fallback.db' : dbPath;
       return actual.initDatabase(targetPath);
     }),
   };
@@ -97,7 +97,7 @@ describe('Orchestrator Module', () => {
 
   afterAll(() => {
     closeDatabase();
-    const fallbackDb = './llm2deck_test_fallback.db';
+    const fallbackDb = './distill_test_fallback.db';
     if (fs.existsSync(fallbackDb)) fs.unlinkSync(fallbackDb);
     if (fs.existsSync(`${fallbackDb}-wal`)) fs.unlinkSync(`${fallbackDb}-wal`);
     if (fs.existsSync(`${fallbackDb}-shm`)) fs.unlinkSync(`${fallbackDb}-shm`);
@@ -842,7 +842,7 @@ describe('Orchestrator Module', () => {
       expect(() => getDb()).toThrow();
 
       // Clean up the default test database file created
-      const fallbackDb = './llm2deck_test_fallback.db';
+      const fallbackDb = './distill_test_fallback.db';
       if (fs.existsSync(fallbackDb)) {
         fs.unlinkSync(fallbackDb);
       }

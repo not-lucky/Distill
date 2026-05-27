@@ -11,7 +11,7 @@ const DEFAULTS = {
     request_delay: 1.0,
     default_timeout: null,
     output_dir: './output',
-    cache_db_path: './llm2deck.db',
+    cache_db_path: './distill.db',
     keys_file_path: './keys.yaml',
     prompts_file_path: './prompts.yaml',
     log_level: 'info',

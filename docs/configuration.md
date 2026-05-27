@@ -1,8 +1,8 @@
 # Configuration
 
-LLM2Deck reads three YAML files from the project root: `config.yaml`,
+Distill reads three YAML files from the project root: `config.yaml`,
 `keys.yaml`, and `prompts.yaml`. Drop-in examples live in
-[`examples/`](https://github.com/not-lucky/LLM2Deck/tree/master/examples)
+[`examples/`](https://github.com/not-lucky/Distill/tree/master/examples)
 at three levels of detail (`minimal`, `standard`, `full`).
 
 ## `config.yaml`
@@ -18,7 +18,7 @@ provider catalogue, and the model assignment for each pipeline stage.
 | `request_delay`     | float       | `1.0`            | Seconds to stagger the start of each new request.                                         |
 | `default_timeout`   | float\|null | `null`           | Default API request timeout in seconds. `null` (or `0`) disables the client-side timeout. |
 | `output_dir`        | path        | `./output`       | Compiled Anki deck target directory.                                                      |
-| `cache_db_path`     | path        | `./llm2deck.db`  | SQLite database path for the request cache and run state.                                 |
+| `cache_db_path`     | path        | `./distill.db`   | SQLite database path for the request cache and run state.                                 |
 | `keys_file_path`    | path        | `./keys.yaml`    | Path to the API keys YAML.                                                                |
 | `prompts_file_path` | path        | `./prompts.yaml` | Path to the prompts YAML.                                                                 |
 | `log_level`         | string      | `info`           | Min log level: `debug`, `info`, `warning`, `error`, `fatal`.                              |

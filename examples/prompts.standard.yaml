@@ -1,4 +1,4 @@
-# Standard LLM2Deck prompts file.
+# Standard Distill prompts file.
 # All four `defaults` keys are overridden with short illustrative text.
 # Two subjects are configured: one in topic mode, one in document mode.
 #

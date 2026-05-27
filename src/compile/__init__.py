@@ -1,5 +1,5 @@
 """
-LLM2Deck compile package.
+Distill compile package.
 
 Re-exports the public compile API and the ID-registry module-level state for
 backward compatibility with the monolithic `src/compile.py` module. New code

@@ -1,4 +1,4 @@
-# Minimal LLM2Deck prompts file.
+# Minimal Distill prompts file.
 # One subject, topic mode, no global defaults. The pipeline will fall back to
 # the hard-coded prompts in src/prompts.js for any missing fields.
 

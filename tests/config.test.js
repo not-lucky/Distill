@@ -33,7 +33,7 @@ describe('Configuration Loader - Edge Cases & Robustness', () => {
     expect(config.global.request_delay).toBe(1.0);
     expect(config.global.default_timeout).toBeNull();
     expect(config.global.output_dir).toBe('./output');
-    expect(config.global.cache_db_path).toBe('./llm2deck.db');
+    expect(config.global.cache_db_path).toBe('./distill.db');
 
     // Keys map should be empty
     expect(keys).toEqual({});

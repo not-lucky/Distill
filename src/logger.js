@@ -24,7 +24,7 @@ export async function setupLogging(options = {}) {
 
   const loggers = [
     {
-      category: ['llm2deck'],
+      category: ['distill'],
       sinks: ['console'],
       lowestLevel: isTest ? null : level,
     },
@@ -56,13 +56,13 @@ export async function setupLogging(options = {}) {
 }
 
 /**
- * Get a logger for a specific subcategory under the root 'llm2deck' category.
+ * Get a logger for a specific subcategory under the root 'distill' category.
  *
  * @param {string[]} [subcategory=[]] - Subcategory path, e.g., ['orchestrator']
  * @returns {import('@logtape/logtape').Logger} LogTape logger instance
  */
 export function getLogger(subcategory = []) {
-  return logtapeGetLogger(['llm2deck', ...subcategory]);
+  return logtapeGetLogger(['distill', ...subcategory]);
 }
 
 /**

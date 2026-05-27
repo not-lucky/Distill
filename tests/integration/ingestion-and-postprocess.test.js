@@ -38,7 +38,7 @@ describe('Integration: real disk ingestion + real postProcess', () => {
   let docs;
 
   beforeEach(async () => {
-    root = await fsp.mkdtemp(path.join(os.tmpdir(), 'llm2deck-it-ingest-'));
+    root = await fsp.mkdtemp(path.join(os.tmpdir(), 'distill-it-ingest-'));
     await makeTree(root, {
       'subjects/react/basics/jsx.md': '# JSX\nWhat is JSX?',
       'subjects/react/basics/components.md':

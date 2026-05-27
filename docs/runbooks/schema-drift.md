@@ -12,13 +12,13 @@
 
 ```bash
 # 1. See the latest synthesis output for the failing question
-sqlite3 llm2deck.db \
+sqlite3 distill.db \
   "SELECT question_id, output FROM api_outputs
    WHERE stage = 'synthesis' AND run_id = '<run-id>'
    ORDER BY created_at DESC LIMIT 5;"
 
 # 2. See the latest enforcement attempt and its error
-sqlite3 llm2deck.db \
+sqlite3 distill.db \
   "SELECT question_id, error FROM steps
    WHERE stage = 'enforcement' AND status = 'failed'
    ORDER BY updated_at DESC LIMIT 5;"

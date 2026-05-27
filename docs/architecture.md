@@ -1,6 +1,6 @@
 # Architecture
 
-LLM2Deck is a hybrid Node.js (ESM) + Python flashcard generation pipeline.
+Distill is a hybrid Node.js (ESM) + Python flashcard generation pipeline.
 This page explains how the four stages fit together, where state lives,
 and how resumption works.
 
@@ -54,7 +54,7 @@ src/
 
 ## State and resumption
 
-The SQLite database (`llm2deck.db` by default) stores:
+The SQLite database (`distill.db` by default) stores:
 
 - `runs` — one row per `node src/cli.js run …` invocation
 - `steps` — one row per (run, question, stage)

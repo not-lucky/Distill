@@ -1,6 +1,6 @@
 # Getting started
 
-This page walks you through installing LLM2Deck, configuring providers and
+This page walks you through installing Distill, configuring providers and
 keys, and running the pipeline on a real subject.
 
 ## Prerequisites
@@ -16,15 +16,15 @@ keys, and running the pipeline on a real subject.
 Clone the repository and install the JavaScript and Python dependencies:
 
 ```bash
-git clone https://github.com/not-lucky/LLM2Deck.git
-cd LLM2Deck
+git clone https://github.com/not-lucky/Distill.git
+cd Distill
 npm install
 uv sync
 ```
 
 ## Configure
 
-LLM2Deck reads three YAML files from the project root:
+Distill reads three YAML files from the project root:
 
 | File           | Purpose                                   | Committed? |
 | -------------- | ----------------------------------------- | ---------- |

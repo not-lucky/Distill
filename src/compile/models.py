@@ -1,5 +1,5 @@
 """
-genanki Model construction for LLM2Deck.
+genanki Model construction for Distill.
 
 Defines the three card layouts (Basic, Cloze, MCQ) with deterministic IDs and
 the shared Catppuccin Mocha CSS theme. The Basic and Cloze templates use the
@@ -121,8 +121,8 @@ def create_models() -> tuple[genanki.Model, genanki.Model, genanki.Model]:
     with deterministic IDs and the Catppuccin Mocha CSS theme.
     """
     basic_model = genanki.Model(
-        generate_id("LLM2Deck Basic Model"),
-        "LLM2Deck Basic Model",
+        generate_id("Distill Basic Model"),
+        "Distill Basic Model",
         fields=[
             {"name": "Front"},
             {"name": "Back"},
@@ -138,8 +138,8 @@ def create_models() -> tuple[genanki.Model, genanki.Model, genanki.Model]:
     )
 
     cloze_model = genanki.Model(
-        generate_id("LLM2Deck Cloze Model"),
-        "LLM2Deck Cloze Model",
+        generate_id("Distill Cloze Model"),
+        "Distill Cloze Model",
         fields=[
             {"name": "Front"},
             {"name": "Explanation"},
@@ -155,8 +155,8 @@ def create_models() -> tuple[genanki.Model, genanki.Model, genanki.Model]:
     )
 
     mcq_model = genanki.Model(
-        generate_id("LLM2Deck MCQ Model"),
-        "LLM2Deck MCQ Model",
+        generate_id("Distill MCQ Model"),
+        "Distill MCQ Model",
         fields=[
             {"name": "Front"},
             {"name": "OptionA"},

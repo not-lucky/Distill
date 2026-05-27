@@ -1,28 +1,28 @@
 [project]
-name = "llm2deck"
+name = "distill"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "bleach>=6.3.0",
+    "bleach>=6.4.0",
     "genanki>=0.13.1",
     "markdown>=3.10.2",
 ]
 
 [dependency-groups]
 dev = [
-    "deptry==0.23.1",
-    "jsonschema>=4.23.0,<5",
-    "mkdocs>=1.6,<2",
-    "mkdocs-material>=9.5,<10",
-    "mkdocstrings>=0.27,<2",
-    "mkdocstrings-python>=1.10,<3",
-    "pymdown-extensions>=10.10,<11",
-    "pytest>=9.0.3",
-    "pytest-cov>=7.0.0",
-    "pytest-rerunfailures>=16.0.0",
-    "ruff>=0.15.15",
-    "ty==0.0.1a25",
-    "vulture==2.14",
+    "deptry>=0.25.1",
+    "jsonschema>=4.26.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings>=1.0.4",
+    "mkdocstrings-python>=2.0.5",
+    "pymdown-extensions>=10.21.3",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-rerunfailures>=16.3",
+    "ruff>=0.15.18",
+    "ty>=0.0.51",
+    "vulture>=2.16",
 ]
 
 # ---- pytest configuration (signals: test_performance_tracking, test_coverage_thresholds, flaky_test_detection) ----
@@ -56,7 +56,7 @@ unsupported-base = "warn"
 # Detects unused or missing Python dependencies.
 # `uv run deptry .` is wired into CI.
 [tool.deptry]
-known_first_party = ["llm2deck"]
+known_first_party = ["distill"]
 
 [tool.deptry.per_rule_ignores]
 DEP001 = ["compile"]

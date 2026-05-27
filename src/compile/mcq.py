@@ -1,5 +1,5 @@
 """
-MCQ (multiple-choice question) shuffling for LLM2Deck.
+MCQ (multiple-choice question) shuffling for Distill.
 
 The pipeline emits cards with the correct answer letter fixed (A/B/C/D); we
 shuffle the option order at compile time so the correct letter is not always

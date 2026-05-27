@@ -14,7 +14,7 @@ node src/cli.js cache stats           # should still work; uses no API
 node src/cli.js run <subject> -v      # verbose will surface 401/429
 
 # 2. Check the request cache hit rate
-sqlite3 llm2deck.db \
+sqlite3 distill.db \
   "SELECT provider, model, COUNT(*) AS hits
      FROM api_outputs
      WHERE created_at > datetime('now', '-1 day')
@@ -60,7 +60,7 @@ The most common root causes are:
 - A provider rolled out a new key format and old keys are no longer valid
 - The OpenAI SDK was upgraded to a version that requires a different env
   var name (the project uses the SDK's `apiKey` constructor argument
-  exclusively, so this should not affect LLM2Deck)
+  exclusively, so this should not affect Distill)
 
 ## Postmortem checklist
 

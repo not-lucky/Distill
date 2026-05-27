@@ -5,7 +5,7 @@ global:
   request_delay: 1.0 # Delay in seconds between starting requests
   default_timeout: null # Default network request timeout in seconds (null/0 = no client-side timeout)
   output_dir: './output' # Where final compiled .apkg files land
-  cache_db_path: './llm2deck.db' # SQLite database path for runs, steps, and caching
+  cache_db_path: './distill.db' # SQLite database path for runs, steps, and caching
   keys_file_path: './keys.yaml' # Path to keys file where all providers' keys are stored
   log_level: 'info' # Minimum log level: "debug", "info", "warning", "error", "fatal"
   log_dir: './logs' # Directory for rotating log files (e.g., "./logs")

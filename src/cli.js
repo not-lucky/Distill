@@ -19,8 +19,8 @@ async function exit(code) {
 const program = new Command();
 
 program
-  .name('llm2deck')
-  .description('LLM2Deck: LLM-powered flashcard generation pipeline')
+  .name('distill')
+  .description('Distill: LLM-powered flashcard generation pipeline')
   .version('1.0.0');
 
 program

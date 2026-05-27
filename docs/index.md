@@ -1,13 +1,13 @@
-# LLM2Deck
+# Distill
 
-> Orchestrated parallel flashcard generation for Anki. LLM2Deck turns study
+> Orchestrated parallel flashcard generation for Anki. Distill turns study
 > material (textbooks, codebases, LeetCode algorithms, language specs) into
 > high-density, pedagogically optimised Anki `.apkg` decks through a
 > four-stage pipeline.
 
 ## What is it?
 
-LLM2Deck avoids the failure mode of a single, expensive LLM prompt (low
+Distill avoids the failure mode of a single, expensive LLM prompt (low
 detail density, high syntax-error rate) by splitting the work into four
 stages:
 
@@ -49,6 +49,6 @@ stages:
 
 ## Project links
 
-- Source: <https://github.com/not-lucky/LLM2Deck>
-- Issues: <https://github.com/not-lucky/LLM2Deck/issues>
-- CI: <https://github.com/not-lucky/LLM2Deck/actions/workflows/ci.yml>
+- Source: <https://github.com/not-lucky/Distill>
+- Issues: <https://github.com/not-lucky/Distill/issues>
+- CI: <https://github.com/not-lucky/Distill/actions/workflows/ci.yml>

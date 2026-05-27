@@ -124,7 +124,7 @@ describe('Integration: orchestrator resume behavior (real DB + real runPipeline)
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    tempOutDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'llm2deck-resume-it-'));
+    tempOutDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'distill-resume-it-'));
   });
 
   it('first run processes all questions, second run with same id is a no-op', async () => {

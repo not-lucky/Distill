@@ -1,6 +1,6 @@
 # Development
 
-LLM2Deck uses a hybrid Node.js (ESM) + Python toolchain. This page lists
+Distill uses a hybrid Node.js (ESM) + Python toolchain. This page lists
 the day-to-day commands and the conventions enforced in CI.
 
 ## Commands

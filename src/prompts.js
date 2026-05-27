@@ -1,5 +1,5 @@
 /**
- * System prompt templates and selection helper for LLM2Deck stages.
+ * System prompt templates and selection helper for Distill stages.
  */
 
 export const DEFAULT_GENERATION = `You are a world-class educator and domain-specific technical expert.
