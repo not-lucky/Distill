@@ -11,13 +11,13 @@
 
 ```bash
 # 1. Confirm the database is broken
-sqlite3 llm2deck.db "PRAGMA integrity_check;"
+sqlite3 distill.db "PRAGMA integrity_check;"
 # Expected on a healthy DB: "ok"
 # Anything else means corruption.
 
 # 2. Check the file size and last-modified time
-ls -la llm2deck.db
-file llm2deck.db
+ls -la distill.db
+file distill.db
 ```
 
 ## Mitigation
@@ -34,10 +34,10 @@ material lives in your repository. The recovery path is:
    for forensics):
 
    ```bash
-   mv llm2deck.db llm2deck.db.corrupt.$(date +%Y%m%d-%H%M%S)
+   mv distill.db distill.db.corrupt.$(date +%Y%m%d-%H%M%S)
    ```
 
-3. **Restart the run from scratch.** LLM2Deck will re-create the
+3. **Restart the run from scratch.** Distill will re-create the
    database on the next `node src/cli.js run …`. Cache hits will be
    missed for the first run, so the next run will be slower (and
    slightly more expensive) but otherwise identical.
@@ -51,8 +51,8 @@ material lives in your repository. The recovery path is:
    port any rows that are missing:
 
    ```bash
-   sqlite3 llm2deck.db.corrupt.<timestamp> .dump > old.sql
-   sqlite3 llm2deck.db <new> old.sql   # manual reconciliation
+   sqlite3 distill.db.corrupt.<timestamp> .dump > old.sql
+   sqlite3 distill.db <new> old.sql   # manual reconciliation
    ```
 
    In most cases this step is unnecessary — the corruption is usually
@@ -66,20 +66,20 @@ The most common root causes are:
 - The process was killed mid-write (SIGKILL, OOM, power loss)
 - The disk ran out of space while SQLite was flushing the WAL
 - An external tool (e.g. `sqlite3 … VACUUM INTO`) was run against the
-  file while LLM2Deck was also writing to it
+  file while Distill was also writing to it
 
 ## Prevention
 
 - Use `PRAGMA journal_mode = WAL;` (set automatically by
   `src/database.js`) and `PRAGMA synchronous = NORMAL;` so that crashes
   never corrupt the main DB file.
-- Make sure `output_dir` and the directory containing `llm2deck.db` are
+- Make sure `output_dir` and the directory containing `distill.db` are
   on a filesystem with at least 1 GB of free headroom.
-- Do not run `sqlite3 llm2deck.db …` while a pipeline run is in flight.
+- Do not run `sqlite3 distill.db …` while a pipeline run is in flight.
 
 ## Postmortem checklist
 
-- [ ] A new, healthy `llm2deck.db` has been created
+- [ ] A new, healthy `distill.db` has been created
 - [ ] At least one end-to-end run has completed since the recovery
 - [ ] The corrupted file is archived (not deleted) until the incident
       is closed

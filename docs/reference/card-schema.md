@@ -1,6 +1,6 @@
 # Card schema reference
 
-LLM2Deck supports three card layouts (Basic, Cloze, MCQ) and eight
+Distill supports three card layouts (Basic, Cloze, MCQ) and eight
 pedagogical card types (Concept, Code, Procedure, Syntax, Behavior,
 Constraint, ErrorHandling, TradeOff). The schema is enforced by Zod in
 `src/pipeline/schemas/card-zod.js` and exported as a JSON Schema at
@@ -124,4 +124,4 @@ A single-topic JSON file consumed by `src/compile.py`:
 ```
 
 The full machine-readable contract lives at
-[`schemas/stage3-deck.schema.json`](https://github.com/not-lucky/LLM2Deck/blob/master/schemas/stage3-deck.schema.json).
+[`schemas/stage3-deck.schema.json`](https://github.com/not-lucky/Distill/blob/master/schemas/stage3-deck.schema.json).

@@ -1,4 +1,4 @@
-# Minimal LLM2Deck configuration.
+# Minimal Distill configuration.
 # Smallest viable setup: one provider, one model per stage, low concurrency.
 # Use as a starting point; see config.standard.yaml / config.full.yaml for more.
 
@@ -11,7 +11,7 @@ global:
   # their own `timeout` field to override the global value.
   default_timeout: null
   output_dir: './output'
-  cache_db_path: './llm2deck.db'
+  cache_db_path: './distill.db'
   keys_file_path: './keys.yaml'
   prompts_file_path: './prompts.yaml'
   log_level: 'info'

@@ -285,7 +285,7 @@ function ensureDatabaseInitialized(config) {
     getDb();
     return false;
   } catch (_err) {
-    const dbPath = config?.global?.cache_db_path || './llm2deck.db';
+    const dbPath = config?.global?.cache_db_path || './distill.db';
     initDatabase(dbPath);
     return true;
   }

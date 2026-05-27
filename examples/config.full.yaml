@@ -1,4 +1,4 @@
-# Full LLM2Deck configuration.
+# Full Distill configuration.
 # Exercises every documented option across global, providers, and pipeline.
 # Use as a reference; copy to ./config.yaml and trim to your needs.
 #
@@ -24,7 +24,7 @@ global:
   # Where final compiled .apkg and intermediate JSON files land.
   output_dir: './output'
   # SQLite cache for runs, steps, and LLM response cache.
-  cache_db_path: './llm2deck.db'
+  cache_db_path: './distill.db'
   # Where API keys live (kept separate from version control).
   keys_file_path: './keys.yaml'
   # Custom prompts + subject presets.

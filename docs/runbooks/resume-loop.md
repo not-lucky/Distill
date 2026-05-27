@@ -13,7 +13,7 @@
 
 ```bash
 # 1. Inspect the run's steps table
-sqlite3 llm2deck.db \
+sqlite3 distill.db \
   "SELECT question_id, stage, status, error
      FROM steps
      WHERE run_id = '<run-id>'
@@ -21,7 +21,7 @@ sqlite3 llm2deck.db \
      LIMIT 20;"
 
 # 2. Look for the failure pattern
-sqlite3 llm2deck.db \
+sqlite3 distill.db \
   "SELECT question_id, COUNT(*) AS attempts
      FROM steps
      WHERE run_id = '<run-id>' AND status = 'failed'
@@ -39,7 +39,7 @@ retry budget (default 3 for Stage 3), you are in a resume loop.
    will show it. Open the synthesis output for that question:
 
    ```bash
-   sqlite3 llm2deck.db \
+   sqlite3 distill.db \
      "SELECT output FROM api_outputs
         WHERE run_id = '<run-id>' AND question_id = '<offender>'
           AND stage = 'synthesis';" | tee /tmp/synthesis.txt

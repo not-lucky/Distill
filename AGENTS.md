@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-LLM2Deck is a hybrid Node.js (ESM) + Python flashcard generation pipeline. It converts study materials into Anki `.apkg` decks through a four-stage pipeline: parallel generation, synthesis, schema enforcement, and compilation.
+Distill is a hybrid Node.js (ESM) + Python flashcard generation pipeline. It converts study materials into Anki `.apkg` decks through a four-stage pipeline: parallel generation, synthesis, schema enforcement, and compilation.
 
 ## Stack
 

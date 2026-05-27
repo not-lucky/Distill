@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Schema publisher for LLM2Deck.
+ * Schema publisher for Distill.
  *
  * Reads the in-tree Zod definitions in src/pipeline/schemas/ and writes
  * machine-readable JSON Schema files under schemas/. The published files
@@ -28,8 +28,8 @@ void fileURLToPath;
 function buildDeckSchema(cardSchema) {
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
-    $id: 'https://github.com/not-lucky/LLM2Deck/schemas/stage3-deck.schema.json',
-    title: 'LLM2Deck Stage 3 deck contract',
+    $id: 'https://github.com/not-lucky/Distill/schemas/stage3-deck.schema.json',
+    title: 'Distill Stage 3 deck contract',
     description:
       'The deck-level JSON contract consumed by `src/compile.py` and produced ' +
       'by Stage 3 (schema enforcement). Accepts a single topic object or an ' +
@@ -53,8 +53,8 @@ function buildDeckSchema(cardSchema) {
 function buildCardSchema(cardSchema) {
   return {
     $schema: 'http://json-schema.org/draft-07/schema#',
-    $id: 'https://github.com/not-lucky/LLM2Deck/schemas/stage3-card.schema.json',
-    title: 'LLM2Deck Stage 3 single topic (cards array)',
+    $id: 'https://github.com/not-lucky/Distill/schemas/stage3-card.schema.json',
+    title: 'Distill Stage 3 single topic (cards array)',
     description:
       'A single topic with a cards array. This is the per-topic contract; ' +
       'the deck-level wrapper at stage3-deck.schema.json allows either a ' +

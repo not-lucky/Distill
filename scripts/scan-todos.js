@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Tech-debt scanner for LLM2Deck.
+ * Tech-debt scanner for Distill.
  *
  * Walks src/, tests/, and scripts/ looking for TODO/FIXME/XXX/HACK comments
  * and enforces the `TODO(<TICKET-ID>)` annotation format required by the

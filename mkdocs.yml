@@ -1,12 +1,12 @@
-# MkDocs configuration for LLM2Deck
+# MkDocs configuration for Distill
 # Builds the project's user/dev documentation site with Material for MkDocs.
 # The auto-generated reference (signals: automated_doc_generation) lives
 # under docs/api/ and is rendered by mkdocstrings from Python/JS source.
-site_name: LLM2Deck
+site_name: Distill
 site_description: Orchestrated parallel flashcard generation for Anki
-site_url: https://not-lucky.github.io/LLM2Deck/
-repo_url: https://github.com/not-lucky/LLM2Deck
-repo_name: not-lucky/LLM2Deck
+site_url: https://not-lucky.github.io/Distill/
+repo_url: https://github.com/not-lucky/Distill
+repo_name: not-lucky/Distill
 edit_uri: edit/master/docs/
 
 docs_dir: docs

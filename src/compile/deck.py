@@ -1,5 +1,5 @@
 """
-Top-level Anki deck compilation for LLM2Deck.
+Top-level Anki deck compilation for Distill.
 
 This module orchestrates loading, model creation, note generation, and
 writing the final `.apkg` package. It is intentionally thin: all logic lives

@@ -1,4 +1,4 @@
-# Full LLM2Deck keys file.
+# Full Distill keys file.
 # Mirrors every provider declared in examples/config.full.yaml.
 #
 # Format: provider_name -> string (single key) OR list of strings (round-robin

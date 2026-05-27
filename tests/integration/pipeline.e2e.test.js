@@ -27,7 +27,7 @@ const STAGE3_BASIC = {
     {
       card_format: 'Basic',
       card_type: 'Concept',
-      front: 'What is LLM2Deck?',
+      front: 'What is Distill?',
       back: 'A flashcard generation pipeline.',
       explanation: 'It uses LLMs to turn study material into Anki decks.',
       tags: ['e2e', 'concept'],
@@ -118,7 +118,7 @@ describe('Integration: end-to-end pipeline (real CLI + real Python compiler)', (
   });
 
   it('compiles a Basic card fixture into a valid .apkg package', async () => {
-    workdir = await fsp.mkdtemp(path.join(os.tmpdir(), 'llm2deck-e2e-basic-'));
+    workdir = await fsp.mkdtemp(path.join(os.tmpdir(), 'distill-e2e-basic-'));
     const jsonPath = await writeFixture(workdir, 'basic', STAGE3_BASIC);
     const apkgPath = path.join(workdir, 'basic.apkg');
 
@@ -142,7 +142,7 @@ describe('Integration: end-to-end pipeline (real CLI + real Python compiler)', (
   }, 60000);
 
   it('compiles a Cloze card fixture and produces a valid .apkg', async () => {
-    workdir = await fsp.mkdtemp(path.join(os.tmpdir(), 'llm2deck-e2e-cloze-'));
+    workdir = await fsp.mkdtemp(path.join(os.tmpdir(), 'distill-e2e-cloze-'));
     const jsonPath = await writeFixture(workdir, 'cloze', STAGE3_CLOZE);
     const apkgPath = path.join(workdir, 'cloze.apkg');
 
@@ -158,7 +158,7 @@ describe('Integration: end-to-end pipeline (real CLI + real Python compiler)', (
   }, 60000);
 
   it('compiles an MCQ card fixture and produces a valid .apkg', async () => {
-    workdir = await fsp.mkdtemp(path.join(os.tmpdir(), 'llm2deck-e2e-mcq-'));
+    workdir = await fsp.mkdtemp(path.join(os.tmpdir(), 'distill-e2e-mcq-'));
     const jsonPath = await writeFixture(workdir, 'mcq', STAGE3_MCQ);
     const apkgPath = path.join(workdir, 'mcq.apkg');
 
@@ -175,7 +175,7 @@ describe('Integration: end-to-end pipeline (real CLI + real Python compiler)', (
   }, 60000);
 
   it('fails with a non-zero exit code for malformed JSON input', async () => {
-    workdir = await fsp.mkdtemp(path.join(os.tmpdir(), 'llm2deck-e2e-bad-'));
+    workdir = await fsp.mkdtemp(path.join(os.tmpdir(), 'distill-e2e-bad-'));
     const jsonPath = path.join(workdir, 'bad.json');
     await fsp.writeFile(jsonPath, '{ not valid json', 'utf8');
     const apkgPath = path.join(workdir, 'bad.apkg');

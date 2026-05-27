@@ -13,7 +13,7 @@ npm-debug.log*
 
 # Application DB & Keys
 keys.yaml
-llm2deck.db
+distill.db
 .env
 .env.local
 

@@ -21,7 +21,7 @@ export async function cacheAction(action, options, exit) {
     await setupLogging({ level, logDir: config.global.log_dir || null });
 
     logger.debug`Starting cache command with action: ${action}`;
-    const dbPath = path.resolve(process.cwd(), config.global.cache_db_path || './llm2deck.db');
+    const dbPath = path.resolve(process.cwd(), config.global.cache_db_path || './distill.db');
     initDatabase(dbPath);
 
     if (action === 'clear') {

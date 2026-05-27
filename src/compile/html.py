@@ -1,5 +1,5 @@
 """
-Markdown rendering and HTML sanitization for LLM2Deck.
+Markdown rendering and HTML sanitization for Distill.
 
 Cards are authored in Markdown (with fenced code and tables), then converted to
 HTML and sanitized against a strict allow-list of tags and attributes before

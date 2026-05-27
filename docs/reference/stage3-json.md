@@ -1,6 +1,6 @@
 # Stage 3 JSON contract
 
-The Stage 3 JSON contract is the machine-readable shape that LLM2Deck's
+The Stage 3 JSON contract is the machine-readable shape that Distill's
 Stage 3 (schema enforcement) stage produces, and that Stage 4
 (`src/compile.py`) consumes to build the final `.apkg`. It is the only
 stable contract in the pipeline — Stages 1 and 2 produce free-form text.

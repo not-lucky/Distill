@@ -1,5 +1,5 @@
 {
-  "name": "llm2deck",
+  "name": "distill",
   "version": "1.0.0",
   "description": "",
   "main": "src/cli.js",
@@ -37,16 +37,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/not-lucky/LLM2Deck.git"
+    "url": "git+https://github.com/not-lucky/Distill.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "bugs": {
-    "url": "https://github.com/not-lucky/LLM2Deck/issues"
+    "url": "https://github.com/not-lucky/Distill/issues"
   },
-  "homepage": "https://github.com/not-lucky/LLM2Deck#readme",
+  "homepage": "https://github.com/not-lucky/Distill#readme",
   "dependencies": {
     "@logtape/file": "2.1.5",
     "@logtape/logtape": "2.1.5",

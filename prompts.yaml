@@ -1,4 +1,4 @@
-# Full LLM2Deck prompts file.
+# Full Distill prompts file.
 # All four `defaults` keys are populated with the VERBATIM hard-coded prompts
 # shipped in src/prompts.js (DEFAULT_GENERATION, DEFAULT_GENERATION_DOCUMENT,
 # DEFAULT_SYNTHESIS, DEFAULT_ENFORCEMENT). Two fully worked subjects demonstrate

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * AGENTS.md accuracy validator for LLM2Deck.
+ * AGENTS.md accuracy validator for Distill.
  *
  * Walks the AGENTS.md file and checks that:
  *  1. Every relative path it references exists in the repository.

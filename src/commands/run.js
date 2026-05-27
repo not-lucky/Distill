@@ -202,7 +202,7 @@ async function resolveQuestions({ sourcePath, options, prompts }) {
  * full pipeline. Closes the database on the way out (success or fail).
  */
 async function executePipeline({ config, keys, prompts, questions, subject, cardType, options }) {
-  const dbPath = path.resolve(process.cwd(), config.global.cache_db_path || './llm2deck.db');
+  const dbPath = path.resolve(process.cwd(), config.global.cache_db_path || './distill.db');
   initDatabase(dbPath);
 
   const result = await runPipeline({

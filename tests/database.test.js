@@ -21,7 +21,7 @@ import {
 } from '../src/database.js';
 
 const FIXTURES_DIR = path.resolve('./tests/fixtures_database');
-const TEST_DB_PATH = path.join(FIXTURES_DIR, 'test_llm2deck.db');
+const TEST_DB_PATH = path.join(FIXTURES_DIR, 'test_distill.db');
 
 describe('Database Module & SQLite Operations', () => {
   beforeAll(() => {

@@ -1,5 +1,5 @@
 """
-Tag construction for LLM2Deck notes.
+Tag construction for Distill notes.
 
 Builds the set of Anki tags for a note by combining:
 - topic::<normalized_topic_name>

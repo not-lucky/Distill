@@ -1,7 +1,7 @@
 # Runbooks
 
 This directory contains step-by-step playbooks for the most common
-incident scenarios in LLM2Deck. Each playbook follows the same structure:
+incident scenarios in Distill. Each playbook follows the same structure:
 
 1. **Symptoms** — what you'll see in the logs or the CLI output
 2. **Triage** — quick checks to confirm the diagnosis
@@ -22,7 +22,7 @@ log output — the goal is to grow this section over time.
 - [API key rotation (429 / auth errors)](api-key-rotation.md) — how to
   rotate keys in `keys.yaml` without losing resume state
 - [SQLite cache corruption (`database disk image is malformed`)](database-corruption.md) —
-  when `llm2deck.db` is unreadable and runs can't resume
+  when `distill.db` is unreadable and runs can't resume
 - [Resume loop (run never finishes)](resume-loop.md) — when `--resume`
   keeps picking up the same question
 
@@ -35,4 +35,4 @@ If none of the playbooks resolve the issue, gather:
 3. The exact `node src/cli.js …` command line, with redacted keys
 4. The output of `node src/cli.js cache stats`
 
-…and open an issue at <https://github.com/not-lucky/LLM2Deck/issues>.
+…and open an issue at <https://github.com/not-lucky/Distill/issues>.

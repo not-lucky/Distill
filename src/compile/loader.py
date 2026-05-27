@@ -41,5 +41,5 @@ def resolve_deck_name(topics: list, deck_name: str | None = None) -> str:
     if deck_name:
         return deck_name
     if len(topics) == 1 and isinstance(topics[0], dict):
-        return topics[0].get("topic", "LLM2Deck Compiled")
-    return "LLM2Deck Compiled"
+        return topics[0].get("topic", "Distill Compiled")
+    return "Distill Compiled"

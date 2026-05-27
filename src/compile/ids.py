@@ -1,9 +1,9 @@
 """
-Deterministic ID generation for LLM2Deck.
+Deterministic ID generation for Distill.
 
 Anki requires stable, positive 64-bit integer IDs for models and decks so that
 notes can be updated in place across runs. We derive them from MD5 hashes of
-human-readable names (e.g., "LLM2Deck Basic Model") and resolve collisions by
+human-readable names (e.g., "Distill Basic Model") and resolve collisions by
 incrementing until a free slot is found.
 """
 

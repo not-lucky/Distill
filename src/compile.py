@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Backward-compatible CLI entry point for LLM2Deck's Anki compiler.
+Backward-compatible CLI entry point for Distill's Anki compiler.
 
 The implementation has been split into the `src/compile/` package; this
 file exists solely so the historical subprocess invocation

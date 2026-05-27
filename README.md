@@ -1,6 +1,6 @@
-# LLM2Deck: Orchestrated Parallel Flashcard Generation
+# Distill: Orchestrated Parallel Flashcard Generation
 
-[![CI](https://github.com/not-lucky/LLM2Deck/actions/workflows/ci.yml/badge.svg)](https://github.com/not-lucky/LLM2Deck/actions/workflows/ci.yml)
+[![CI](https://github.com/not-lucky/Distill/actions/workflows/ci.yml/badge.svg)](https://github.com/not-lucky/Distill/actions/workflows/ci.yml)
 
 > A legacy v1 implementation is preserved in the `.archived/` directory for reference.
 
@@ -8,9 +8,9 @@
 
 ## General Overview
 
-**LLM2Deck** is an orchestrated system designed to convert complex technical study materials (codebases, Textbook chapters, LeetCode algorithms, language specifications) into high-quality, pedagogically optimized Anki flashcards (`.apkg`).
+**Distill** is an orchestrated system designed to convert complex technical study materials (codebases, Textbook chapters, LeetCode algorithms, language specifications) into high-quality, pedagogically optimized Anki flashcards (`.apkg`).
 
-Rather than relying on a single, expensive LLM prompt that suffers from low detail density and high syntax failures, LLM2Deck uses a **four-stage parallel execution and synthesis pipeline** built in Node.js (ESM), utilizing an SQLite database cache and spawning a Python script for final deck compilation.
+Rather than relying on a single, expensive LLM prompt that suffers from low detail density and high syntax failures, Distill uses a **four-stage parallel execution and synthesis pipeline** built in Node.js (ESM), utilizing an SQLite database cache and spawning a Python script for final deck compilation.
 
 ---
 
@@ -81,7 +81,7 @@ global:
   request_delay: 1.0 # Delay (seconds) between starting requests
   default_timeout: 500.0 # Default API request timeout (seconds)
   output_dir: './output' # Compiled Anki decks target directory
-  cache_db_path: './llm2deck.db' # Database cache path
+  cache_db_path: './distill.db' # Database cache path
   keys_file_path: './keys.yaml' # Path to API keys configuration
   prompts_file_path: './prompts.yaml' # Custom prompts configuration path
 
@@ -255,7 +255,7 @@ See [AGENTS.md](AGENTS.md) for the detailed architecture map and coding conventi
 
 ## How to Run
 
-LLM2Deck exposes a command-line interface:
+Distill exposes a command-line interface:
 
 ### Run Pipeline Generation
 
