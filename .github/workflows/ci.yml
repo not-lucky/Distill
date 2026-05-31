@@ -17,21 +17,21 @@ jobs:
         node-version: [20, 22]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v8
 
       - name: Install Node.js dependencies
         run: npm ci
@@ -46,7 +46,7 @@ jobs:
       - name: Validate AGENTS.md
         run: npm run agents:validate
         continue-on-error: true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: agents-md-validation-${{ matrix.node-version }}
@@ -108,7 +108,7 @@ jobs:
       - name: Run jscpd
         run: npx jscpd
         continue-on-error: true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: jscpd-report
@@ -118,22 +118,24 @@ jobs:
       - name: Scan TODO/FIXME markers
         run: npm run todo:scan
         continue-on-error: true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: todos-report
           path: reports/todos.md
 
       # ---- Large file detection (signal: large_file_detection) ----
+      # Walks src/ for *.js and *.py files that exceed a 500-line threshold.
+      # Replaces an earlier inline bash one-liner that matched the aggregate
+      # `wc -l` total line and always failed. Report is uploaded as a CI
+      # artifact so a clean run is also visible.
       - name: Detect oversized source files
-        run: |
-          set -e
-          # 500-line threshold for source files (excludes tests and vendored content)
-          OVER=$(find src -type f \( -name '*.js' -o -name '*.py' \) -size +0c -exec wc -l {} + | awk '$1 > 500 { print $0 }')
-          if [ -n "$OVER" ]; then
-            echo "::error::Files exceed 500 lines: $OVER"
-            exit 1
-          fi
+        run: npm run oversize
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: oversize-report
+          path: reports/oversize-files.md
 
       # ---- Tests ----
       # Signal: test_performance_tracking  — the verbose reporter surfaces test
@@ -149,7 +151,7 @@ jobs:
 
       - name: Upload JS coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: js-coverage-${{ matrix.node-version }}
           path: |
@@ -166,7 +168,7 @@ jobs:
 
       - name: Upload Python coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: py-coverage-${{ matrix.node-version }}
           path: coverage/coverage.xml
@@ -180,15 +182,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-and-test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v8
 
       - name: Install Python dependencies
         run: uv sync
@@ -198,7 +200,7 @@ jobs:
 
       - name: Upload built site
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-site
           path: site/

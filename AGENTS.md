@@ -41,6 +41,7 @@ npm run deadcode       # Run knip to detect unused exports/files
 npm run deps:check     # Run depcheck for unused JS deps
 npm run duplication    # Run jscpd to detect copy-paste code
 npm run todo:scan      # Scan for unannotated TODO/FIXME markers
+npm run oversize       # Fail if any src/ *.js or *.py file exceeds 500 lines
 npm run coverage       # JS test coverage report
 npm run schemas:export # Publish JSON Schema files under schemas/ from the in-tree Zod source
 npm run agents:validate # Fail if AGENTS.md references a missing path or unrecognised command
