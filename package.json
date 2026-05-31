@@ -19,6 +19,7 @@
     "deps:check": "depcheck",
     "duplication": "jscpd",
     "todo:scan": "node scripts/scan-todos.js",
+    "oversize": "node scripts/check-oversize.js",
     "prepare": "husky",
     "schemas:export": "node scripts/export-schemas.js",
     "agents:validate": "node scripts/validate-agents-md.js",

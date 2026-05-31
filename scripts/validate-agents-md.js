@@ -39,6 +39,7 @@ const NPM_SCRIPTS = new Set([
   'deps:check',
   'duplication',
   'todo:scan',
+  'oversize',
   'coverage',
 ]);
 
