@@ -1,10 +1,5 @@
 import { spawn } from 'child_process';
 
-export function sanitizeFilename(name) {
-  if (typeof name !== 'string') return '';
-  return name.replace(/[^a-zA-Z0-9-_]/g, '_');
-}
-
 export function spawnCompiler(jsonPath, outputPath, options = {}) {
   const timeoutMs = options.timeout !== undefined ? options.timeout : 60000;
 

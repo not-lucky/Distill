@@ -1,4 +1,5 @@
-import { resolveProviderModel, callLLM } from '../../llm/index.js';
+import { resolveProviderModel } from '../../llm/keys.js';
+import { callLLM } from '../../llm/caller.js';
 import { addPipelineStep, upsertQuestionEntry } from '../../database.js';
 import { resolvePrompts } from '../../prompts.js';
 import { getLogger } from '../../logger.js';

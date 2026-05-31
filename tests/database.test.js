@@ -499,3 +499,49 @@ describe('Database Module & SQLite Operations', () => {
     expect(questionIds).not.toContain('inner-q');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Behaviour-driven coverage for the previously-uncovered defensive branches
+// in initDatabase. These tests verify the *contract* (re-init is safe,
+// missing directories are created) rather than chasing line numbers.
+// ---------------------------------------------------------------------------
+
+describe('initDatabase defensive behaviour', () => {
+  afterEach(() => {
+    closeDatabase();
+  });
+
+  it('closes a stale connection before re-initialising on a different path', () => {
+    // Contract: calling initDatabase twice (e.g. orchestrator re-init
+    // after config change) must not leak the first connection. The second
+    // init returns a working DB and the first one's file is released.
+    const pathA = path.join(FIXTURES_DIR, 'reinit-a.db');
+    const pathB = path.join(FIXTURES_DIR, 'reinit-b.db');
+    initDatabase(pathA);
+    expect(getDb()).toBeDefined();
+
+    // Re-init on a different path; this exercises the stale-close branch.
+    initDatabase(pathB);
+    expect(getDb()).toBeDefined();
+
+    // Tidy up the second file.
+    if (fs.existsSync(pathB)) fs.unlinkSync(pathB);
+  });
+
+  it('creates the parent directory on demand when it does not yet exist', () => {
+    // Contract: callers can pass a nested path (e.g. ./var/cache/distill.db)
+    // and initDatabase will mkdir -p the missing parent rather than
+    // crashing with ENOENT.
+    const nested = path.join(FIXTURES_DIR, 'nested_subdir', 'deep.db');
+    expect(fs.existsSync(path.dirname(nested))).toBe(false);
+
+    initDatabase(nested);
+
+    expect(fs.existsSync(path.dirname(nested))).toBe(true);
+    expect(getDb()).toBeDefined();
+
+    // Tidy up.
+    closeDatabase();
+    fs.rmSync(path.dirname(nested), { recursive: true, force: true });
+  });
+});

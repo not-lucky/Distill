@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { loadConfig } from '../config.js';
 import { initDatabase, closeDatabase } from '../database.js';
-import { runPipeline } from '../orchestrator.js';
+import { runPipeline } from '../pipeline/orchestrator.js';
 import {
   ingestDirectory,
   loadPreset,
@@ -17,8 +17,11 @@ const logger = getLogger(['cli']);
 /**
  * Validates the CLI `--card-type` value and exits with a clear error
  * if the value is not one of the supported layouts.
+ *
+ * Exported for direct unit testing; the call site in runAction injects
+ * the real `exit` from cli.js.
  */
-async function assertValidCardType(cardType, exit) {
+export async function assertValidCardType(cardType, exit) {
   if (cardType === 'standard' || cardType === 'mcq') return;
   console.error(`Error: Invalid card-type "${cardType}". Must be 'standard' or 'mcq'.`);
   await exit(1);
@@ -29,7 +32,7 @@ async function assertValidCardType(cardType, exit) {
  * with the namespace-prefixed questionId, and copies the deckPath into
  * the topic and categoryName fields so downstream stages can use them.
  */
-function pushDocumentQuestion(questions, namespacePrefix, doc) {
+export function pushDocumentQuestion(questions, namespacePrefix, doc) {
   questions.push({
     questionId: `${namespacePrefix}::${doc.deckPath}`,
     topic: doc.deckPath,
@@ -43,7 +46,7 @@ function pushDocumentQuestion(questions, namespacePrefix, doc) {
  * list of question descriptors. Used for both the YAML preset path
  * and the prompts.yaml subject-preset topic path.
  */
-function buildTopicQuestions(presetName, categories) {
+export function buildTopicQuestions(presetName, categories) {
   const fmtName = formatNamespaceComponent(presetName);
   const questions = [];
   for (const cat of categories) {
@@ -67,7 +70,7 @@ function buildTopicQuestions(presetName, categories) {
  * document-mode preset and converts each result into a question
  * descriptor keyed by the preset's namespace.
  */
-async function buildDocumentQuestions(presetName, preset, resolvedPresetPath) {
+export async function buildDocumentQuestions(presetName, preset, resolvedPresetPath) {
   const fmtName = formatNamespaceComponent(presetName);
   const baseDir = resolvedPresetPath ? path.dirname(resolvedPresetPath) : process.cwd();
   const sources = {};
@@ -84,7 +87,7 @@ async function buildDocumentQuestions(presetName, preset, resolvedPresetPath) {
  * subject block) into question descriptors + a mode marker. Returns
  * null when the preset is empty or has no usable questions.
  */
-async function presetToQuestions(preset, presetName, resolvedPresetPath) {
+export async function presetToQuestions(preset, presetName, resolvedPresetPath) {
   if (!preset) return null;
   if (preset.mode === 'document') {
     return buildDocumentQuestions(presetName, preset, resolvedPresetPath);
@@ -101,7 +104,7 @@ async function presetToQuestions(preset, presetName, resolvedPresetPath) {
  * subjects map. Returns the original (case-preserved) key on match,
  * or null when no entry matches.
  */
-function findSubjectKey(subjects, subjectQuery) {
+export function findSubjectKey(subjects, subjectQuery) {
   if (!subjects) return null;
   const target = subjectQuery.toLowerCase();
   return Object.keys(subjects).find((k) => k.toLowerCase() === target) || null;
@@ -112,7 +115,7 @@ function findSubjectKey(subjects, subjectQuery) {
  * Both the document and topic branches live here; the caller is left
  * with a normalised { questions, activeSubject } pair.
  */
-async function loadFromSubjectPreset(sourcePath, subjectKey, subjectPreset) {
+export async function loadFromSubjectPreset(sourcePath, subjectKey, subjectPreset) {
   const activeSubject = subjectKey;
   if (subjectPreset && subjectPreset.mode === 'document') {
     if (!subjectPreset.files && !subjectPreset.folder) {
@@ -141,7 +144,7 @@ async function loadFromSubjectPreset(sourcePath, subjectKey, subjectPreset) {
  * Loads questions + active subject from a path on disk: a YAML preset,
  * a directory (recursive scan), or a non-YAML file (error).
  */
-async function loadFromPath(sourcePath, explicitSubject) {
+export async function loadFromPath(sourcePath, explicitSubject) {
   const resolvedPath = path.resolve(sourcePath);
   if (!fs.existsSync(resolvedPath)) {
     return {
@@ -189,7 +192,7 @@ async function loadFromPath(sourcePath, explicitSubject) {
  * Top-level: decides whether `sourcePath` is a known subject preset
  * or a filesystem path, then routes to the appropriate loader.
  */
-async function resolveQuestions({ sourcePath, options, prompts }) {
+export async function resolveQuestions({ sourcePath, options, prompts }) {
   const subjectKey = findSubjectKey(prompts?.subjects, sourcePath);
   if (subjectKey) {
     return loadFromSubjectPreset(sourcePath, subjectKey, prompts.subjects[subjectKey]);

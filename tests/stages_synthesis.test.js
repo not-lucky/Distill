@@ -6,15 +6,12 @@ import {
   createRun,
   clearCache,
 } from '../src/database.js';
-import {
-  createProviderClients,
-  createThrottledFetcher,
-  computeCacheKey,
-  computePromptHash,
-  writeCache,
-} from '../src/providers.js';
+import { createProviderClients } from '../src/llm/client.js';
+import { createThrottledFetcher } from '../src/llm/throttle.js';
+import { computeCacheKey, computePromptHash } from '../src/llm/cache.js';
+import { writeCache } from '../src/llm/cache-io.js';
 import { DEFAULT_SYNTHESIS, FORMAT_STANDARD } from '../src/prompts.js';
-import { runStage2 } from '../src/stages.js';
+import { runStage2 } from '../src/pipeline/stages/stage2-synthesis.js';
 
 vi.mock('openai', () => {
   const MockOpenAI = vi.fn().mockImplementation(function mockOpenAIConstructor(options) {

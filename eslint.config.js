@@ -26,7 +26,6 @@ export default [
         { type: 'pipeline', pattern: 'src/pipeline/**' },
         { type: 'llm', pattern: 'src/llm/**' },
         { type: 'core', pattern: 'src/*.{js,mjs,cjs}' },
-        { type: 'barrel', pattern: 'src/(stages|providers|orchestrator).js' },
       ],
     },
     rules: {
@@ -73,48 +72,29 @@ export default [
         {
           default: 'disallow',
           rules: [
-            // CLI entry may depend on commands and barrel re-exports
+            // CLI entry may depend on commands and core
             {
               from: { type: 'entry' },
-              allow: [
-                { to: { type: 'command' } },
-                { to: { type: 'barrel' } },
-                { to: { type: 'core' } },
-              ],
+              allow: [{ to: { type: 'command' } }, { to: { type: 'core' } }],
             },
-            // Commands orchestrate pipelines and may use core/barrel
+            // Commands orchestrate pipelines and may use core/llm
             {
               from: { type: 'command' },
               allow: [
                 { to: { type: 'pipeline' } },
                 { to: { type: 'core' } },
-                { to: { type: 'barrel' } },
                 { to: { type: 'llm' } },
               ],
             },
             // Pipeline stages can use LLM helpers and core utilities
             {
               from: { type: 'pipeline' },
-              allow: [
-                { to: { type: 'llm' } },
-                { to: { type: 'core' } },
-                { to: { type: 'barrel' } },
-              ],
+              allow: [{ to: { type: 'llm' } }, { to: { type: 'core' } }],
             },
             // LLM helpers depend on core only
             { from: { type: 'llm' }, allow: [{ to: { type: 'core' } }] },
             // Core utilities must remain framework-agnostic (no upward deps)
             { from: { type: 'core' }, allow: [{ to: { type: 'core' } }] },
-            // Barrel re-exports may only point into the rest of the graph
-            {
-              from: { type: 'barrel' },
-              allow: [
-                { to: { type: 'pipeline' } },
-                { to: { type: 'llm' } },
-                { to: { type: 'core' } },
-                { to: { type: 'command' } },
-              ],
-            },
           ],
         },
       ],

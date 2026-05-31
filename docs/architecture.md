@@ -57,8 +57,8 @@ src/
 The SQLite database (`distill.db` by default) stores:
 
 - `runs` — one row per `node src/cli.js run …` invocation
-- `steps` — one row per (run, question, stage)
-- `api_outputs` — one row per successful LLM call, keyed by the SHA256
+- `pipeline_steps` — one row per (run, question, stage)
+- `llm_cache` — one row per successful LLM call, keyed by the SHA256
   cache hash
 
 When you start a run, the orchestrator scans the database for already
@@ -81,10 +81,3 @@ Stage functions take a single `context` object created by
 `createPipelineContext()` (`src/context.js`) rather than 10+ positional
 parameters. The context carries the logger, LLM caller, database, prompts,
 and stage-specific configuration.
-
-## Barrel exports
-
-For backward compatibility, the project ships thin barrel files
-(`src/stages.js`, `src/providers.js`, `src/orchestrator.js`) that
-re-export from the new submodule paths. New code should import directly
-from the submodules.

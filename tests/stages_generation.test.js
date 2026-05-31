@@ -7,7 +7,8 @@ import {
   createRun,
   clearCache,
 } from '../src/database.js';
-import { createProviderClients, createThrottledFetcher } from '../src/providers.js';
+import { createProviderClients } from '../src/llm/client.js';
+import { createThrottledFetcher } from '../src/llm/throttle.js';
 import {
   resolvePrompts,
   DEFAULT_GENERATION,
@@ -15,7 +16,7 @@ import {
   DEFAULT_ENFORCEMENT,
   DEFAULT_GENERATION_DOCUMENT,
 } from '../src/prompts.js';
-import { runStage1 } from '../src/stages.js';
+import { runStage1 } from '../src/pipeline/stages/stage1-generation.js';
 import { loadConfig } from '../src/config.js';
 
 vi.mock('openai', () => {

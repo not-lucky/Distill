@@ -96,6 +96,33 @@ describe('Ingestion - File Reading Encodings', () => {
     expect(result).toBe('Hello éñ');
   });
 
+  it('returns null and warns when both UTF-8 and Latin-1 fail to decode the file', async () => {
+    // Contract: readFileWithFallback must not throw when neither decoder
+    // accepts the bytes; it logs and returns null so the caller can skip
+    // the file. We force both decoders to fail by stubbing TextDecoder.
+    const filePath = path.join(FIXTURES_DIR, 'undecodable.bin');
+    fs.writeFileSync(filePath, Buffer.from([0x00, 0x01, 0x02]));
+
+    const originalTextDecoder = globalThis.TextDecoder;
+    class FailingDecoder {
+      constructor(_encoding, _options) {
+        // Always throw on decode — simulates bytes that neither
+        // utf-8 nor windows-1252 can handle in fatal mode.
+      }
+      decode() {
+        throw new TypeError('decode failed');
+      }
+    }
+    globalThis.TextDecoder = FailingDecoder;
+
+    try {
+      const result = await readFileWithFallback(filePath);
+      expect(result).toBeNull();
+    } finally {
+      globalThis.TextDecoder = originalTextDecoder;
+    }
+  });
+
   it('should return null and warn when reading a non-existent file', async () => {
     const filePath = path.join(FIXTURES_DIR, 'does_not_exist.txt');
     const result = await readFileWithFallback(filePath);
@@ -190,6 +217,28 @@ describe('Ingestion - Directory Ingestion', () => {
     fs.writeFileSync(filePath, 'not a dir', 'utf8');
 
     await expect(ingestDirectory(filePath)).rejects.toThrow(/is not a directory/);
+  });
+
+  it('returns an empty list (instead of throwing) when the directory read fails', async () => {
+    // Contract: walkDirectory swallows errors from fs.readdir and
+    // returns an empty array, so a transient I/O failure mid-scan
+    // doesn't abort the entire ingestion. We simulate that by
+    // replacing fs.promises.readdir with a rejection for one call.
+    const isolatedDir = path.join(FIXTURES_DIR, 'disappearing');
+    fs.mkdirSync(isolatedDir, { recursive: true });
+    fs.writeFileSync(path.join(isolatedDir, 'a.txt'), 'a', 'utf8');
+
+    const originalReaddir = fs.promises.readdir;
+    fs.promises.readdir = vi.fn(async () => {
+      throw new Error('simulated EACCES');
+    });
+
+    try {
+      const result = await ingestDirectory(isolatedDir);
+      expect(result).toEqual([]);
+    } finally {
+      fs.promises.readdir = originalReaddir;
+    }
   });
 
   it('should handle multi-level nested folders correctly', async () => {

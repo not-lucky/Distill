@@ -13,3 +13,5 @@ uv.lock
 reports/
 tests/temp_out_*/
 schemas/
+tests/fixtures_database/
+tests/fixtures/

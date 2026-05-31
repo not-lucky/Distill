@@ -11,7 +11,9 @@ import {
   closeDatabase,
 } from '../database.js';
 import { createPipelineContext } from '../context.js';
-import { runStage1, runStage2, runStage3 } from './stages/index.js';
+import { runStage1 } from './stages/stage1-generation.js';
+import { runStage2 } from './stages/stage2-synthesis.js';
+import { runStage3 } from './stages/stage3-enforcement.js';
 import { spawnCompiler } from './compiler.js';
 import { cleanJsonOutput } from './validation.js';
 import { postProcess } from '../postProcess.js';
@@ -255,19 +257,19 @@ function getTopicConcurrency(config) {
 /**
  * Collapses per-question results into the (results, mergedTopics) outputs
  * that the rest of the pipeline consumes.
+ *
+ * Exported for direct unit testing.
  */
-function collectResults(taskResults) {
+export function collectResults(taskResults) {
   const results = [];
   const mergedTopics = [];
   for (const res of taskResults) {
-    /* v8 ignore next */
     if (!res) continue;
     if (res.failure || res.error) continue;
     if (res.dryRun) {
       results.push({ questionId: res.questionId, dryRun: true });
       continue;
     }
-    /* v8 ignore next 3 */
     if (res.postProcessedResult) {
       mergedTopics.push(res.postProcessedResult);
     }

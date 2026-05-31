@@ -1,0 +1,11 @@
+providers:
+  openai:
+    base_url: "x"
+pipeline:
+  generation:
+    models:
+      - "openai/gpt-4o"
+  synthesis:
+    model: "openai/gpt-4o"
+  schema_enforcement:
+    model: "openai/gpt-4o"
