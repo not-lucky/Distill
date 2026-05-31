@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { loadConfig } from '../config.js';
-import { spawnCompiler } from '../orchestrator.js';
+import { spawnCompiler } from '../pipeline/compiler.js';
 import { setupLogging, getLogger } from '../logger.js';
 import { resolveLogLevel } from './_log.js';
 
@@ -11,7 +11,7 @@ const logger = getLogger(['cli']);
  * Resolves the .apkg output path: an explicit `--output` flag wins,
  * otherwise the configured output_dir is used as the default location.
  */
-function resolveOutputPath(options, config) {
+export function resolveOutputPath(options, config) {
   if (options.output) return options.output;
   return path.resolve(process.cwd(), config?.global?.output_dir || './output');
 }

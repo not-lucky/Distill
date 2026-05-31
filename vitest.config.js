@@ -21,18 +21,9 @@ export default defineConfig({
       reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
       include: ['src/**/*.js'],
-      // Exclude entry-point/loader modules and barrels where coverage is
-      // tested through the underlying modules they re-export.
-      exclude: [
-        'src/cli.js',
-        'src/logger.js',
-        'src/stages.js',
-        'src/providers.js',
-        'src/orchestrator.js',
-        'src/pipeline/stages/index.js',
-        'src/pipeline/schemas/index.js',
-        'src/llm/index.js',
-      ],
+      // Exclude entry-point/loader modules where coverage is exercised
+      // through their callers rather than the modules themselves.
+      exclude: ['src/cli.js', 'src/logger.js'],
       thresholds: {
         lines: 80,
         branches: 70,

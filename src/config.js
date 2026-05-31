@@ -182,13 +182,10 @@ function loadPromptsFile(promptsPath, warnings) {
 export function loadConfig(configPath = './config.yaml', keysPath = null) {
   const warnings = [];
   const parsedConfig = readConfigFile(configPath, warnings);
-  /* v8 ignore next */
   const config = deepMerge(DEFAULTS, parsedConfig || {});
-  /* v8 ignore next */
   const resolvedKeysPath = keysPath || config.global.keys_file_path || './keys.yaml';
   const keys = readYamlObject(resolvedKeysPath, warnings, 'Keys file');
 
-  /* v8 ignore next */
   const activeProviders = extractActiveProviders(
     config.pipeline,
     Object.keys(config.providers || {}),
@@ -249,13 +246,14 @@ function visitValue(value, parentKey, declaredProviders, providers) {
  * Recursively traverses pipeline stages to find any provider prefixes in "provider/model" format.
  * Throws an error if any model is specified in an invalid format or uses an undeclared provider.
  *
+ * Exported for direct unit testing.
+ *
  * @param {Object} pipeline The pipeline configuration object.
  * @param {string[]} declaredProviders List of declared provider names from configuration.
  * @returns {Set<string>} Set of active provider names.
  */
-function extractActiveProviders(pipeline, declaredProviders = []) {
+export function extractActiveProviders(pipeline, declaredProviders = []) {
   const providers = new Set();
-  /* v8 ignore next */
   if (!pipeline || typeof pipeline !== 'object') return providers;
   visitValue(pipeline, null, declaredProviders, providers);
   return providers;

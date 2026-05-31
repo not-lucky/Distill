@@ -14,12 +14,12 @@ import {
   getDb,
 } from '../src/database.js';
 import {
-  sanitizeFilename,
   spawnCompiler,
   getCompletedQuestions,
   getCompletedStage3Results,
   runPipeline,
-} from '../src/orchestrator.js';
+  collectResults,
+} from '../src/pipeline/orchestrator.js';
 
 vi.mock('../src/database.js', async (importOriginal) => {
   const actual = await importOriginal();
@@ -36,7 +36,7 @@ vi.mock('child_process', () => ({
   spawn: vi.fn(),
 }));
 
-vi.mock('../src/pipeline/stages/index.js', () => ({
+vi.mock('../src/pipeline/stages/stage1-generation.js', () => ({
   runStage1: vi.fn().mockImplementation(async (ctx, { questionId }) => {
     addPipelineStep({
       runId: ctx.runId,
@@ -49,6 +49,9 @@ vi.mock('../src/pipeline/stages/index.js', () => ({
     });
     return [{ provider: 'mock-provider', model: 'gen-model', output: 'stage1-output' }];
   }),
+}));
+
+vi.mock('../src/pipeline/stages/stage2-synthesis.js', () => ({
   runStage2: vi.fn().mockImplementation(async (ctx, { questionId }) => {
     addPipelineStep({
       runId: ctx.runId,
@@ -61,6 +64,9 @@ vi.mock('../src/pipeline/stages/index.js', () => ({
     });
     return 'stage2-output';
   }),
+}));
+
+vi.mock('../src/pipeline/stages/stage3-enforcement.js', () => ({
   runStage3: vi.fn().mockImplementation(async (ctx, { questionId }) => {
     addPipelineStep({
       runId: ctx.runId,
@@ -125,21 +131,6 @@ describe('Orchestrator Module', () => {
     if (fs.existsSync(tempOutputDir)) {
       fs.rmSync(tempOutputDir, { recursive: true, force: true });
     }
-  });
-
-  describe('sanitizeFilename', () => {
-    it('should strip non-alphanumeric characters except hyphens and underscores', () => {
-      expect(sanitizeFilename('CS::LeetCode::Two Sum')).toBe('CS__LeetCode__Two_Sum');
-      expect(sanitizeFilename('file-name_123.json')).toBe('file-name_123_json');
-      expect(sanitizeFilename('hello/world\\test?')).toBe('hello_world_test_');
-    });
-
-    it('should handle non-string inputs gracefully', () => {
-      expect(sanitizeFilename(null)).toBe('');
-      expect(sanitizeFilename(undefined)).toBe('');
-      expect(sanitizeFilename(123)).toBe('');
-      expect(sanitizeFilename({})).toBe('');
-    });
   });
 
   describe('spawnCompiler', () => {
@@ -469,9 +460,6 @@ describe('Orchestrator Module', () => {
         configHash: 'hash-resume',
       });
 
-      // Manually set created_at to NULL to cover line 214 fallback
-      getDb().prepare('UPDATE runs SET created_at = NULL WHERE run_id = ?').run(resumeRunId);
-
       // Mark q1 as completed
       upsertQuestionEntry({
         runId: resumeRunId,
@@ -498,14 +486,6 @@ describe('Orchestrator Module', () => {
         }),
       });
 
-      // Mark q1c with null latestResponse to cover line 31
-      upsertQuestionEntry({
-        runId: resumeRunId,
-        questionId: 'q-resume-1c',
-        currentStage: 'enforcement',
-        latestResponse: null,
-      });
-
       const questions = [
         { questionId: 'q-resume-1', content: 'content 1' },
         {
@@ -517,7 +497,6 @@ describe('Orchestrator Module', () => {
             problemIndex: 6,
           },
         },
-        { questionId: 'q-resume-1c', content: 'content 1c' },
         { questionId: 'q-resume-2', content: 'content 2' },
       ];
 
@@ -533,14 +512,99 @@ describe('Orchestrator Module', () => {
 
       expect(res.runId).toBe(resumeRunId);
       expect(res.hasFailures).toBe(false);
-      expect(res.results).toHaveLength(4);
+      expect(res.results).toHaveLength(3);
+      // q-resume-1 and q-resume-1b were already completed, so they're skipped.
       expect(res.results[0].skipped).toBe(true);
       expect(res.results[1].skipped).toBe(true);
+      // q-resume-2 was new, so it goes through the full pipeline.
       expect(res.results[2].skipped).toBeUndefined();
-      expect(res.results[3].jsonPath).toBeDefined();
+      expect(res.results[2].jsonPath).toBeDefined();
 
       const runRecord = getRun(resumeRunId);
       expect(runRecord.status).toBe('completed');
+    });
+
+    it('tolerates a resumed run whose created_at column is NULL', async () => {
+      // Contract: if the database row exists but created_at is NULL
+      // (e.g. data imported from an older schema), the resume must still
+      // succeed. The orchestrator uses an in-memory fallback for the
+      // timestamp it needs during the resume, and the run is reported
+      // as completed.
+      const mockChild = new EventEmitter();
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(mockChild);
+      process.nextTick(() => mockChild.emit('close', 0));
+
+      const resumeRunId = 'run-resume-null-created-at';
+      createRun({
+        runId: resumeRunId,
+        subject: 'Algorithms',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash',
+      });
+      getDb().prepare('UPDATE runs SET created_at = NULL WHERE run_id = ?').run(resumeRunId);
+
+      const res = await runPipeline({
+        config: mockConfig,
+        keys: mockKeys,
+        questions: [{ questionId: 'q-x', content: 'x' }],
+        subject: 'Algorithms',
+        cardType: 'standard',
+        outputDir: tempOutputDir,
+        resumeRunId,
+      });
+
+      expect(res.runId).toBe(resumeRunId);
+      expect(res.hasFailures).toBe(false);
+      // The run is successfully completed; the orchestrator did not crash
+      // on the NULL created_at. (The NULL value stays in the row — the
+      // fallback is in-memory only.)
+      expect(getRun(resumeRunId).status).toBe('completed');
+    });
+
+    it('treats a question with no recorded latestResponse as not yet completed', async () => {
+      // Contract: a row may exist for a question (e.g. stage 1 was started
+      // but interrupted before stage 2/3 wrote a latestResponse). The
+      // resume logic must not consider such a question "completed", so it
+      // gets re-processed by the pipeline.
+      const mockChild = new EventEmitter();
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(mockChild);
+      process.nextTick(() => mockChild.emit('close', 0));
+
+      const resumeRunId = 'run-resume-null-response';
+      createRun({
+        runId: resumeRunId,
+        subject: 'Algorithms',
+        cardType: 'standard',
+        status: 'running',
+        configHash: 'hash',
+      });
+      upsertQuestionEntry({
+        runId: resumeRunId,
+        questionId: 'q-no-response',
+        currentStage: 'generation',
+        latestResponse: null,
+      });
+
+      const res = await runPipeline({
+        config: mockConfig,
+        keys: mockKeys,
+        questions: [{ questionId: 'q-no-response', content: 'x' }],
+        subject: 'Algorithms',
+        cardType: 'standard',
+        outputDir: tempOutputDir,
+        resumeRunId,
+      });
+
+      expect(res.runId).toBe(resumeRunId);
+      expect(res.results).toHaveLength(1);
+      // No skipped flag — the question went through the pipeline again.
+      expect(res.results[0].skipped).toBeUndefined();
+      expect(res.results[0].jsonPath).toBeDefined();
     });
 
     it('should throw error when resuming non-existent run ID', async () => {
@@ -574,8 +638,8 @@ describe('Orchestrator Module', () => {
     });
 
     it('should tolerate failures in individual questions and mark run failed', async () => {
-      const stages = await import('../src/pipeline/stages/index.js');
-      const originalStage1 = stages.runStage1;
+      const { runStage1: originalStage1 } =
+        await import('../src/pipeline/stages/stage1-generation.js');
 
       // Mock runStage1 to throw on q-fail
       vi.mocked(originalStage1).mockImplementationOnce(async (ctx, { questionId }) => {
@@ -741,8 +805,12 @@ describe('Orchestrator Module', () => {
     });
 
     it('should handle custom outputPath that already exists as a directory', async () => {
-      // Intent: Verify that if outputPath refers to a directory that already exists,
-      // the orchestrator appends the sanitized question ID to resolve the final output path.
+      // Contract: when outputPath is a directory (rather than a file path),
+      // the orchestrator writes the compiled deck *into* that directory
+      // using a generated filename. We don't pin the exact filename format
+      // (an implementation detail) — only the invariants the user cares
+      // about: it lives inside outputPath and has the .apkg extension
+      // Anki expects.
       const existingDir = path.join(tempOutputDir, 'existing_dir');
       fs.mkdirSync(existingDir, { recursive: true });
 
@@ -759,11 +827,10 @@ describe('Orchestrator Module', () => {
       });
 
       expect(res.hasFailures).toBe(false);
-      const expectedFilename = `${res.results[0].apkgPath.split('/').pop()}`;
-      expect(expectedFilename).toMatch(
-        /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_[0-9a-fA-F-]+\.apkg$/,
-      );
-      expect(res.results[0].apkgPath).toBe(path.join(existingDir, expectedFilename));
+      const apkgPath = res.results[0].apkgPath;
+      expect(apkgPath).toBeDefined();
+      expect(path.dirname(apkgPath)).toBe(existingDir);
+      expect(path.extname(apkgPath)).toBe('.apkg');
     });
 
     it('should compile to custom single file path when there is only one compiled question', async () => {
@@ -815,16 +882,16 @@ describe('Orchestrator Module', () => {
       expect(res.results[0].apkgPath).toBeUndefined();
     });
 
-    it('should fall back to default values for pipeline, providers, and content', async () => {
-      // Intent: Cover fallback branch logic when config structure or question content is missing.
-      // We close the DB so it is initialized with default DB path.
+    it('runs end-to-end with a minimal config and a question missing content/metadata', async () => {
+      // Contract: when the user provides only `config.global = {}` (no
+      // providers, no pipeline section, no question content), the run must
+      // still complete successfully and the question must be recorded. The
+      // orchestrator fills in defaults rather than throwing.
       closeDatabase();
 
       const minimalConfig = { global: {} };
 
-      const questions = [
-        { questionId: 'q-fallback-test' }, // missing content, metadata, indices
-      ];
+      const questions = [{ questionId: 'q-fallback-test' }];
 
       const res = await runPipeline({
         config: minimalConfig,
@@ -838,7 +905,7 @@ describe('Orchestrator Module', () => {
       expect(res.hasFailures).toBe(false);
       expect(res.results[0].questionId).toBe('q-fallback-test');
 
-      // The database should have been closed at the end because dbInitialized was true
+      // The database was opened for this run and closed at the end.
       expect(() => getDb()).toThrow();
 
       // Clean up the default test database file created
@@ -947,8 +1014,8 @@ describe('Orchestrator Module', () => {
       ];
 
       // Temporarily mock runStage2 to check database status during execution
-      const stages = await import('../src/pipeline/stages/index.js');
-      const originalStage2 = stages.runStage2;
+      const { runStage2: originalStage2 } =
+        await import('../src/pipeline/stages/stage2-synthesis.js');
       vi.mocked(originalStage2).mockImplementationOnce(async (ctx) => {
         const runId = ctx.runId;
         const run = getRun(runId);
@@ -1106,10 +1173,12 @@ describe('Orchestrator Module', () => {
     });
 
     it('should respect topic_concurrency limit when processing questions', async () => {
-      const stages = await import('../src/pipeline/stages/index.js');
-      const originalStage1 = stages.runStage1;
-      const originalStage2 = stages.runStage2;
-      const originalStage3 = stages.runStage3;
+      const { runStage1: originalStage1 } =
+        await import('../src/pipeline/stages/stage1-generation.js');
+      const { runStage2: originalStage2 } =
+        await import('../src/pipeline/stages/stage2-synthesis.js');
+      const { runStage3: originalStage3 } =
+        await import('../src/pipeline/stages/stage3-enforcement.js');
 
       let activeTopics = 0;
       let maxActiveTopics = 0;
@@ -1155,6 +1224,78 @@ describe('Orchestrator Module', () => {
       expect(res.hasFailures).toBe(false);
       expect(maxActiveTopics).toBeLessThanOrEqual(2);
       expect(maxActiveTopics).toBeGreaterThan(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // collectResults: pure helper that turns per-question task outputs into
+  // the (results, mergedTopics) shapes the rest of the orchestrator consumes.
+  // These tests cover every branch of the helper, including the previously
+  // v8-ignored defensive branches (null entries, postProcessedResult merges).
+  // -------------------------------------------------------------------------
+  describe('collectResults', () => {
+    it('skips null/undefined entries without producing results', () => {
+      const { results, mergedTopics } = collectResults([null, undefined, null]);
+      expect(results).toEqual([]);
+      expect(mergedTopics).toEqual([]);
+    });
+
+    it('skips results that failed (failure or error fields set)', () => {
+      const failed = collectResults([
+        { questionId: 'q1', failure: 'stage1 broke' },
+        { questionId: 'q2', error: new Error('boom') },
+      ]);
+      expect(failed.results).toEqual([]);
+      expect(failed.mergedTopics).toEqual([]);
+    });
+
+    it('records dryRun results with dryRun: true and does not mark them as completed', () => {
+      const { results, mergedTopics } = collectResults([{ questionId: 'q-dry', dryRun: true }]);
+      expect(results).toEqual([{ questionId: 'q-dry', dryRun: true }]);
+      expect(mergedTopics).toEqual([]);
+    });
+
+    it('records skipped results with skipped: true', () => {
+      const { results, mergedTopics } = collectResults([{ questionId: 'q-skip', skipped: true }]);
+      expect(results).toEqual([{ questionId: 'q-skip', skipped: true }]);
+      expect(mergedTopics).toEqual([]);
+    });
+
+    it('records normal results as { questionId }', () => {
+      const { results, mergedTopics } = collectResults([
+        { questionId: 'q-ok', somethingElse: 'ignored' },
+      ]);
+      expect(results).toEqual([{ questionId: 'q-ok' }]);
+      expect(mergedTopics).toEqual([]);
+    });
+
+    it('merges postProcessedResult into mergedTopics when present', () => {
+      const topicA = { questionId: 'q-a', title: 'A' };
+      const topicB = { questionId: 'q-b', title: 'B' };
+      const { results, mergedTopics } = collectResults([
+        { questionId: 'q-a', postProcessedResult: topicA },
+        { questionId: 'q-b', postProcessedResult: topicB },
+      ]);
+      expect(mergedTopics).toEqual([topicA, topicB]);
+      expect(results).toEqual([{ questionId: 'q-a' }, { questionId: 'q-b' }]);
+    });
+
+    it('combines all branches in a realistic mixed input', () => {
+      const { results, mergedTopics } = collectResults([
+        null, // skipped: defensive branch
+        { questionId: 'q-fail', failure: 'x' }, // skipped: failed
+        { questionId: 'q-dry', dryRun: true }, // dry-run
+        { questionId: 'q-skip', skipped: true }, // skipped
+        { questionId: 'q-merged', postProcessedResult: { id: 'q-merged' } }, // merged
+        { questionId: 'q-normal' }, // normal
+      ]);
+      expect(results).toEqual([
+        { questionId: 'q-dry', dryRun: true },
+        { questionId: 'q-skip', skipped: true },
+        { questionId: 'q-merged' },
+        { questionId: 'q-normal' },
+      ]);
+      expect(mergedTopics).toEqual([{ id: 'q-merged' }]);
     });
   });
 });

@@ -22,7 +22,7 @@ import {
   getRun,
   upsertQuestionEntry,
 } from '../../src/database.js';
-import { runPipeline } from '../../src/orchestrator.js';
+import { runPipeline } from '../../src/pipeline/orchestrator.js';
 
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('child_process', () => ({
 // This is the only mock: we don't want to call real LLMs in tests. The rest
 // of the pipeline (DB, postProcess, writeAndCompileOutput, getCompleted*
 // helpers) runs un-mocked and is what this integration test exercises.
-vi.mock('../../src/pipeline/stages/index.js', async (importOriginal) => {
+vi.mock('../../src/pipeline/stages/stage1-generation.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
@@ -41,7 +41,19 @@ vi.mock('../../src/pipeline/stages/index.js', async (importOriginal) => {
       .mockImplementation(async () => [
         { provider: 'mock', model: 'model-a', output: 'stage 1 output' },
       ]),
+  };
+});
+vi.mock('../../src/pipeline/stages/stage2-synthesis.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
     runStage2: vi.fn().mockImplementation(async () => 'synthesis text'),
+  };
+});
+vi.mock('../../src/pipeline/stages/stage3-enforcement.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
     runStage3: vi.fn().mockImplementation(async (context, { questionId }) => {
       // Persist the enforcement row so the integration test can verify
       // the orchestrator's resume path queries completed questions.
@@ -274,8 +286,9 @@ describe('Integration: orchestrator resume behavior (real DB + real runPipeline)
 
   it('handles a stage 3 throw in a single question without losing sibling progress', async () => {
     // Replace the runStage3 mock with a conditional that fails for one qid
-    const stages = await import('../../src/pipeline/stages/index.js');
-    vi.mocked(stages.runStage3).mockImplementation(async (_context, { questionId }) => {
+    const { runStage3: mockedRunStage3 } =
+      await import('../../src/pipeline/stages/stage3-enforcement.js');
+    vi.mocked(mockedRunStage3).mockImplementation(async (_context, { questionId }) => {
       if (questionId === 'q-bad') {
         throw new Error('synthetic stage 3 failure');
       }

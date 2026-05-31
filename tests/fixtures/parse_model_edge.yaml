@@ -1,0 +1,11 @@
+providers:
+  openai:
+    base_url: "https://api.openai.com/v1"
+pipeline:
+  generation:
+    models:
+      - "openai/"
+  synthesis:
+    model: "openai/gpt-4o"
+  schema_enforcement:
+    model: "openai/gpt-4o"

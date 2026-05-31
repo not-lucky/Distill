@@ -1,14 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "src/commands/run.js",
-    "src/commands/compile.js",
-    "src/commands/cache.js",
-    "src/providers.js",
-    "src/stages.js",
-    "src/orchestrator.js",
-    "src/llm/index.js"
-  ],
+  "entry": ["src/commands/run.js", "src/commands/compile.js", "src/commands/cache.js"],
   "project": ["src/**/*.{js,mjs,cjs}", "scripts/**/*.{js,mjs,cjs}"],
   "ignoreBinaries": ["uv"]
 }

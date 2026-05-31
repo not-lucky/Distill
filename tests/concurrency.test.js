@@ -9,9 +9,10 @@ import {
   createRun,
   upsertQuestionEntry,
 } from '../src/database.js';
-import { createThrottledFetcher, createProviderClients } from '../src/providers.js';
-import { runStage1 } from '../src/pipeline/stages/index.js';
-import { runPipeline } from '../src/orchestrator.js';
+import { createProviderClients } from '../src/llm/client.js';
+import { createThrottledFetcher } from '../src/llm/throttle.js';
+import { runPipeline } from '../src/pipeline/orchestrator.js';
+import { runStage1 } from '../src/pipeline/stages/stage1-generation.js';
 
 // Mock child_process spawn to simulate python compiler calls
 vi.mock('child_process', () => ({
@@ -20,7 +21,7 @@ vi.mock('child_process', () => ({
 
 // Mock stages modules to control execution flow in orchestrator tests.
 // Default mocked stages return canned responses, avoiding heavy LLM/schema checks.
-vi.mock('../src/pipeline/stages/index.js', async (importOriginal) => {
+vi.mock('../src/pipeline/stages/stage1-generation.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
@@ -29,7 +30,19 @@ vi.mock('../src/pipeline/stages/index.js', async (importOriginal) => {
       .mockImplementation(async () => [
         { provider: 'mock', model: 'model-a', output: 'stage 1 output' },
       ]),
+  };
+});
+vi.mock('../src/pipeline/stages/stage2-synthesis.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
     runStage2: vi.fn().mockImplementation(async () => 'stage 2 output'),
+  };
+});
+vi.mock('../src/pipeline/stages/stage3-enforcement.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
     runStage3: vi.fn().mockImplementation(async () => ({
       title: 'Title',
       topic: 'Topic',
@@ -186,7 +199,7 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       config.pipeline.generation.models = ['openai/gpt-4'];
 
       const { runStage1: originalRunStage1 } = await vi.importActual(
-        '../src/pipeline/stages/index.js',
+        '../src/pipeline/stages/stage1-generation.js',
       );
 
       // Test negative concurrency
@@ -337,7 +350,7 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       vi.spyOn(cerebrasClient.chat.completions, 'create').mockImplementation(mockCall);
 
       const { runStage1: originalRunStage1 } = await vi.importActual(
-        '../src/pipeline/stages/index.js',
+        '../src/pipeline/stages/stage1-generation.js',
       );
 
       await originalRunStage1(
@@ -397,7 +410,7 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       vi.spyOn(cerebrasClient.chat.completions, 'create').mockImplementation(mockCall);
 
       const { runStage1: originalRunStage1 } = await vi.importActual(
-        '../src/pipeline/stages/index.js',
+        '../src/pipeline/stages/stage1-generation.js',
       );
 
       await originalRunStage1(
@@ -447,7 +460,7 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       });
 
       const { runStage1: originalRunStage1 } = await vi.importActual(
-        '../src/pipeline/stages/index.js',
+        '../src/pipeline/stages/stage1-generation.js',
       );
 
       // Stage 1 throws the propagated error from the first failing model
@@ -478,9 +491,10 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
       // Mock runStage1 to resolve dynamically with artificial delay:
       // Topic 1 takes 100ms, Topic 2 takes 10ms, Topic 3 takes 50ms.
       // Therefore, they finish in the order: Topic 2 -> Topic 3 -> Topic 1.
-      const stages = await import('../src/pipeline/stages/index.js');
-      const originalStage1 = stages.runStage1;
-      const originalStage3 = stages.runStage3;
+      const { runStage1: originalStage1 } =
+        await import('../src/pipeline/stages/stage1-generation.js');
+      const { runStage3: originalStage3 } =
+        await import('../src/pipeline/stages/stage3-enforcement.js');
 
       vi.mocked(originalStage1).mockImplementation(async (_ctx, { questionId }) => {
         let delay = 10;
@@ -532,8 +546,8 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
     });
 
     it('should correctly release the topic slot and continue processing subsequent tasks if a topic pipeline execution throws an error', async () => {
-      const stages = await import('../src/pipeline/stages/index.js');
-      const originalStage1 = stages.runStage1;
+      const { runStage1: originalStage1 } =
+        await import('../src/pipeline/stages/stage1-generation.js');
 
       // Topic 1 throws an error
       vi.mocked(originalStage1).mockImplementationOnce(async () => {
@@ -595,8 +609,8 @@ describe('Pipeline Dual Concurrency & Edge Cases', () => {
         }),
       });
 
-      const stages = await import('../src/pipeline/stages/index.js');
-      const originalStage1 = stages.runStage1;
+      const { runStage1: originalStage1 } =
+        await import('../src/pipeline/stages/stage1-generation.js');
 
       const stage1Spy = vi
         .mocked(originalStage1)

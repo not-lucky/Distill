@@ -1,0 +1,18 @@
+# Distill API key template.
+#
+# Copy this file to keys.yaml (gitignored) and fill in real provider keys:
+#
+#   cp keys.yaml.example keys.yaml
+#
+# Each provider may declare a single key as a string, or an array of keys
+# for round-robin rotation. Providers declared in config.yaml's `providers:`
+# section that do not appear here will trigger a "missing API key" warning
+# at startup (except `ollama_local`, which talks to a local server and
+# does not require credentials).
+#
+# NEVER commit real keys. The values below are placeholder strings only.
+openai:
+  - 'sk-replace-me'
+
+cerebras:
+  - 'cber-replace-me'

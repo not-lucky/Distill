@@ -6,16 +6,17 @@ import {
   createRun,
   clearCache,
 } from '../src/database.js';
-import { createProviderClients, createThrottledFetcher } from '../src/providers.js';
+import { createProviderClients } from '../src/llm/client.js';
+import { createThrottledFetcher } from '../src/llm/throttle.js';
 import {
   cleanJsonOutput,
   parseStage2Questions,
   verifyContentLoss,
-  runStage3,
   removeNullValues,
-  CARD_ZOD_SCHEMA,
   normalizeJsonObj,
-} from '../src/stages.js';
+} from '../src/pipeline/validation.js';
+import { runStage3 } from '../src/pipeline/stages/stage3-enforcement.js';
+import { CARD_ZOD_SCHEMA } from '../src/pipeline/schemas/card-zod.js';
 
 vi.mock('openai', () => {
   const MockOpenAI = vi.fn().mockImplementation(function mockOpenAIConstructor(options) {

@@ -129,16 +129,11 @@ src/
     cache.js                  — Cache key hashing (SHA256)
     cache-io.js               — Cache read/write via database
     keys.js                   — API key rotation and model string parsing
-
-  stages.js                   — Barrel re-exports (backward compat)
-  providers.js                — Barrel re-exports (backward compat)
-  orchestrator.js             — Barrel re-exports (backward compat)
 ```
 
 ### Key Design Patterns
 
 - **PipelineContext**: Stage functions take `(context, { questionId, ... })` instead of 10+ individual parameters. Created by `createPipelineContext()` in `src/context.js`.
-- **Barrel exports**: `src/stages.js`, `src/providers.js`, and `src/orchestrator.js` re-export from new submodule paths for backward compatibility.
 
 ## Key Files
 

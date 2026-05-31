@@ -2,18 +2,12 @@ import { vi, describe, it, expect, beforeEach, beforeAll, afterAll } from 'vites
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { initDatabase, closeDatabase, clearCache, getCacheStats } from '../src/database.js';
-import {
-  computeCacheKey,
-  computePromptHash,
-  checkCache,
-  writeCache,
-  createProviderClients,
-  createThrottledFetcher,
-  resolveProviderModel,
-  resolveClientTimeoutSec,
-  callLLM,
-  _resetKeyCounters,
-} from '../src/providers.js';
+import { computeCacheKey, computePromptHash } from '../src/llm/cache.js';
+import { checkCache, writeCache } from '../src/llm/cache-io.js';
+import { createProviderClients, resolveClientTimeoutSec } from '../src/llm/client.js';
+import { createThrottledFetcher } from '../src/llm/throttle.js';
+import { resolveProviderModel, _resetKeyCounters } from '../src/llm/keys.js';
+import { callLLM } from '../src/llm/caller.js';
 
 vi.mock('openai', () => {
   const MockOpenAI = vi.fn().mockImplementation(function mockOpenAIConstructor(options) {
