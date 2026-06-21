@@ -5,7 +5,7 @@ keys, and running the pipeline on a real subject.
 
 ## Prerequisites
 
-- **Node.js** v20 or newer (the project uses native ESM)
+- **Node.js** v26 or newer (the project uses native ESM)
 - **Python** 3.12 or newer
 - **uv** for Python dependency management — <https://docs.astral.sh/uv/>
 - An OpenAI-compatible API endpoint and a valid key (or any combination of

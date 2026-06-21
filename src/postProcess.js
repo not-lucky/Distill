@@ -51,28 +51,33 @@ export function deduplicateCards(cards) {
   if (!Array.isArray(cards)) return [];
   const seen = new Map(); // key: normalized front -> value: { card, index }
 
-  for (let i = 0; i < cards.length; i++) {
-    const card = cards[i];
+  for (const [i, card] of cards.entries()) {
     if (!card) continue;
     const norm = normalizeQuestion(card.front);
     const explanationLength = typeof card.explanation === 'string' ? card.explanation.length : 0;
 
-    if (seen.has(norm)) {
-      const existing = seen.get(norm);
+    // Single-lookup get-or-insert: when the key is missing, the factory runs
+    // and installs { card, index: i }; on a hit we get the prior entry back.
+    // Because the loop index is strictly monotonic, entry.index !== i is a
+    // reliable "we just inserted" signal that lets us skip the length compare
+    // for fresh keys without an extra `.has()` probe.
+    const entry = seen.getOrInsertComputed(norm, () => ({ card, index: i }));
+    if (entry.index !== i) {
       const existingLength =
-        typeof existing.card.explanation === 'string' ? existing.card.explanation.length : 0;
+        typeof entry.card.explanation === 'string' ? entry.card.explanation.length : 0;
       // Discard shorter explanation. If new is longer, overwrite but preserve index.
       if (explanationLength > existingLength) {
-        seen.set(norm, { card, index: existing.index });
+        seen.set(norm, { card, index: entry.index });
       }
-    } else {
-      // First occurrence of this unique card: record it with index to preserve order.
-      seen.set(norm, { card, index: i });
     }
   }
 
   // Sort back to their original input sequence using the stored first-occurrence index.
-  const sortedKept = Array.from(seen.values()).sort((a, b) => a.index - b.index);
+  // `toSorted` returns a new array (non-mutating) and avoids the `Array.from(...).sort(...)` chain.
+  const sortedKept = seen
+    .values()
+    .toArray()
+    .toSorted((a, b) => a.index - b.index);
   return sortedKept.map((item) => ({ ...item.card }));
 }
 

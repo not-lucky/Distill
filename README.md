@@ -2,8 +2,6 @@
 
 [![CI](https://github.com/not-lucky/Distill/actions/workflows/ci.yml/badge.svg)](https://github.com/not-lucky/Distill/actions/workflows/ci.yml)
 
-> A legacy v1 implementation is preserved in the `.archived/` directory for reference.
-
 ---
 
 ## General Overview
@@ -46,7 +44,7 @@ Rather than relying on a single, expensive LLM prompt that suffers from low deta
 
 ## Installation & Setup
 
-Ensure you have Node.js (v20+) and Python 3.12+ installed.
+Ensure you have Node.js (v26+) and Python 3.12+ installed.
 
 ### 1. Install Node.js Dependencies
 

@@ -1,7 +1,8 @@
-import path from 'path';
+import path from 'node:path';
 import { loadConfig } from '../config.js';
 import { initDatabase, closeDatabase, clearCache, getCacheStats } from '../database.js';
 import { setupLogging, getLogger } from '../logger.js';
+import { resolveLogLevel } from './_log.js';
 
 const logger = getLogger(['cli']);
 
@@ -14,10 +15,7 @@ export async function cacheAction(action, options, exit) {
 
     const { config } = loadConfig();
 
-    let level = config.global.log_level || 'info';
-    if (options.verbose) level = 'debug';
-    else if (options.quiet) level = 'error';
-
+    const level = resolveLogLevel(options, config.global.log_level);
     await setupLogging({ level, logDir: config.global.log_dir || null });
 
     logger.debug`Starting cache command with action: ${action}`;

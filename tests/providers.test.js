@@ -9,6 +9,27 @@ import { createThrottledFetcher } from '../src/llm/throttle.js';
 import { resolveProviderModel, _resetKeyCounters } from '../src/llm/keys.js';
 import { callLLM } from '../src/llm/caller.js';
 
+// callLLM uses `node:timers/promises.setTimeout` for retry backoff. The
+// libuv-backed timers/promises timer is not intercepted by vitest's
+// `useFakeTimers` (which only fakes the JS-land global `setTimeout`), so
+// we route the setTimeout export through the global. This lets
+// `vi.useFakeTimers` advance the backoff sleeps and lets the
+// `vi.spyOn(global, 'setTimeout')` assertions observe the scheduled
+// delays.
+vi.mock('node:timers/promises', async () => {
+  const actual = await vi.importActual('node:timers/promises');
+  return {
+    ...actual,
+    // Forward all positional args (delay, value, options) to the global
+    // setTimeout so callers passing the optional value/options arguments
+    // don't silently lose them. The global setTimeout passes extra args to
+    // its callback, and Promise#resolve uses the first one as the
+    // fulfillment value (and ignores the rest), which matches
+    // node:timers/promises.setTimeout's contract.
+    setTimeout: (...args) => new Promise((resolve) => setTimeout(resolve, ...args)),
+  };
+});
+
 vi.mock('openai', () => {
   const MockOpenAI = vi.fn().mockImplementation(function mockOpenAIConstructor(options) {
     this.baseURL = options.baseURL;

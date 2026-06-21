@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 
 export function spawnCompiler(jsonPath, outputPath, options = {}) {
   const timeoutMs = options.timeout !== undefined ? options.timeout : 60000;

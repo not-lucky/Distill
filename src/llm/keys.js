@@ -22,7 +22,7 @@ export function getNextKey(provider, providerKeys) {
     return undefined;
   }
   if (Array.isArray(providerKeys) && providerKeys.length > 0) {
-    const counter = _keyCounters.get(provider) || 0;
+    const counter = _keyCounters.getOrInsert(provider, 0);
     const key = providerKeys[counter % providerKeys.length];
     _keyCounters.set(provider, counter + 1);
     return key;
