@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadConfig } from '../config.js';
+import { loadConfig, resolveDbPath, resolveOutputDir } from '../config.js';
 import { initDatabase, closeDatabase } from '../database.js';
 import { runPipeline } from '../pipeline/orchestrator.js';
 import {
@@ -205,8 +205,7 @@ export async function resolveQuestions({ sourcePath, options, prompts }) {
  * full pipeline. Closes the database on the way out (success or fail).
  */
 async function executePipeline({ config, keys, prompts, questions, subject, cardType, options }) {
-  const dbPath = path.resolve(process.cwd(), config.global.cache_db_path || './distill.db');
-  initDatabase(dbPath);
+  initDatabase(resolveDbPath(config));
 
   const result = await runPipeline({
     config,
@@ -218,7 +217,7 @@ async function executePipeline({ config, keys, prompts, questions, subject, card
     resumeRunId: options.resume || null,
     dryRun: !!options.dryRun,
     outputPath: null,
-    outputDir: path.resolve(process.cwd(), config.global.output_dir || './output'),
+    outputDir: resolveOutputDir(config),
   });
   return result;
 }

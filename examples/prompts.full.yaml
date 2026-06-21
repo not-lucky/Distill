@@ -76,9 +76,9 @@ defaults:
     - Enforce atomic structuring on consolidated cards, splitting combined items if the previous stage merged distinct facts.
     - OUTPUT ONLY the final consolidated list of flashcards. Do not include any introductory text, concluding remarks, explanations of changes, meta-commentary, or conversational filler (e.g., do not say "As a senior technical editor, I have consolidated..."). Start immediately with the first flashcard.
 
-  # Stage 4 base prompt. The code in src/stages.js:473 appends the target
-  # JSON schema and a "no markdown fences" instruction to this base string
-  # before sending it to the model. (See src/prompts.js:36.)
+  # Stage 4 base prompt. The code in src/pipeline/stages/stage3-enforcement.js
+  # appends the target JSON schema and a "no markdown fences" instruction to
+  # this base string before sending it to the model. (See src/prompts.js:36.)
   schema_enforcement: |-
     You are a schema compliance engine. You will be provided a plain text/markdown list of consolidated flashcards and a target JSON Schema. Your job is to parse and convert this list into a JSON object that strictly conforms to the schema, correcting any field names, types, array lengths, or formats to meet the schema requirements. Ensure no educational, contextual, or explanation details are modified or deleted.
 

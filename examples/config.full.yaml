@@ -4,9 +4,9 @@
 #
 # Code references:
 #   - Defaults applied:  src/config.js:4-13
-#   - Per-provider fields read: src/providers.js:104-105, 229
-#   - Pipeline stage keys read: src/stages.js:38, 136, 461
-#   - compiler_timeout read at: src/orchestrator.js:405
+#   - Per-provider fields read: src/llm/client.js:33-67
+#   - Pipeline stage keys read: src/pipeline/validation.js, src/pipeline/stages/stage{1,2,3}-*.js
+#   - compiler_timeout read at: src/pipeline/compiler.js:5
 
 global:
   # Max generation models running simultaneously per topic (0 = unlimited).
@@ -29,7 +29,7 @@ global:
   keys_file_path: './keys.yaml'
   # Custom prompts + subject presets.
   prompts_file_path: './prompts.yaml'
-  # Python compiler subprocess timeout in ms (src/orchestrator.js:405).
+  # Python compiler subprocess timeout in ms (src/pipeline/compiler.js:5).
   # When omitted, the spawnCompiler default of 60000 ms is used.
   compiler_timeout: 180000
   # Minimum log level: "debug", "info", "warning", "error", "fatal"
@@ -86,7 +86,7 @@ pipeline:
     use_completion_api: false
 
   # NOTE: A `translation` stage appears in README.md and the legacy v1 schema,
-  # but the current code (src/stages.js) implements only the three stages
+  # but the current code (src/pipeline/stages/) implements only the three stages
   # above. Uncommenting `translation` will trigger a "Undeclared provider" or
   # "Invalid model format" warning at config load time.
   #

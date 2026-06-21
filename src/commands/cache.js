@@ -1,5 +1,4 @@
-import path from 'node:path';
-import { loadConfig } from '../config.js';
+import { loadConfig, resolveDbPath } from '../config.js';
 import { initDatabase, closeDatabase, clearCache, getCacheStats } from '../database.js';
 import { setupLogging, getLogger } from '../logger.js';
 import { resolveLogLevel } from './_log.js';
@@ -19,8 +18,7 @@ export async function cacheAction(action, options, exit) {
     await setupLogging({ level, logDir: config.global.log_dir || null });
 
     logger.debug`Starting cache command with action: ${action}`;
-    const dbPath = path.resolve(process.cwd(), config.global.cache_db_path || './distill.db');
-    initDatabase(dbPath);
+    initDatabase(resolveDbPath(config));
 
     if (action === 'clear') {
       clearCache();

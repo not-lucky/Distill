@@ -8,30 +8,17 @@
  * exits non-zero if any unannotated markers are found.
  */
 
-import { readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join, relative, extname } from 'node:path';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { walk } from './_walk.js';
 
 const ROOT = process.cwd();
 const SCAN_DIRS = ['src', 'tests'];
 const SELF_FILE = 'scripts/scan-todos.js';
 const REPORT_PATH = join(ROOT, 'reports', 'todos.md');
+const EXTS = ['.js', '.mjs', '.cjs', '.py'];
 
 const PATTERN = /\b(TODO|FIXME|XXX|HACK)\b(\([^)]+\))?/g;
-
-function walk(dir) {
-  const out = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const st = statSync(full);
-    if (st.isDirectory()) {
-      if (entry === 'node_modules' || entry === '.venv' || entry === '__pycache__') continue;
-      out.push(...walk(full));
-    } else if (['.js', '.mjs', '.cjs', '.py'].includes(extname(entry))) {
-      out.push(full);
-    }
-  }
-  return out;
-}
 
 function scanFile(path) {
   const lines = readFileSync(path, 'utf8').split('\n');
@@ -58,7 +45,7 @@ function main() {
   const files = SCAN_DIRS.flatMap((d) => {
     const abs = join(ROOT, d);
     try {
-      return walk(abs);
+      return walk(abs, EXTS);
     } catch {
       return [];
     }
