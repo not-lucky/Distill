@@ -1,6 +1,6 @@
-import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import pLimit from 'p-limit';
 import {
   initDatabase,
@@ -147,13 +147,14 @@ function resolveApkgOutputPath(outputPath, outputDir, defaultApkgFilename) {
   if (!outputPath) {
     return path.join(outputDir, defaultApkgFilename);
   }
-  const looksLikeDirectory =
-    (fs.existsSync(outputPath) && fs.statSync(outputPath).isDirectory()) ||
-    !path.extname(outputPath);
+  // throwIfNoEntry: false folds the existsSync + statSync pair into a single
+  // syscall that returns undefined for a missing path instead of throwing.
+  const stats = fs.statSync(outputPath, { throwIfNoEntry: false });
+  const looksLikeDirectory = stats?.isDirectory() || !path.extname(outputPath);
   if (looksLikeDirectory) {
-    if (!fs.existsSync(outputPath)) {
-      fs.mkdirSync(outputPath, { recursive: true });
-    }
+    // fs.mkdir with { recursive: true } is idempotent, so we don't need to
+    // gate it behind a separate existsSync probe.
+    fs.mkdirSync(outputPath, { recursive: true });
     return path.join(outputPath, defaultApkgFilename);
   }
   return outputPath;
@@ -178,9 +179,9 @@ async function writeAndCompileOutput({
 }) {
   if (!mergedTopics.length) return false;
 
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
+  // fs.mkdir with { recursive: true } is idempotent, so we don't need a
+  // pre-flight existsSync guard.
+  fs.mkdirSync(outputDir, { recursive: true });
   const safeIsoDate = createdAtIso.replace(/[:.]/g, '-');
   const jsonPath = path.join(outputDir, `${safeIsoDate}_${runId}.json`);
   fs.writeFileSync(jsonPath, JSON.stringify(mergedTopics, null, 2), 'utf8');
@@ -218,25 +219,29 @@ function resolveRunState({ resumeRunId, config, subject, cardType, dryRun }) {
     if (!dryRun) updateRunStatus(resumeRunId, 'running');
     return {
       runId: resumeRunId,
-      createdAtIso: existingRun.created_at || new Date().toISOString(),
+      createdAtIso:
+        existingRun.created_at || Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
       completedQuestions: getCompletedQuestions(resumeRunId),
       completedStage3Results: getCompletedStage3Results(resumeRunId),
     };
   }
 
   const runId = crypto.randomUUID();
-  const createdAtIso = new Date().toISOString();
+  const createdAtIso = Temporal.Now.instant().toString({ fractionalSecondDigits: 3 });
   if (!dryRun) {
     const pipelineConfig = config.pipeline || {};
     const providersConfig = config.providers || {};
-    const hash = crypto.createHash('sha256');
-    hash.update(JSON.stringify({ pipeline: pipelineConfig, providers: providersConfig }));
+    const configHash = crypto.hash(
+      'sha256',
+      JSON.stringify({ pipeline: pipelineConfig, providers: providersConfig }),
+      'hex',
+    );
     createRun({
       runId,
       subject,
       cardType,
       status: 'running',
-      configHash: hash.digest('hex'),
+      configHash,
       createdAt: createdAtIso,
     });
   }

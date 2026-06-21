@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import pLimit from 'p-limit';
 
 export function createThrottledFetcher(config) {
@@ -19,9 +20,7 @@ export function createThrottledFetcher(config) {
 
       if (diff > 0) {
         lastStartTime = nextStart;
-        await new Promise((resolve) => {
-          setTimeout(resolve, diff);
-        });
+        await sleep(diff);
       } else {
         lastStartTime = now;
       }

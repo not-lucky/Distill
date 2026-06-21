@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { getLogger } from './logger.js';
 
 const logger = getLogger(['database']);
@@ -46,11 +46,11 @@ export function initDatabase(dbPath) {
     dbConn = null;
   }
 
-  // Ensure the directory exists
-  const dir = path.dirname(dbPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  // Ensure the directory exists. fs.mkdir with { recursive: true } is
+  // idempotent, so this is safe whether or not the directory already exists
+  // and avoids the TOCTOU race that an `if (!existsSync) mkdirSync` pair would
+  // create.
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
   dbConn = new Database(dbPath);
 
@@ -145,7 +145,7 @@ export function closeDatabase() {
 export function createRun({ runId, subject, cardType, status, configHash, createdAt }) {
   logger.debug`Creating run record in DB: ${runId} (subject: ${subject}, cardType: ${cardType})`;
   const db = getDb();
-  const dateVal = createdAt || new Date().toISOString();
+  const dateVal = createdAt || Temporal.Now.instant().toString({ fractionalSecondDigits: 3 });
   const stmt = db.prepare(`
     INSERT INTO runs (run_id, created_at, subject, card_type, status, config_hash)
     VALUES (?, ?, ?, ?, ?, ?)

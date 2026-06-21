@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadConfig } from '../config.js';
 import { spawnCompiler } from '../pipeline/compiler.js';
 import { setupLogging, getLogger } from '../logger.js';

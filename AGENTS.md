@@ -6,7 +6,7 @@ Distill is a hybrid Node.js (ESM) + Python flashcard generation pipeline. It con
 
 ## Stack
 
-- **Runtime**: Node.js v20+ (ESM), Python 3.12+
+- **Runtime**: Node.js v26+ (ESM), Python 3.12+
 - **JS Testing**: Vitest (`npx vitest run`) — ~250 tests, 80%+ statement coverage
 - **N+1 Detection**: `tests/n_plus_one.test.js` instruments better-sqlite3
   prepared-statement calls to assert bulk read paths stay O(1) per query

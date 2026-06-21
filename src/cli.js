@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from 'node:url';
 import { dispose } from './logger.js';
 import { runAction } from './commands/run.js';
 import { compileAction } from './commands/compile.js';

@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { zodTextFormat, zodResponseFormat } from 'openai/helpers/zod';
 import { getLogger } from '../logger.js';
 import { isValidTimeout } from '../config.js';
@@ -123,12 +124,6 @@ function isRetryableError(error) {
  */
 function computeBackoffDelay(attempt) {
   return Math.min(BASE_RETRY_DELAY_MS * 2 ** attempt, MAX_RETRY_DELAY_MS);
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
 
 export async function callLLM({
