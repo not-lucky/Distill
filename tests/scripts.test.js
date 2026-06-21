@@ -152,6 +152,8 @@ describe('scripts/check-oversize.js', () => {
         );
       const patchedPath = join(tmp, 'check-oversize.js');
       writeFileSync(patchedPath, patched);
+      // copy the shared walker alongside so the relocated script can resolve it
+      writeFileSync(join(tmp, '_walk.js'), readFileSync(join(SCRIPTS, '_walk.js'), 'utf8'));
 
       let exitCode = 0;
       let stderr = '';

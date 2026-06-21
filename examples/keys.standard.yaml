@@ -2,8 +2,8 @@
 # Mirrors providers declared in examples/config.standard.yaml.
 #
 # Format: provider_name -> string (single key) OR list of strings (round-robin
-# rotation in src/providers.js:281-283). The first key in a list is also used
-# to initialize the OpenAI client (src/providers.js:108-117).
+# rotation in src/llm/keys.js:27-37). The first key in a list is also used
+# to initialize the OpenAI client (src/llm/client.js:36-49).
 #
 # `ollama_local` is exempted from key validation in src/config.js:83, so its
 # value may be omitted entirely or set to a placeholder.
@@ -15,6 +15,6 @@ openai:
 cerebras:
   - 'csk-replace-with-your-cerebras-key'
 # Ollama runs locally; the literal string "ollama" is hard-coded in
-# src/providers.js:108 as a default placeholder.
+# src/llm/client.js:37 as a default placeholder.
 ollama_local:
   - 'ollama'

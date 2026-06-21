@@ -11,6 +11,7 @@ import {
   closeDatabase,
 } from '../database.js';
 import { createPipelineContext } from '../context.js';
+import { resolveDbPath } from '../config.js';
 import { runStage1 } from './stages/stage1-generation.js';
 import { runStage2 } from './stages/stage2-synthesis.js';
 import { runStage3 } from './stages/stage3-enforcement.js';
@@ -292,8 +293,7 @@ function ensureDatabaseInitialized(config) {
     getDb();
     return false;
   } catch (_err) {
-    const dbPath = config?.global?.cache_db_path || './distill.db';
-    initDatabase(dbPath);
+    initDatabase(resolveDbPath(config));
     return true;
   }
 }

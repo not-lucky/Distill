@@ -14,29 +14,15 @@
  * Run with:  node scripts/check-oversize.js
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { extname, join, relative } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { walk } from './_walk.js';
 
 const ROOT = process.cwd();
 const SCAN_DIR = join(ROOT, 'src');
 const REPORT_PATH = join(ROOT, 'reports', 'oversize-files.md');
 const THRESHOLD = 500;
-const EXTS = new Set(['.js', '.py']);
-
-function walk(dir) {
-  const out = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const st = statSync(full);
-    if (st.isDirectory()) {
-      if (entry === 'node_modules' || entry === '.venv' || entry === '__pycache__') continue;
-      out.push(...walk(full));
-    } else if (EXTS.has(extname(entry))) {
-      out.push(full);
-    }
-  }
-  return out;
-}
+const EXTS = ['.js', '.py'];
 
 function countLines(path) {
   // Match `wc -l` semantics: number of newline characters.
@@ -51,7 +37,7 @@ function main() {
     process.exit(1);
   }
 
-  const files = walk(SCAN_DIR);
+  const files = walk(SCAN_DIR, EXTS);
   const offenders = [];
   for (const file of files) {
     const lines = countLines(file);

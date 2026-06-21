@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import yaml from 'js-yaml';
 import { getLogger } from './logger.js';
 
@@ -298,3 +299,24 @@ export function deepMerge(target, source) {
 }
 
 export { isValidTimeout };
+
+/**
+ * Resolves the absolute path of the SQLite cache file used by the
+ * pipeline. Pulls the configured value (or the DEFAULTS fallback) and
+ * anchors it to `process.cwd()` so every caller — CLI commands and the
+ * pipeline orchestrator — agrees on the same on-disk location.
+ */
+export function resolveDbPath(config) {
+  const configured = config?.global?.cache_db_path || DEFAULTS.global.cache_db_path;
+  return path.resolve(process.cwd(), configured);
+}
+
+/**
+ * Resolves the absolute path of the directory where compiled .apkg
+ * files and intermediate JSON are written. Same cwd-anchoring
+ * rationale as `resolveDbPath`.
+ */
+export function resolveOutputDir(config) {
+  const configured = config?.global?.output_dir || DEFAULTS.global.output_dir;
+  return path.resolve(process.cwd(), configured);
+}

@@ -2,7 +2,7 @@
 # Mirrors every provider declared in examples/config.full.yaml.
 #
 # Format: provider_name -> string (single key) OR list of strings (round-robin
-# rotation in src/providers.js:281-283).
+# rotation in src/llm/keys.js:27-37).
 #
 # Rules enforced at config load time (src/config.js:82-97):
 #   - Every provider referenced in `pipeline.*` must have at least one
